@@ -224,6 +224,7 @@ class ExtractSubprocessor(Subprocessor):
                         rect = np.array(rect)
 
                         if self.face_type == FaceType.MARK_ONLY:
+                            image_to_face_mat = None
                             face_image = image
                             face_image_landmarks = image_landmarks
                         else:
@@ -239,8 +240,8 @@ class ExtractSubprocessor(Subprocessor):
                             if landmarks_area > 4*rect_area: #get rid of faces which umeyama-landmark-area > 4*detector-rect-area
                                 continue
 
-                        if self.debug_dir is not None:
-                            LandmarksProcessor.draw_rect_landmarks (debug_image, rect, image_landmarks, self.image_size, self.face_type, transparent_mask=True)
+                            if self.debug_dir is not None:
+                                LandmarksProcessor.draw_rect_landmarks (debug_image, rect, image_landmarks, self.image_size, self.face_type, transparent_mask=True)
 
                         if src_dflimg is not None and filename_path.suffix == '.jpg':
                             #if extracting from dflimg and jpg copy it in order not to lose quality
@@ -797,6 +798,7 @@ def main(input_dir,
 
     input_path = Path(input_dir)
     output_path = Path(output_dir)
+    face_type='mark_only'
     face_type = FaceType.fromString(face_type)
 
     multi_gpu = device_args.get('multi_gpu', False)

@@ -188,7 +188,10 @@ class SampleProcessor(object):
 
                     img = imagelib.warp_by_params (params, img, warp, transform, flip, True)
                     if mask is not None:
-                        mask = imagelib.warp_by_params (params, mask, warp, transform, flip, False)[...,np.newaxis]
+                        mask = imagelib.warp_by_params (params, mask, warp, transform, flip, False)
+                        if len(mask.shape) == 2:
+                            mask = mask[...,np.newaxis]
+
                         img = np.concatenate( (img, mask ), -1 )
 
                     cached_images[img_type] = img
