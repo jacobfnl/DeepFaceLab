@@ -117,9 +117,9 @@ class AVATARModel(ModelBase):
                     mean_t, logvar_t = input
                     #import code
                     #code.interact(local=dict(globals(), **locals()))    
-                    #return beta * K.sum( -0.5*(1 + logvar_t - K.exp(logvar_t) - K.square(mean_t)), axis=1 )
+                    return beta * K.sum( -0.5*(1 + logvar_t - K.exp(logvar_t) - K.square(mean_t)), axis=1 )
                
-                    return beta * K.mean ( K.sum( -0.5*(1 + logvar_t - K.exp(logvar_t) - K.square(mean_t)), axis=1 ), axis=0, keepdims=True )
+                    #return beta * K.mean ( K.sum( -0.5*(1 + logvar_t - K.exp(logvar_t) - K.square(mean_t)), axis=1 ), axis=0, keepdims=True )
                 return func
                 
             #loss_A = DLoss(fake_A0_B0_d_ones, fake_A0_B0_d)  + \
