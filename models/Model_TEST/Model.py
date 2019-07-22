@@ -36,6 +36,7 @@ class AVATARModel(ModelBase):
         self.set_vram_batch_requirements({2:1})
 
         resolution = self.options['resolution']
+        resolution = 128
         in_bgr_shape = (64, 64, 3)
         out_bgr_shape = (resolution, resolution, 3)
         mask_shape = (resolution, resolution, 1)
@@ -313,33 +314,30 @@ class AVATARModel(ModelBase):
             b,h,w,c = K.int_shape(x)
             
             dims = 64
-            x = Conv2D(90, kernel_size=5, strides=1, padding='same')(x)
-            x = Conv2D(90, kernel_size=5, strides=1, padding='same')(x)
+            x = Conv2D(64, kernel_size=5, strides=1, padding='same')(x)
+            x = Conv2D(64, kernel_size=5, strides=1, padding='same')(x)
             x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
             
-            x = Conv2D(180, kernel_size=3, strides=1, padding='same')(x)
-            x = Conv2D(180, kernel_size=3, strides=1, padding='same')(x)
+            x = Conv2D(128, kernel_size=3, strides=1, padding='same')(x)
+            x = Conv2D(128, kernel_size=3, strides=1, padding='same')(x)
             x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
             
-            x = Conv2D(360, kernel_size=3, strides=1, padding='same')(x)
-            x = Conv2D(360, kernel_size=3, strides=1, padding='same')(x)
+            x = Conv2D(256, kernel_size=3, strides=1, padding='same')(x)
+            x = Conv2D(256, kernel_size=3, strides=1, padding='same')(x)
             x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
             
-            #x = Dense (1024)(x)
-            #x = LeakyReLU(0.1)(x)
-            #x = Dropout(0.5)(x)            
-            #x = Dense (1024)(x)
-            #x = LeakyReLU(0.1)(x)
-            #x = Dropout(0.5)(x)
+            x = Conv2D(512, kernel_size=3, strides=1, padding='same')(x)
+            x = Conv2D(512, kernel_size=3, strides=1, padding='same')(x)
+            x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
+            
             x = Flatten()(x)
             x = Dense(256)(x)
-            x = ReLU()(x)
-            
+            x = ReLU()(x)            
             x = Dense(256)(x)
             x = ReLU()(x)
 
-            mean = Dense(64)(x)
-            logvar = Dense(64)(x)
+            mean = Dense(128)(x)
+            logvar = Dense(128)(x)
 
             return mean, logvar
             
@@ -413,9 +411,9 @@ class AVATARModel(ModelBase):
             x = ResidualBlock(dims*4)(x)
             x = ResidualBlock(dims*4)(x)
             
-            x = upscale(dims*4)( x )
-            x = ResidualBlock(dims*4)(x)
-            x = ResidualBlock(dims*4)(x)
+            #x = upscale(dims*4)( x )
+            #x = ResidualBlock(dims*4)(x)
+            #x = ResidualBlock(dims*4)(x)
             
             return to_bgr(output_nc) ( x )
             
