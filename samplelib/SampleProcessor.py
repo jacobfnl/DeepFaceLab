@@ -61,6 +61,7 @@ class SampleProcessor(object):
         FACE_TYPE_FULL             = 11
         FACE_TYPE_HEAD             = 12  #currently unused
         FACE_TYPE_AVATAR           = 13  #currently unused
+        FACE_TYPE_FULL_NO_ROTATION = 14
         FACE_TYPE_END = 20
 
         MODE_BEGIN = 40
@@ -103,7 +104,8 @@ class SampleProcessor(object):
         SPTF_FACETYPE_TO_FACETYPE =  {  SPTF.FACE_TYPE_HALF : FaceType.HALF,
                                         SPTF.FACE_TYPE_FULL : FaceType.FULL,
                                         SPTF.FACE_TYPE_HEAD : FaceType.HEAD,
-                                        SPTF.FACE_TYPE_AVATAR : FaceType.AVATAR }
+                                        SPTF.FACE_TYPE_AVATAR : FaceType.AVATAR,
+                                        SPTF.FACE_TYPE_FULL_NO_ROTATION : FaceType.FULL_NO_ROTATION }
 
         outputs = []
         for opts in output_sample_types:

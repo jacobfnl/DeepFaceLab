@@ -5,9 +5,10 @@ class FaceType(IntEnum):
     FULL = 1,
     HEAD = 2,
     AVATAR = 3,    #centered nose only
-    MARK_ONLY = 4, #no align at all, just embedded faceinfo
-    QTY = 5
-
+    
+    FULL_NO_ROTATION = 5,
+    MARK_ONLY = 10, #no align at all, just embedded faceinfo
+    
     @staticmethod
     def fromString (s):
         r = from_string_dict.get (s.lower())
@@ -24,10 +25,12 @@ from_string_dict = {'half_face': FaceType.HALF,
                     'head' : FaceType.HEAD,
                     'avatar' : FaceType.AVATAR,
                     'mark_only' : FaceType.MARK_ONLY,
+                    'full_face_no_rotation' : FaceType.FULL_NO_ROTATION,
                     }
 to_string_list = [ 'half_face',
                    'full_face',
                    'head',
                    'avatar',
-                   'mark_only'
+                   'mark_only',
+                   'full_face_no_rotation'
                     ]

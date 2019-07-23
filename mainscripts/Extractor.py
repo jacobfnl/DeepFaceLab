@@ -6,6 +6,7 @@ import multiprocessing
 import shutil
 from pathlib import Path
 import numpy as np
+import math
 import mathlib
 import imagelib
 import cv2
@@ -20,6 +21,8 @@ from facelib import FANSegmentator
 from nnlib import nnlib
 from joblib import Subprocessor
 from interact import interact as io
+
+DEBUG = False
 
 class ExtractSubprocessor(Subprocessor):
     class Data(object):
@@ -44,6 +47,11 @@ class ExtractSubprocessor(Subprocessor):
             self.cpu_only     = client_dict['device_type'] == 'CPU'
             self.final_output_path  = Path(client_dict['final_output_dir']) if 'final_output_dir' in client_dict.keys() else None
             self.debug_dir    = client_dict['debug_dir']
+            
+            #transfer and set stdin in order to work code.interact in debug subprocess
+            stdin_fd         = client_dict['stdin_fd']
+            if stdin_fd is not None and DEBUG:
+                sys.stdin = os.fdopen(stdin_fd)
 
             self.cached_image = (None, None)
 
@@ -229,6 +237,7 @@ class ExtractSubprocessor(Subprocessor):
                             face_image_landmarks = image_landmarks
                         else:
                             image_to_face_mat = LandmarksProcessor.get_transform_mat (image_landmarks, self.image_size, self.face_type)
+                            
                             face_image = cv2.warpAffine(image, image_to_face_mat, (self.image_size, self.image_size), cv2.INTER_LANCZOS4)
                             face_image_landmarks = LandmarksProcessor.transform_points (image_landmarks, image_to_face_mat)
 
@@ -297,7 +306,7 @@ class ExtractSubprocessor(Subprocessor):
 
         self.devices = ExtractSubprocessor.get_devices_for_config(self.manual, self.type, multi_gpu, cpu_only)
 
-        no_response_time_sec = 60 if not self.manual else 999999
+        no_response_time_sec = 60 if not self.manual and not DEBUG else 999999
         super().__init__('Extractor', ExtractSubprocessor.Cli, no_response_time_sec)
 
     #override
@@ -343,7 +352,8 @@ class ExtractSubprocessor(Subprocessor):
                      'image_size': self.image_size,
                      'face_type': self.face_type,
                      'debug_dir': self.debug_dir,
-                     'final_output_dir': str(self.final_output_path)}
+                     'final_output_dir': str(self.final_output_path),
+                     'stdin_fd': sys.stdin.fileno() }
 
 
         for (device_idx, device_type, device_name, device_total_vram_gb) in self.devices:
@@ -621,7 +631,7 @@ class ExtractSubprocessor(Subprocessor):
                     return [ (i, 'CPU', 'CPU%d' % (i), 0 ) for i in range( min(8, multiprocessing.cpu_count() // 2) ) ]
 
         elif type == 'final':
-            return [ (i, 'CPU', 'CPU%d' % (i), 0 ) for i in range(min(8, multiprocessing.cpu_count())) ]
+            return [ (i, 'CPU', 'CPU%d' % (i), 0 ) for i in (range(min(8, multiprocessing.cpu_count())) if not DEBUG else [0]) ]
 
 class DeletedFilesSearcherSubprocessor(Subprocessor):
     class Cli(Subprocessor.Cli):
@@ -798,7 +808,7 @@ def main(input_dir,
 
     input_path = Path(input_dir)
     output_path = Path(output_dir)
-    face_type='mark_only'
+    #face_type = 'mark_only'
     face_type = FaceType.fromString(face_type)
 
     multi_gpu = device_args.get('multi_gpu', False)

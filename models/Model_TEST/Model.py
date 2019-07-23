@@ -22,10 +22,11 @@ class AVATARModel(ModelBase):
 
     #override
     def onInitializeOptions(self, is_first_run, ask_override):
+        def_resolution = 128
         if is_first_run:
-            self.options['resolution'] = io.input_int("Resolution ( 128,256 ?:help skip:256) : ", 256, [128,256], help_message="More resolution requires more VRAM and time to train. Value will be adjusted to multiple of 16.")
+            self.options['resolution'] = io.input_int("Resolution ( 128,256 ?:help skip:%d) : " % def_resolution, def_resolution, [128,256], help_message="More resolution requires more VRAM and time to train. Value will be adjusted to multiple of 16.")
         else:
-            self.options['resolution'] = self.options.get('resolution', 256)
+            self.options['resolution'] = self.options.get('resolution', def_resolution)
 
 
     #override
@@ -36,7 +37,6 @@ class AVATARModel(ModelBase):
         self.set_vram_batch_requirements({2:1})
 
         resolution = self.options['resolution']
-        resolution = 128
         in_bgr_shape = (64, 64, 3)
         out_bgr_shape = (resolution, resolution, 3)
         mask_shape = (resolution, resolution, 1)
@@ -93,11 +93,12 @@ class AVATARModel(ModelBase):
             return K.mean(K.abs(t1 - t2), axis=[1,2,3] )
             
         real_A0_mean, real_A0_log = self.enc (real_A0)
-        real_B0_mean, real_B0_log = self.enc (real_B0)
-        
+        real_B0_mean, real_B0_log = self.enc (real_B0)        
         real_A0_code = self.BVAEResampler([real_A0_mean, real_A0_log])        
-        real_B0_code = self.BVAEResampler([real_B0_mean, real_B0_log])
-        
+        real_B0_code = self.BVAEResampler([real_B0_mean, real_B0_log])        
+        #real_A0_code = self.enc (real_A0)
+        #real_B0_code = self.enc (real_B0)   
+
         rec_A0 = self.decA (real_A0_code)
         rec_B0 = self.decB (real_B0_code)
         rec_A0_B0 = self.decB (real_A0_code)
@@ -124,13 +125,13 @@ class AVATARModel(ModelBase):
                 return func
                 
             #loss_A = DLoss(fake_A0_B0_d_ones, fake_A0_B0_d)  + \
-            loss_A = lambda_A * (MAELoss(rec_A0, real_rec_A0) ) + \
-                     BVAELoss(4)([real_A0_mean, real_A0_log])
+            loss_A = lambda_A * (MAELoss(rec_A0, real_rec_A0) )
+            loss_A += BVAELoss(4)([real_A0_mean, real_A0_log])
 
             weights_A = self.enc.trainable_weights + self.decA.trainable_weights
 
-            loss_B = lambda_B * (MAELoss(rec_B0, real_rec_B0) ) + \
-                     BVAELoss(4)([real_B0_mean, real_B0_log])
+            loss_B = lambda_B * (MAELoss(rec_B0, real_rec_B0) )
+            loss_B += BVAELoss(4)([real_B0_mean, real_B0_log])
 
             weights_B = self.enc.trainable_weights + self.decB.trainable_weights
 
@@ -157,18 +158,18 @@ class AVATARModel(ModelBase):
 
             t = SampleProcessor.Types
 
-            output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_HALF, t.MODE_BGR), 'resolution':64, 'normalize_tanh':True},
-                                  {'types': (t.IMG_SOURCE, t.FACE_TYPE_HALF, t.MODE_BGR), 'resolution':resolution, 'normalize_tanh':True},
+            output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64, 'normalize_tanh':True},
+                                  {'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':resolution, 'normalize_tanh':True},
                                   {'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution, 'normalize_tanh':True},
                                 ]
 
             self.set_training_data_generators ([
                     SampleGeneratorFace(self.training_data_src_path, debug=self.is_debug(), batch_size=self.batch_size,
-                        sample_process_options=SampleProcessor.Options(random_flip=False),
+                        sample_process_options=SampleProcessor.Options(random_flip=False, rotation_range=[0,0]),
                         output_sample_types=output_sample_types ),
 
                     SampleGeneratorFace(self.training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
-                        sample_process_options=SampleProcessor.Options(random_flip=False),
+                        sample_process_options=SampleProcessor.Options(random_flip=False, rotation_range=[0,0]),
                         output_sample_types=output_sample_types )
                    ])
         else:
@@ -331,6 +332,10 @@ class AVATARModel(ModelBase):
             x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
             
             x = Flatten()(x)
+            
+            #x = Dense(128)(x)
+            #return x
+            
             x = Dense(256)(x)
             x = ReLU()(x)            
             x = Dense(256)(x)

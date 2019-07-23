@@ -109,6 +109,14 @@ landmarks_68_3D = np.array( [
 [0.205322    , 31.408738    , -21.903670  ],
 [-7.198266   , 30.844876    , -20.328022  ] ], dtype=np.float32)
 
+def transform_points(points, mat, invert=False):
+    if invert:
+        mat = cv2.invertAffineTransform (mat)
+    points = np.expand_dims(points, axis=1)
+    points = cv2.transform(points, mat, points.shape)
+    points = np.squeeze(points)
+    return points
+    
 def get_transform_mat (image_landmarks, output_size, face_type, scale=1.0):
     if not isinstance(image_landmarks, np.ndarray):
         image_landmarks = np.array (image_landmarks)
@@ -128,6 +136,11 @@ def get_transform_mat (image_landmarks, output_size, face_type, scale=1.0):
         mat = mat * scale * (output_size / 3)
         mat[:,2] += output_size / 2
     else:
+        remove_rotation = False
+        if face_type == FaceType.FULL_NO_ROTATION:
+            face_type = FaceType.FULL
+            remove_rotation = True
+        
         if face_type == FaceType.HALF:
             padding = 0
         elif face_type == FaceType.FULL:
@@ -142,17 +155,18 @@ def get_transform_mat (image_landmarks, output_size, face_type, scale=1.0):
         mat[:,2] += padding
         mat *= (1 / scale)
         mat[:,2] += -output_size*( ( (1 / scale) - 1.0 ) / 2 )
+        
+        if remove_rotation:
+            bbox = transform_points ( [ (0,0), (0,output_size-1), (output_size-1, output_size-1), (output_size-1,0) ], mat, True)
+            area = mathlib.polygon_area(bbox[:,0], bbox[:,1] )
+            side = math.sqrt(area) / 2
+            center = transform_points ( [(output_size/2,output_size/2)], mat, True)
+            
+            pts1 = np.float32([ center+[-side,-side], center+[side,-side], center+[-side,side] ])
+            pts2 = np.float32([[0,0],[output_size-1,0],[0,output_size-1]])
+            mat = cv2.getAffineTransform(pts1,pts2)
 
     return mat
-
-def transform_points(points, mat, invert=False):
-    if invert:
-        mat = cv2.invertAffineTransform (mat)
-    points = np.expand_dims(points, axis=1)
-    points = cv2.transform(points, mat, points.shape)
-    points = np.squeeze(points)
-    return points
-
 
 def get_image_hull_mask (image_shape, image_landmarks, ie_polys=None):
     if len(image_landmarks) != 68:
@@ -309,7 +323,7 @@ def draw_landmarks (image, image_landmarks, color=(0,255,0), transparent_mask=Fa
         mask = get_image_hull_mask (image.shape, image_landmarks, ie_polys)
         image[...] = ( image * (1-mask) + image * mask / 2 )[...]
 
-def draw_rect_landmarks (image, rect, image_landmarks, face_size, face_type, transparent_mask=False, ie_polys=None, landmarks_color=(0,255,0) ):
+def draw_rect_landmarks (image, rect, image_landmarks, face_size, face_type, transparent_mask=False, ie_polys=None, landmarks_color=(0,255,0)):
     draw_landmarks(image, image_landmarks, color=landmarks_color, transparent_mask=transparent_mask, ie_polys=ie_polys)
     imagelib.draw_rect (image, rect, (255,0,0), 2 )
 
