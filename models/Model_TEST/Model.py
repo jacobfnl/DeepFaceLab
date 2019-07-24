@@ -57,14 +57,16 @@ class AVATARModel(ModelBase):
         self.decA = modelify(AVATARModel.DFDecFlow (out_bgr_shape[2])) (dec_Inputs)
         self.decB = modelify(AVATARModel.DFDecFlow (out_bgr_shape[2])) (dec_Inputs)
 
-        self.D = modelify(AVATARModel.PatchDiscriminator(ndf=ndf) ) (Input(out_bgr_shape))
+        self.DA = modelify(AVATARModel.PatchDiscriminator(ndf=ndf) ) (Input(out_bgr_shape))
+        self.DB = modelify(AVATARModel.PatchDiscriminator(ndf=ndf) ) (Input(out_bgr_shape))
         
         if not self.is_first_run():
             weights_to_load = [
                 (self.enc, 'enc.h5'),
                 (self.decA, 'decA.h5'),
                 (self.decB, 'decB.h5'),
-                (self.D, 'D.h5'),
+                (self.DA, 'DA.h5'),
+                (self.DB, 'DB.h5'),
             ]
             self.load_weights_safe(weights_to_load)
 
@@ -92,23 +94,30 @@ class AVATARModel(ModelBase):
             #return dssim(kernel_size=int(resolution/11.6),max_value=2.0)(t1+1,t2+1 )
             return K.mean(K.abs(t1 - t2), axis=[1,2,3] )
             
-        real_A0_mean, real_A0_log = self.enc (real_A0)
-        real_B0_mean, real_B0_log = self.enc (real_B0)        
-        real_A0_code = self.BVAEResampler([real_A0_mean, real_A0_log])        
-        real_B0_code = self.BVAEResampler([real_B0_mean, real_B0_log])        
-        #real_A0_code = self.enc (real_A0)
-        #real_B0_code = self.enc (real_B0)   
+        #real_A0_mean, real_A0_log = self.enc (real_A0)
+        #real_B0_mean, real_B0_log = self.enc (real_B0)        
+        #real_A0_code = self.BVAEResampler([real_A0_mean, real_A0_log])        
+        #real_B0_code = self.BVAEResampler([real_B0_mean, real_B0_log])        
+        real_A0_code = self.enc (real_A0)
+        real_B0_code = self.enc (real_B0)   
 
         rec_A0 = self.decA (real_A0_code)
         rec_B0 = self.decB (real_B0_code)
         rec_A0_B0 = self.decB (real_A0_code)
 
-        real_B0_d = self.D(real_B0)
-        real_B0_d_ones = K.ones_like(real_B0_d)
+        real_rec_A0_d = self.DA(real_rec_A0)
+        real_rec_A0_d_ones = K.ones_like(real_rec_A0_d)
 
-        fake_A0_B0_d = self.D(rec_A0_B0)
-        fake_A0_B0_d_ones = K.ones_like(fake_A0_B0_d)
-        fake_A0_B0_d_zeros = K.zeros_like(fake_A0_B0_d)
+        fake_A0_d = self.DA(rec_A0)
+        fake_A0_d_ones = K.ones_like(fake_A0_d)
+        fake_A0_d_zeros = K.zeros_like(fake_A0_d)
+        
+        real_rec_B0_d = self.DB(real_rec_B0)
+        real_rec_B0_d_ones = K.ones_like(real_rec_B0_d)
+
+        fake_B0_d = self.DB(rec_B0)
+        fake_B0_d_ones = K.ones_like(fake_B0_d)
+        fake_B0_d_zeros = K.zeros_like(fake_B0_d)
 
         self.G_view = K.function([real_A0, real_B0],[rec_A0, rec_B0, rec_A0_B0])
 
@@ -124,14 +133,15 @@ class AVATARModel(ModelBase):
                     #return beta * K.mean ( K.sum( -0.5*(1 + logvar_t - K.exp(logvar_t) - K.square(mean_t)), axis=1 ), axis=0, keepdims=True )
                 return func
                 
-            #loss_A = DLoss(fake_A0_B0_d_ones, fake_A0_B0_d)  + \
-            loss_A = lambda_A * (MAELoss(rec_A0, real_rec_A0) )
-            loss_A += BVAELoss(4)([real_A0_mean, real_A0_log])
+            loss_A = DLoss(fake_A0_d_ones, fake_A0_d)
+            loss_A += lambda_A * (MAELoss(rec_A0, real_rec_A0) )
+            #loss_A += BVAELoss(4)([real_A0_mean, real_A0_log])
 
             weights_A = self.enc.trainable_weights + self.decA.trainable_weights
 
-            loss_B = lambda_B * (MAELoss(rec_B0, real_rec_B0) )
-            loss_B += BVAELoss(4)([real_B0_mean, real_B0_log])
+            loss_B = DLoss(fake_B0_d_ones, fake_B0_d)
+            loss_B += lambda_B * (MAELoss(rec_B0, real_rec_B0) )
+            #loss_B += BVAELoss(4)([real_B0_mean, real_B0_log])
 
             weights_B = self.enc.trainable_weights + self.decB.trainable_weights
 
@@ -147,15 +157,22 @@ class AVATARModel(ModelBase):
 
             ###########
 
-            loss_D = ( DLoss(real_B0_d_ones, real_B0_d ) + \
-                       DLoss(fake_A0_B0_d_zeros, fake_A0_B0_d ) ) * 0.5
+            loss_DA = ( DLoss(real_rec_A0_d_ones, real_rec_A0_d ) + \
+                        DLoss(fake_A0_d_zeros, fake_A0_d ) ) * 0.5
 
-            self.D_train = K.function ([real_A0, real_B0],[loss_D],
-                                        opt(lr=2e-5).get_updates(loss_D, self.D.trainable_weights) )
+            self.DA_train = K.function ([real_A0, real_rec_A0],[ K.mean(loss_DA)],
+                                        opt(lr=2e-5).get_updates(loss_DA, self.DA.trainable_weights) )
 
             ############
 
+            loss_DB = ( DLoss(real_rec_B0_d_ones, real_rec_B0_d ) + \
+                        DLoss(fake_B0_d_zeros, fake_B0_d ) ) * 0.5
 
+            self.DB_train = K.function ([real_B0, real_rec_B0],[ K.mean(loss_DB)],
+                                        opt(lr=2e-5).get_updates(loss_DB, self.DB.trainable_weights) )
+
+            ############
+            
             t = SampleProcessor.Types
 
             output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64, 'normalize_tanh':True},
@@ -181,7 +198,8 @@ class AVATARModel(ModelBase):
                                  [self.enc,  'enc.h5'],
                                  [self.decA, 'decA.h5'],
                                  [self.decB, 'decB.h5'],
-                                 [self.D,    'D.h5'],
+                                 [self.DA,    'DA.h5'],
+                                 [self.DB,    'DB.h5'],
                                  ])
 
     #override
@@ -189,14 +207,12 @@ class AVATARModel(ModelBase):
         warped_src, _, src,  = generators_samples[0]
         warped_dst, _, dst,  = generators_samples[1]
 
-        #import code
-        #code.interact(local=dict(globals(), **locals()))
-
         loss_A, = self.A_train ( [warped_src, src, warped_dst, dst,] )
         loss_B, = self.B_train ( [warped_src, src, warped_dst, dst,] )
-        loss_D = 0#self.D_train ( [warped_src, warped_dst,] )
-
-        return ( ('A', loss_A), ('B', loss_B), ('D', loss_D),  )
+        loss_DA, = self.DA_train ( [warped_src, src] )
+        loss_DB, = self.DB_train ( [warped_dst, dst] )
+        
+        return ( ('A', loss_A), ('B', loss_B), ('DA', loss_DA), ('DB', loss_DB) )
 
     #override
     def onGetPreview(self, sample):
@@ -333,8 +349,8 @@ class AVATARModel(ModelBase):
             
             x = Flatten()(x)
             
-            #x = Dense(128)(x)
-            #return x
+            x = Dense(128)(x)
+            return x
             
             x = Dense(256)(x)
             x = ReLU()(x)            
@@ -356,16 +372,19 @@ class AVATARModel(ModelBase):
         def XNormalization(x):
             return BatchNormalization (axis=-1)(x)
         XConv2D = partial(Conv2D, padding=padding, use_bias=use_bias)
-
+        XConv2DTranspose = partial(Conv2DTranspose, padding='same', use_bias=use_bias)
+        
         def Act(act='', lrelu_alpha=0.1):
             if act == 'prelu':
                 return PReLU()
+            elif act == 'relu':
+                return ReLU()
             else:
                 return LeakyReLU(alpha=lrelu_alpha)
 
         def upscale (dim, **kwargs):
             def func(x):
-                return SubpixelUpscaler()(Act()( XNormalization(XConv2D(dim * 4, kernel_size=3, strides=1)(x))))
+                return Act('relu')( XNormalization(XConv2DTranspose(dim, kernel_size=3, strides=2)(x)))
             return func
 
         def to_bgr (output_nc, **kwargs):
@@ -397,24 +416,24 @@ class AVATARModel(ModelBase):
 
         def func(input):
             x = input[0]
-            x = Dense(8 * 8 * dims*4)(x)
-            x = Reshape((8, 8, dims*4))(x)
+            x = Dense(8 * 8 * dims*8, activation="relu")(x)
+            x = Reshape((8, 8, dims*8))(x)
+            
+            x = upscale(dims*8)( x )
+            x = ResidualBlock(dims*8)(x)
+            x = ResidualBlock(dims*8)(x)
             
             x = upscale(dims*4)( x )
             x = ResidualBlock(dims*4)(x)
             x = ResidualBlock(dims*4)(x)
             
-            x = upscale(dims*4)( x )
-            x = ResidualBlock(dims*4)(x)
-            x = ResidualBlock(dims*4)(x)
+            x = upscale(dims*2)( x )
+            x = ResidualBlock(dims*2)(x)
+            x = ResidualBlock(dims*2)(x)
             
-            x = upscale(dims*4)( x )
-            x = ResidualBlock(dims*4)(x)
-            x = ResidualBlock(dims*4)(x)
-            
-            x = upscale(dims*4)( x )
-            x = ResidualBlock(dims*4)(x)
-            x = ResidualBlock(dims*4)(x)
+            x = upscale(dims)( x )
+            x = ResidualBlock(dims)(x)
+            x = ResidualBlock(dims)(x)
             
             #x = upscale(dims*4)( x )
             #x = ResidualBlock(dims*4)(x)
