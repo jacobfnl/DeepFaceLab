@@ -88,11 +88,11 @@ class AVATARModel(ModelBase):
             return K.mean(K.square(labels-logits))
 
         def DLoss(labels,logits):
-            return K.mean(K.binary_crossentropy(labels,logits),axis=[1,2,3] )
+            return K.mean(K.binary_crossentropy(labels,logits))
 
         def MAELoss(t1,t2,keepdims=False):
             #return dssim(kernel_size=int(resolution/11.6),max_value=2.0)(t1+1,t2+1 )
-            return K.mean(K.abs(t1 - t2), axis=[1,2,3] )
+            return K.mean(K.abs(t1 - t2) )
 
         #real_A0_mean, real_A0_log = self.enc (real_A0)
         #real_B0_mean, real_B0_log = self.enc (real_B0)
@@ -103,7 +103,7 @@ class AVATARModel(ModelBase):
 
         rec_A0 = self.decA (real_A0_code)
         rec_B0 = self.decB (real_B0_code)
-        rec_A0_B0 = self.decB (real_A0_code)
+        rec_A0_B0 = self.decA (real_A0_code)
 
         real_rec_A0_d = self.DA(real_rec_A0)
         real_rec_A0_d_ones = K.ones_like(real_rec_A0_d)
@@ -119,7 +119,7 @@ class AVATARModel(ModelBase):
         fake_B0_d_ones = K.ones_like(fake_B0_d)
         fake_B0_d_zeros = K.zeros_like(fake_B0_d)
 
-        rec_A0_B0_d = self.DB(rec_A0_B0)
+        rec_A0_B0_d = self.DA(rec_A0_B0)
         rec_A0_B0_d_ones = K.ones_like(rec_A0_B0_d)
         rec_A0_B0_d_zeros = K.zeros_like(rec_A0_B0_d)
 
@@ -137,14 +137,14 @@ class AVATARModel(ModelBase):
                     #return beta * K.mean ( K.sum( -0.5*(1 + logvar_t - K.exp(logvar_t) - K.square(mean_t)), axis=1 ), axis=0, keepdims=True )
                 return func
 
-            loss_A = DLoss(fake_A0_d_ones, fake_A0_d)
-            loss_A += lambda_A * (MAELoss(rec_A0, real_rec_A0) )
+            #loss_A = DLoss(fake_A0_d_ones, fake_A0_d)
+            loss_A = lambda_A * (MAELoss(rec_A0, real_rec_A0) )
             #loss_A += BVAELoss(4)([real_A0_mean, real_A0_log])
 
             weights_A = self.enc.trainable_weights + self.decA.trainable_weights
 
-            loss_B = ( DLoss(fake_B0_d_ones, fake_B0_d) + DLoss(rec_A0_B0_d_ones, rec_A0_B0_d) ) * 0.5
-            loss_B += lambda_B * (MAELoss(rec_B0, real_rec_B0) )
+            #loss_B = ( DLoss(fake_B0_d_ones, fake_B0_d) + DLoss(rec_A0_B0_d_ones, rec_A0_B0_d) ) * 0.5
+            loss_B = lambda_B * (MAELoss(rec_B0, real_rec_B0) )
             #loss_B += BVAELoss(4)([real_B0_mean, real_B0_log])
 
             weights_B = self.enc.trainable_weights + self.decB.trainable_weights
@@ -152,10 +152,10 @@ class AVATARModel(ModelBase):
             def opt(lr=2e-5):
                 return Adam(lr=lr, beta_1=0.5, beta_2=0.999, tf_cpu_mode=2)#, clipnorm=1)
 
-            self.A_train = K.function ([real_A0, real_rec_A0, real_B0, real_rec_B0],[ K.mean(loss_A) ],
+            self.A_train = K.function ([real_A0, real_rec_A0, real_B0, real_rec_B0],[ loss_A ],
                                         opt(lr=2e-5).get_updates(loss_A, weights_A) )
 
-            self.B_train = K.function ([real_A0, real_rec_A0, real_B0, real_rec_B0],[ K.mean(loss_B) ],
+            self.B_train = K.function ([real_A0, real_rec_A0, real_B0, real_rec_B0],[ loss_B ],
                                         opt(lr=2e-5).get_updates(loss_B, weights_B) )
 
 
@@ -164,7 +164,7 @@ class AVATARModel(ModelBase):
             loss_DA = ( DLoss(real_rec_A0_d_ones, real_rec_A0_d ) + \
                         DLoss(fake_A0_d_zeros, fake_A0_d ) ) * 0.5
 
-            self.DA_train = K.function ([real_A0, real_rec_A0],[ K.mean(loss_DA)],
+            self.DA_train = K.function ([real_A0, real_rec_A0],[ loss_DA ],
                                         opt(lr=2e-5).get_updates(loss_DA, self.DA.trainable_weights) )
 
             ############
@@ -172,7 +172,7 @@ class AVATARModel(ModelBase):
             loss_DB = ( DLoss(real_rec_B0_d_ones, real_rec_B0_d ) + \
                       ( DLoss(fake_B0_d_zeros, fake_B0_d) + DLoss(rec_A0_B0_d_zeros, rec_A0_B0_d) ) * 0.5  ) * 0.5
 
-            self.DB_train = K.function ([real_A0, real_B0, real_rec_B0],[ K.mean(loss_DB)],
+            self.DB_train = K.function ([real_A0, real_B0, real_rec_B0],[ loss_DB ],
                                         opt(lr=2e-5).get_updates(loss_DB, self.DB.trainable_weights) )
 
             ############
@@ -194,7 +194,7 @@ class AVATARModel(ModelBase):
                         output_sample_types=output_sample_types )
                    ])
         else:
-            self.G_convert = K.function([real_A0, real_B0m],[fake_B0])
+            self.G_convert = K.function([real_A0 ],[rec_A0_B0])
 
     #override
     def onSave(self):
@@ -213,8 +213,8 @@ class AVATARModel(ModelBase):
 
         loss_A, = self.A_train ( [warped_src, src, warped_dst, dst,] )
         loss_B, = self.B_train ( [warped_src, src, warped_dst, dst,] )
-        loss_DA, = self.DA_train ( [warped_src, src] )
-        loss_DB, = self.DB_train ( [warped_src, warped_dst, dst] )
+        loss_DA, = 0,#self.DA_train ( [warped_src, src] )
+        loss_DB, = 0,#self.DB_train ( [warped_src, warped_dst, dst] )
 
         return ( ('A', loss_A), ('B', loss_B), ('DA', loss_DA), ('DB', loss_DB) )
 
@@ -235,12 +235,12 @@ class AVATARModel(ModelBase):
         #r = np.concatenate ((np.concatenate ( (test_A0f, test_A0r), axis=1),
         #                     np.concatenate ( (test_B0, rec_B0), axis=1)
         #                     ), axis=0)
-        r = np.concatenate ( (test_A0f, rec_A0, test_B0f, rec_B0, rec_A0_B0), axis=1 )
+        r = np.concatenate ( (test_B0f, rec_B0, test_A0f, rec_A0, rec_A0_B0), axis=1 )
 
         return [ ('AVATAR', r ) ]
 
-    def predictor_func (self, avaperator_face, target_face_mask):
-        feed = [ avaperator_face[np.newaxis,...]*2-1, target_face_mask[np.newaxis,...]*2-1 ]
+    def predictor_func (self, inp_face_bgr):
+        feed = [ inp_face_bgr[np.newaxis,...]*2-1 ]
         x = self.G_convert (feed)[0]
         return np.clip ( x[0] / 2 + 0.5 , 0, 1)
 
@@ -262,7 +262,7 @@ class AVATARModel(ModelBase):
 
         from converters import ConverterAvatar
         return ConverterAvatar(self.predictor_func,
-                               predictor_input_size=self.options['resolution'])
+                               predictor_input_size=64)
 
 
     @staticmethod
@@ -329,12 +329,31 @@ class AVATARModel(ModelBase):
         #    return func
 
         #downscale = partial(downscale)
+        def downscale (dim):
+            def func(x):
+                return LeakyReLU(0.1)(Conv2D(dim, 5, strides=2, padding='same')(x))
+            return func
 
+        def upscale (dim):
+            def func(x):
+                return PixelShuffler()(LeakyReLU(0.1)(Conv2D(dim * 4, 3, strides=1, padding='same')(x)))
+            return func
+                
         def func(input):
             x, = input
             b,h,w,c = K.int_shape(x)
+            
+            x = downscale(128)(x)
+            x = downscale(256)(x)
+            x = downscale(512)(x)
+            x = downscale(768)(x)
+#
+            x = Dense(256)(Flatten()(x))
+            x = Dense(4 * 4 * 512)(x)
+            x = Reshape((4, 4, 512))(x)
+            x = upscale(512)(x)
+            return x
 
-            dims = 64
             x = Conv2D(64, kernel_size=5, strides=1, padding='same')(x)
             x = Conv2D(64, kernel_size=5, strides=1, padding='same')(x)
             x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
@@ -420,31 +439,51 @@ class AVATARModel(ModelBase):
 
         def func(input):
             x = input[0]
-            x = Dense(8 * 8 * dims*8, activation="relu")(x)
-            x = Reshape((8, 8, dims*8))(x)
+            x = upscale(512)( x )
+            x = ResidualBlock(512)(x)
+            x = ResidualBlock(512)(x)
+            
+            x = upscale(256)( x )
+            x = ResidualBlock(256)(x)
+            x = ResidualBlock(256)(x)
 
-            x = upscale(dims*8)( x )
-            x = ResidualBlock(dims*8)(x)
-            x = ResidualBlock(dims*8)(x)
+            x = upscale(128)( x )
+            x = ResidualBlock(128)(x)
+            x = ResidualBlock(128)(x)
 
-            x = upscale(dims*4)( x )
-            x = ResidualBlock(dims*4)(x)
-            x = ResidualBlock(dims*4)(x)
-
-            x = upscale(dims*2)( x )
-            x = ResidualBlock(dims*2)(x)
-            x = ResidualBlock(dims*2)(x)
-
-            x = upscale(dims)( x )
-            x = ResidualBlock(dims)(x)
-            x = ResidualBlock(dims)(x)
-
-            #x = upscale(dims*4)( x )
-            #x = ResidualBlock(dims*4)(x)
-            #x = ResidualBlock(dims*4)(x)
+            x = upscale(64)( x )
+            x = ResidualBlock(64)(x)
+            x = ResidualBlock(64)(x)
 
             return to_bgr(output_nc) ( x )
-
+            
+        #def func(input):
+        #    x = input[0]
+        #    x = Dense(8 * 8 * dims*8, activation="relu")(x)
+        #    x = Reshape((8, 8, dims*8))(x)
+#
+        #    x = upscale(dims*8)( x )
+        #    x = ResidualBlock(dims*8)(x)
+        #    x = ResidualBlock(dims*8)(x)
+#
+        #    x = upscale(dims*4)( x )
+        #    x = ResidualBlock(dims*4)(x)
+        #    x = ResidualBlock(dims*4)(x)
+#
+        #    x = upscale(dims*2)( x )
+        #    x = ResidualBlock(dims*2)(x)
+        #    x = ResidualBlock(dims*2)(x)
+#
+        #    x = upscale(dims)( x )
+        #    x = ResidualBlock(dims)(x)
+        #    x = ResidualBlock(dims)(x)
+#
+        #    #x = upscale(dims*4)( x )
+        #    #x = ResidualBlock(dims*4)(x)
+        #    #x = ResidualBlock(dims*4)(x)
+#
+        #    return to_bgr(output_nc) ( x )
+            
         return func
 
 Model = AVATARModel

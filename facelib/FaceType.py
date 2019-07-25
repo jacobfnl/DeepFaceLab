@@ -18,7 +18,7 @@ class FaceType(IntEnum):
 
     @staticmethod
     def toString (face_type):
-        return to_string_list[face_type]
+        return to_string_dict[face_type]
 
 from_string_dict = {'half_face': FaceType.HALF,
                     'full_face': FaceType.FULL,
@@ -27,10 +27,10 @@ from_string_dict = {'half_face': FaceType.HALF,
                     'mark_only' : FaceType.MARK_ONLY,
                     'full_face_no_rotation' : FaceType.FULL_NO_ROTATION,
                     }
-to_string_list = [ 'half_face',
-                   'full_face',
-                   'head',
-                   'avatar',
-                   'mark_only',
-                   'full_face_no_rotation'
-                    ]
+to_string_dict = { FaceType.HALF : 'half_face',
+                   FaceType.FULL : 'full_face',
+                   FaceType.HEAD : 'head',
+                   FaceType.AVATAR : 'avatar',
+                   FaceType.MARK_ONLY :'mark_only',
+                   FaceType.FULL_NO_ROTATION : 'full_face_no_rotation'                   
+                 }

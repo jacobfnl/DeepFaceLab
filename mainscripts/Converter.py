@@ -104,11 +104,13 @@ class ConvertSubprocessor(Subprocessor):
 
                 elif self.converter.type == Converter.TYPE_FACE or self.converter.type == Converter.TYPE_FACE_AVATAR:
                     
+                    """
                     ava_face = None
                     if self.converter.type == Converter.TYPE_FACE_AVATAR:
                         ava_filename_path = self.avatar_image_paths[idx]
                         ava_face = (cv2_imread(str(ava_filename_path)) / 255.0).astype(np.float32)
                         ava_face = normalize_channels (ava_face, 3)
+                    """
                     faces = self.alignments[filename_path.stem]
 
                     if self.debug:
@@ -120,9 +122,9 @@ class ConvertSubprocessor(Subprocessor):
                                 self.log_info ( '\nConverting face_num [%d] in file [%s]' % (face_num, filename_path) )
 
                             if self.debug:
-                                debug_images += self.converter.cli_convert_face(image, image_landmarks, self.debug, avaperator_face_bgr=ava_face)
+                                debug_images += self.converter.cli_convert_face(image, image_landmarks, self.debug)
                             else:
-                                image = self.converter.cli_convert_face(image, image_landmarks, self.debug, avaperator_face_bgr=ava_face)
+                                image = self.converter.cli_convert_face(image, image_landmarks, self.debug)
 
                         except Exception as e:
                             e_str = traceback.format_exc()
@@ -288,7 +290,7 @@ def main (args, device_args):
 
                 alignments[ source_filename_stem ].append (dflimg.get_source_landmarks())
         
-        
+        """
         if converter.type == Converter.TYPE_FACE_AVATAR:
             if avaperator_aligned_dir is None:
                 io.log_err('Avatar operator aligned directory not found. Please ensure it exists.')
@@ -319,7 +321,7 @@ def main (args, device_args):
             if len(input_path_image_paths) < len(avatar_image_paths):
                 io.log_err("Input faces count must be >= avatar operator faces count.")
                 return
-                
+        """        
         files_processed, faces_processed = ConvertSubprocessor (
                     converter              = converter,
                     input_path_image_paths = input_path_image_paths,                    

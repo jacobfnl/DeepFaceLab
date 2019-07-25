@@ -20,8 +20,7 @@ class ConverterAvatar(Converter):
         self.predictor_input_size = predictor_input_size
         
         #dummy predict and sleep, tensorflow caching kernels. If remove it, conversion speed will be x2 slower
-        predictor_func ( np.zeros ( (predictor_input_size,predictor_input_size,3), dtype=np.float32 ), 
-                         np.zeros ( (predictor_input_size,predictor_input_size,1), dtype=np.float32 ) )
+        predictor_func ( np.zeros ( (predictor_input_size,predictor_input_size,3), dtype=np.float32 ) )
         time.sleep(2)
 
         predictor_func_host, predictor_func = SubprocessFunctionCaller.make_pair(predictor_func)
@@ -33,38 +32,22 @@ class ConverterAvatar(Converter):
         self.predictor_func_host.obj.process_messages()
         
     #override
-    def cli_convert_face (self, img_bgr, img_face_landmarks, debug, avaperator_face_bgr=None, **kwargs):
-        if debug:
-            debugs = [img_bgr.copy()]
+    def cli_convert_face (self, img_bgr, img_face_landmarks, debug, **kwargs):
+        
 
         img_size = img_bgr.shape[1], img_bgr.shape[0]
 
-        img_face_mask_a = LandmarksProcessor.get_image_hull_mask (img_bgr.shape, img_face_landmarks)
-        img_face_mask_aaa = np.repeat(img_face_mask_a, 3, -1)
-        
-        output_size = self.predictor_input_size        
-        face_mat = LandmarksProcessor.get_transform_mat (img_face_landmarks, output_size, face_type=FaceType.FULL)
+        inp_size = self.predictor_input_size        
+        face_mat = LandmarksProcessor.get_transform_mat (img_face_landmarks, inp_size, face_type=FaceType.FULL_NO_ROTATION)
 
-        dst_face_mask_a_0 = cv2.warpAffine( img_face_mask_a, face_mat, (output_size, output_size), flags=cv2.INTER_CUBIC )
+        inp_face_bgr = cv2.warpAffine( img_bgr, face_mat, (inp_size, inp_size), flags=cv2.INTER_LANCZOS4 )
+        if debug:
+            debugs = [inp_face_bgr.copy()]
+        prd_face_bgr = self.predictor_func ( inp_face_bgr )
 
-        predictor_input_dst_face_mask_a_0 = cv2.resize (dst_face_mask_a_0, (self.predictor_input_size,self.predictor_input_size), cv2.INTER_CUBIC )
-        prd_inp_dst_face_mask_a = predictor_input_dst_face_mask_a_0[...,np.newaxis]
-
-        prd_inp_avaperator_face_bgr = cv2.resize (avaperator_face_bgr, (self.predictor_input_size,self.predictor_input_size), cv2.INTER_CUBIC )
-
-        prd_face_bgr = self.predictor_func ( prd_inp_avaperator_face_bgr, prd_inp_dst_face_mask_a )
-        
-        out_img = img_bgr.copy()
-        out_img = cv2.warpAffine( prd_face_bgr, face_mat, img_size, out_img, cv2.WARP_INVERSE_MAP | cv2.INTER_LANCZOS4, cv2.BORDER_TRANSPARENT )
-        out_img = np.clip(out_img, 0.0, 1.0)
+        out_img = np.clip(prd_face_bgr, 0.0, 1.0)
         
         if debug:
             debugs += [out_img.copy()]
         
-        out_img = np.clip( img_bgr*(1-img_face_mask_aaa) + (out_img*img_face_mask_aaa) , 0, 1.0 )
-                
-        if debug:
-            debugs += [out_img.copy()]
-
-
         return debugs if debug else out_img
