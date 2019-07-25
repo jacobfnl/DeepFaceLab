@@ -112,6 +112,10 @@ class AVATARModel(ModelBase):
         fake_A0_d_ones = K.ones_like(fake_A0_d)
         fake_A0_d_zeros = K.zeros_like(fake_A0_d)
 
+        rec_A0_B0_d = self.DA(rec_A0_B0)
+        rec_A0_B0_d_ones = K.ones_like(rec_A0_B0_d)
+        rec_A0_B0_d_zeros = K.zeros_like(rec_A0_B0_d)
+        
         real_rec_B0_d = self.DB(real_rec_B0)
         real_rec_B0_d_ones = K.ones_like(real_rec_B0_d)
 
@@ -119,9 +123,7 @@ class AVATARModel(ModelBase):
         fake_B0_d_ones = K.ones_like(fake_B0_d)
         fake_B0_d_zeros = K.zeros_like(fake_B0_d)
 
-        rec_A0_B0_d = self.DA(rec_A0_B0)
-        rec_A0_B0_d_ones = K.ones_like(rec_A0_B0_d)
-        rec_A0_B0_d_zeros = K.zeros_like(rec_A0_B0_d)
+        
 
         self.G_view = K.function([real_A0, real_B0],[rec_A0, rec_B0, rec_A0_B0])
 
@@ -138,7 +140,8 @@ class AVATARModel(ModelBase):
                 return func
 
             #loss_A = DLoss(fake_A0_d_ones, fake_A0_d)
-            loss_A = lambda_A * (MAELoss(rec_A0, real_rec_A0) )
+            loss_A = DLoss(rec_A0_B0_d_ones, rec_A0_B0_d)
+            loss_A += lambda_A * (MAELoss(rec_A0, real_rec_A0) )
             #loss_A += BVAELoss(4)([real_A0_mean, real_A0_log])
 
             weights_A = self.enc.trainable_weights + self.decA.trainable_weights
@@ -162,9 +165,10 @@ class AVATARModel(ModelBase):
             ###########
 
             loss_DA = ( DLoss(real_rec_A0_d_ones, real_rec_A0_d ) + \
-                        DLoss(fake_A0_d_zeros, fake_A0_d ) ) * 0.5
+                        DLoss(rec_A0_B0_d_zeros,  rec_A0_B0_d ) ) * 0.5
+                        #DLoss(fake_A0_d_zeros, fake_A0_d ) ) * 0.5
 
-            self.DA_train = K.function ([real_A0, real_rec_A0],[ loss_DA ],
+            self.DA_train = K.function ([real_A0, real_B0, real_rec_A0],[ loss_DA ],
                                         opt(lr=2e-5).get_updates(loss_DA, self.DA.trainable_weights) )
 
             ############
@@ -213,7 +217,7 @@ class AVATARModel(ModelBase):
 
         loss_A, = self.A_train ( [warped_src, src, warped_dst, dst,] )
         loss_B, = self.B_train ( [warped_src, src, warped_dst, dst,] )
-        loss_DA, = 0,#self.DA_train ( [warped_src, src] )
+        loss_DA, = self.DA_train ( [warped_src, warped_dst, src] )
         loss_DB, = 0,#self.DB_train ( [warped_src, warped_dst, dst] )
 
         return ( ('A', loss_A), ('B', loss_B), ('DA', loss_DA), ('DB', loss_DB) )
