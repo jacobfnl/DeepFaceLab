@@ -90,8 +90,8 @@ class AVATARModel(ModelBase):
         def DLoss(labels,logits):
             return K.mean(K.binary_crossentropy(labels,logits))
 
-        def MAELoss(t1,t2,keepdims=False):
-            #return dssim(kernel_size=int(resolution/11.6),max_value=2.0)(t1+1,t2+1 )
+        def MAELoss(t1,t2):
+            return dssim(kernel_size=int(resolution/11.6),max_value=2.0)(t1+1,t2+1 )
             return K.mean(K.abs(t1 - t2) )
 
         #real_A0_mean, real_A0_log = self.enc (real_A0)
@@ -141,13 +141,13 @@ class AVATARModel(ModelBase):
 
             #loss_A = DLoss(fake_A0_d_ones, fake_A0_d)
             loss_A = DLoss(rec_A0_B0_d_ones, rec_A0_B0_d)
-            loss_A += lambda_A * (MAELoss(rec_A0, real_rec_A0) )
+            loss_A += K.mean( lambda_A * (MAELoss(rec_A0, real_rec_A0) ) )
             #loss_A += BVAELoss(4)([real_A0_mean, real_A0_log])
 
             weights_A = self.enc.trainable_weights + self.decA.trainable_weights
 
             #loss_B = ( DLoss(fake_B0_d_ones, fake_B0_d) + DLoss(rec_A0_B0_d_ones, rec_A0_B0_d) ) * 0.5
-            loss_B = lambda_B * (MAELoss(rec_B0, real_rec_B0) )
+            loss_B = K.mean( lambda_B * (MAELoss(rec_B0, real_rec_B0) ) )
             #loss_B += BVAELoss(4)([real_B0_mean, real_B0_log])
 
             weights_B = self.enc.trainable_weights + self.decB.trainable_weights
