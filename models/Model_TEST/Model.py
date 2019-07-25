@@ -103,7 +103,7 @@ class AVATARModel(ModelBase):
 
         rec_A0 = self.decA (real_A0_code)
         rec_B0 = self.decB (real_B0_code)
-        rec_A0_B0 = self.decA (real_A0_code)
+        rec_A0_B0 = self.decA (real_B0_code)
 
         real_rec_A0_d = self.DA(real_rec_A0)
         real_rec_A0_d_ones = K.ones_like(real_rec_A0_d)
