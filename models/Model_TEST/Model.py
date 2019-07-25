@@ -44,8 +44,8 @@ class AVATARModel(ModelBase):
 
         ngf = 64
         ndf = 64
-        lambda_A = 50
-        lambda_B = 50
+        lambda_A = 100
+        lambda_B = 100
 
         use_batch_norm = True #created_batch_size > 1
 
