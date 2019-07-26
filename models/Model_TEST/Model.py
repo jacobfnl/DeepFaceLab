@@ -44,8 +44,8 @@ class AVATARModel(ModelBase):
 
         ngf = 64
         ndf = 64
-        lambda_A = 100
-        lambda_B = 100
+        lambda_A = 10
+        lambda_B = 10
 
         use_batch_norm = True #created_batch_size > 1
 
@@ -70,14 +70,16 @@ class AVATARModel(ModelBase):
             ]
             self.load_weights_safe(weights_to_load)
 
-        real_A0 = Input(in_bgr_shape)
-        real_rec_A0 = Input(out_bgr_shape)
-
-        real_B0 = Input(in_bgr_shape)
-        real_rec_B0 = Input(out_bgr_shape)
-
-
-
+        warped_A0 = Input(in_bgr_shape)
+        real_A0 = Input(out_bgr_shape)
+        real_A0m = Input(mask_shape)
+        
+        warped_B0 = Input(in_bgr_shape)
+        real_B0 = Input(out_bgr_shape)
+        real_B0m = Input(mask_shape)
+        
+        #real_A0m_blurred = gaussian_blur( max(1, K.int_shape(x)[1] // 32) )(real_A0m)
+        
         def BCELoss(logits, ones):
             if ones:
                 return K.mean(K.binary_crossentropy(K.ones_like(logits),logits))
@@ -94,38 +96,36 @@ class AVATARModel(ModelBase):
             return dssim(kernel_size=int(resolution/11.6),max_value=2.0)(t1+1,t2+1 )
             return K.mean(K.abs(t1 - t2) )
 
-        #real_A0_mean, real_A0_log = self.enc (real_A0)
-        #real_B0_mean, real_B0_log = self.enc (real_B0)
-        #real_A0_code = self.BVAEResampler([real_A0_mean, real_A0_log])
-        #real_B0_code = self.BVAEResampler([real_B0_mean, real_B0_log])
-        real_A0_code = self.enc (real_A0)
-        real_B0_code = self.enc (real_B0)
+        #warped_A0_mean, warped_A0_log = self.enc (warped_A0)
+        #warped_B0_mean, warped_B0_log = self.enc (warped_B0)
+        #warped_A0_code = self.BVAEResampler([warped_A0_mean, warped_A0_log])
+        #warped_B0_code = self.BVAEResampler([warped_B0_mean, warped_B0_log])
+        warped_A0_code = self.enc (warped_A0)
+        warped_B0_code = self.enc (warped_B0)
 
-        rec_A0 = self.decA (real_A0_code)
-        rec_B0 = self.decB (real_B0_code)
-        rec_A0_B0 = self.decA (real_B0_code)
+        rec_A0 = self.decA (warped_A0_code)
+        rec_B0 = self.decB (warped_B0_code)
+        rec_A0_B0 = self.decA (warped_B0_code)
 
-        real_rec_A0_d = self.DA(real_rec_A0)
-        real_rec_A0_d_ones = K.ones_like(real_rec_A0_d)
+        real_A0_d = self.DA(real_A0)
+        real_A0_d_ones = K.ones_like(real_A0_d)
 
-        fake_A0_d = self.DA(rec_A0)
-        fake_A0_d_ones = K.ones_like(fake_A0_d)
-        fake_A0_d_zeros = K.zeros_like(fake_A0_d)
+        rec_A0_d = self.DA(rec_A0)
+        rec_A0_d_ones = K.ones_like(rec_A0_d)
+        rec_A0_d_zeros = K.zeros_like(rec_A0_d)
 
         rec_A0_B0_d = self.DA(rec_A0_B0)
         rec_A0_B0_d_ones = K.ones_like(rec_A0_B0_d)
         rec_A0_B0_d_zeros = K.zeros_like(rec_A0_B0_d)
         
-        real_rec_B0_d = self.DB(real_rec_B0)
-        real_rec_B0_d_ones = K.ones_like(real_rec_B0_d)
+        real_B0_d = self.DB(real_B0)
+        real_B0_d_ones = K.ones_like(real_B0_d)
 
-        fake_B0_d = self.DB(rec_B0)
-        fake_B0_d_ones = K.ones_like(fake_B0_d)
-        fake_B0_d_zeros = K.zeros_like(fake_B0_d)
+        rec_B0_d = self.DB(rec_B0)
+        rec_B0_d_ones = K.ones_like(rec_B0_d)
+        rec_B0_d_zeros = K.zeros_like(rec_B0_d)
 
-        
-
-        self.G_view = K.function([real_A0, real_B0],[rec_A0, rec_B0, rec_A0_B0])
+        self.G_view = K.function([warped_A0, warped_B0],[rec_A0, rec_B0, rec_A0_B0])
 
         if self.is_training_mode:
             def BVAELoss(beta=4):
@@ -140,52 +140,56 @@ class AVATARModel(ModelBase):
                 return func
 
             #loss_A = DLoss(fake_A0_d_ones, fake_A0_d)
-            loss_A = DLoss(rec_A0_B0_d_ones, rec_A0_B0_d)
-            loss_A += K.mean( lambda_A * (MAELoss(rec_A0, real_rec_A0) ) )
-            #loss_A += BVAELoss(4)([real_A0_mean, real_A0_log])
+            #loss_A = DLoss(rec_A0_B0_d_ones, rec_A0_B0_d)
+            loss_A = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( rec_A0, real_A0*real_A0m + (1-real_A0m)*0.5 ) )
+            #loss_A = 10*K.mean( K.abs ( (rec_A0+1) - ( (real_A0+1)*real_A0m + (1.0-real_A0m)-1.0 ) ) )
+
+            #loss_A += BVAELoss(4)([warped_A0_mean, warped_A0_log])
 
             weights_A = self.enc.trainable_weights + self.decA.trainable_weights
 
             #loss_B = ( DLoss(fake_B0_d_ones, fake_B0_d) + DLoss(rec_A0_B0_d_ones, rec_A0_B0_d) ) * 0.5
-            loss_B = K.mean( lambda_B * (MAELoss(rec_B0, real_rec_B0) ) )
-            #loss_B += BVAELoss(4)([real_B0_mean, real_B0_log])
+            loss_B = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( rec_B0, real_B0*real_B0m + (1-real_B0m)*0.5) )
+            #loss_B = 10*K.mean( K.abs ( (rec_B0+1) - ( (real_B0+1)*real_B0m + (1.0-real_B0m)-1.0 ) ) )
+            #loss_B += BVAELoss(4)([warped_B0_mean, warped_B0_log])
 
             weights_B = self.enc.trainable_weights + self.decB.trainable_weights
 
             def opt(lr=2e-5):
                 return Adam(lr=lr, beta_1=0.5, beta_2=0.999, tf_cpu_mode=2)#, clipnorm=1)
 
-            self.A_train = K.function ([real_A0, real_rec_A0, real_B0, real_rec_B0],[ loss_A ],
+            self.A_train = K.function ([warped_A0, real_A0, real_A0m, warped_B0, real_B0, real_B0m],[ loss_A ],
                                         opt(lr=2e-5).get_updates(loss_A, weights_A) )
 
-            self.B_train = K.function ([real_A0, real_rec_A0, real_B0, real_rec_B0],[ loss_B ],
+            self.B_train = K.function ([warped_A0, real_A0, real_A0m, warped_B0, real_B0, real_B0m],[ loss_B ],
                                         opt(lr=2e-5).get_updates(loss_B, weights_B) )
 
 
             ###########
-
-            loss_DA = ( DLoss(real_rec_A0_d_ones, real_rec_A0_d ) + \
+            """
+            loss_DA = ( DLoss(real_A0_d_ones, real_A0_d ) + \
                         DLoss(rec_A0_B0_d_zeros,  rec_A0_B0_d ) ) * 0.5
                         #DLoss(fake_A0_d_zeros, fake_A0_d ) ) * 0.5
 
-            self.DA_train = K.function ([real_A0, real_B0, real_rec_A0],[ loss_DA ],
+            self.DA_train = K.function ([warped_A0, warped_B0, warped_rec_A0],[ loss_DA ],
                                         opt(lr=2e-5).get_updates(loss_DA, self.DA.trainable_weights) )
 
             ############
 
-            loss_DB = ( DLoss(real_rec_B0_d_ones, real_rec_B0_d ) + \
+            loss_DB = ( DLoss(warped_rec_B0_d_ones, warped_rec_B0_d ) + \
                       ( DLoss(fake_B0_d_zeros, fake_B0_d) + DLoss(rec_A0_B0_d_zeros, rec_A0_B0_d) ) * 0.5  ) * 0.5
 
-            self.DB_train = K.function ([real_A0, real_B0, real_rec_B0],[ loss_DB ],
+            self.DB_train = K.function ([warped_A0, warped_B0, warped_rec_B0],[ loss_DB ],
                                         opt(lr=2e-5).get_updates(loss_DB, self.DB.trainable_weights) )
-
+            """
             ############
 
             t = SampleProcessor.Types
 
-            output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64, 'normalize_tanh':True},
-                                  {'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':resolution, 'normalize_tanh':True},
-                                  {'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution, 'normalize_tanh':True},
+            output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
+                                  {'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':resolution},
+                                  {'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution},
+                                  {'types': (t.IMG_SOURCE, t.NONE, t.MODE_M), 'resolution':128}
                                 ]
 
             self.set_training_data_generators ([
@@ -198,7 +202,7 @@ class AVATARModel(ModelBase):
                         output_sample_types=output_sample_types )
                    ])
         else:
-            self.G_convert = K.function([real_A0 ],[rec_A0_B0])
+            self.G_convert = K.function([warped_A0 ],[rec_A0_B0])
 
     #override
     def onSave(self):
@@ -212,15 +216,15 @@ class AVATARModel(ModelBase):
 
     #override
     def onTrainOneIter(self, generators_samples, generators_list):
-        warped_src, _, src,  = generators_samples[0]
-        warped_dst, _, dst,  = generators_samples[1]
+        warped_src, _, src, srcm, = generators_samples[0]
+        warped_dst, _, dst, dstm, = generators_samples[1]
 
-        loss_A, = self.A_train ( [warped_src, src, warped_dst, dst,] )
-        loss_B, = self.B_train ( [warped_src, src, warped_dst, dst,] )
-        loss_DA, = self.DA_train ( [warped_src, warped_dst, src] )
+        loss_A, = self.A_train ( [warped_src, src, srcm, warped_dst, dst, dstm] )
+        loss_B, = self.B_train ( [warped_src, src, srcm, warped_dst, dst, dstm] )
+        loss_DA, = 0,#self.DA_train ( [warped_src, warped_dst, src] )
         loss_DB, = 0,#self.DB_train ( [warped_src, warped_dst, dst] )
 
-        return ( ('A', loss_A), ('B', loss_B), ('DA', loss_DA), ('DB', loss_DB) )
+        return ( ('A', loss_A), ('B', loss_B), )# ('DA', loss_DA), ('DB', loss_DB) )
 
     #override
     def onGetPreview(self, sample):
@@ -234,8 +238,8 @@ class AVATARModel(ModelBase):
 
         G_view_result = self.G_view([test_A0, test_B0 ])
 
-        test_A0f, test_A0r, test_B0f, test_B0r, rec_A0, rec_B0, rec_A0_B0 = [ x[0] / 2 + 0.5 for x in ([test_A0f, test_A0r, test_B0f, test_B0r] + G_view_result)  ]
-
+        #test_A0f, test_A0r, test_B0f, test_B0r, rec_A0, rec_B0, rec_A0_B0 = [ x[0] / 2 + 0.5 for x in ([test_A0f, test_A0r, test_B0f, test_B0r] + G_view_result)  ]
+        test_A0f, test_A0r, test_B0f, test_B0r, rec_A0, rec_B0, rec_A0_B0 = [ x[0] for x in ([test_A0f, test_A0r, test_B0f, test_B0r] + G_view_result)  ]
         #r = np.concatenate ((np.concatenate ( (test_A0f, test_A0r), axis=1),
         #                     np.concatenate ( (test_B0, rec_B0), axis=1)
         #                     ), axis=0)
@@ -246,7 +250,7 @@ class AVATARModel(ModelBase):
     def predictor_func (self, inp_face_bgr):
         feed = [ inp_face_bgr[np.newaxis,...]*2-1 ]
         x = self.G_convert (feed)[0]
-        return np.clip ( x[0] / 2 + 0.5 , 0, 1)
+        return np.clip ( x[0]/2+0.5, 0, 1)
 
     # #override
     # def get_converter(self, **in_options):
@@ -416,7 +420,7 @@ class AVATARModel(ModelBase):
 
         def to_bgr (output_nc, **kwargs):
             def func(x):
-                return XConv2D(output_nc, kernel_size=5, use_bias=True, activation='tanh')(x)
+                return XConv2D(output_nc, kernel_size=5, use_bias=True, activation='sigmoid')(x)
             return func
 
         class ResidualBlock(object):
