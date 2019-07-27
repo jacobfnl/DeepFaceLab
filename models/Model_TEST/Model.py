@@ -56,6 +56,9 @@ class AVATARModel(ModelBase):
         dec_Inputs = [ Input(K.int_shape( self.enc.outputs[0] )[1:]) ]
         self.decA = modelify(AVATARModel.DFDecFlow (out_bgr_shape[2])) (dec_Inputs)
         self.decB = modelify(AVATARModel.DFDecFlow (out_bgr_shape[2])) (dec_Inputs)
+        
+        self.C = modelify(AVATARModel.ResNet (out_bgr_shape[2], use_batch_norm=False, n_blocks=6, ngf=ngf, use_dropout=True))(Input(out_bgr_shape))
+        
 
         self.DA = modelify(AVATARModel.PatchDiscriminator(ndf=ndf) ) (Input(out_bgr_shape))
         self.DB = modelify(AVATARModel.PatchDiscriminator(ndf=ndf) ) (Input(out_bgr_shape))
@@ -67,6 +70,7 @@ class AVATARModel(ModelBase):
                 (self.decB, 'decB.h5'),
                 (self.DA, 'DA.h5'),
                 (self.DB, 'DB.h5'),
+                (self.C, 'C.h5')
             ]
             self.load_weights_safe(weights_to_load)
 
@@ -125,7 +129,11 @@ class AVATARModel(ModelBase):
         rec_B0_d_ones = K.ones_like(rec_B0_d)
         rec_B0_d_zeros = K.zeros_like(rec_B0_d)
 
-        self.G_view = K.function([warped_A0, warped_B0],[rec_A0, rec_B0, rec_A0_B0])
+        rec_C_A0 = self.C ( real_A0*real_A0m + (1-real_A0m)*0.5 )
+        
+        rec_C_A0_B0 = self.C (rec_A0_B0)
+        
+        self.G_view = K.function([warped_A0, warped_B0],[rec_A0, rec_B0, rec_A0_B0, rec_C_A0_B0])
 
         if self.is_training_mode:
             def BVAELoss(beta=4):
@@ -154,6 +162,11 @@ class AVATARModel(ModelBase):
             #loss_B += BVAELoss(4)([warped_B0_mean, warped_B0_log])
 
             weights_B = self.enc.trainable_weights + self.decB.trainable_weights
+            
+
+            loss_C = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A0, rec_C_A0 ) )
+
+            weights_C = self.C.trainable_weights
 
             def opt(lr=2e-5):
                 return Adam(lr=lr, beta_1=0.5, beta_2=0.999, tf_cpu_mode=2)#, clipnorm=1)
@@ -164,7 +177,8 @@ class AVATARModel(ModelBase):
             self.B_train = K.function ([warped_A0, real_A0, real_A0m, warped_B0, real_B0, real_B0m],[ loss_B ],
                                         opt(lr=2e-5).get_updates(loss_B, weights_B) )
 
-
+            self.C_train = K.function ([real_A0, real_A0m],[ loss_C ],
+                                        opt(lr=2e-5).get_updates(loss_C, weights_C) )
             ###########
             """
             loss_DA = ( DLoss(real_A0_d_ones, real_A0_d ) + \
@@ -202,7 +216,7 @@ class AVATARModel(ModelBase):
                         output_sample_types=output_sample_types )
                    ])
         else:
-            self.G_convert = K.function([warped_A0 ],[rec_A0_B0])
+            self.G_convert = K.function([warped_B0 ],[rec_A0_B0])
 
     #override
     def onSave(self):
@@ -212,6 +226,7 @@ class AVATARModel(ModelBase):
                                  [self.decB, 'decB.h5'],
                                  [self.DA,    'DA.h5'],
                                  [self.DB,    'DB.h5'],
+                                 [self.C,     'C.h5']
                                  ])
 
     #override
@@ -221,10 +236,11 @@ class AVATARModel(ModelBase):
 
         loss_A, = self.A_train ( [warped_src, src, srcm, warped_dst, dst, dstm] )
         loss_B, = self.B_train ( [warped_src, src, srcm, warped_dst, dst, dstm] )
+        loss_C, = self.C_train ( [src, srcm] )
         loss_DA, = 0,#self.DA_train ( [warped_src, warped_dst, src] )
         loss_DB, = 0,#self.DB_train ( [warped_src, warped_dst, dst] )
 
-        return ( ('A', loss_A), ('B', loss_B), )# ('DA', loss_DA), ('DB', loss_DB) )
+        return ( ('A', loss_A), ('B', loss_B), ('C', loss_C) )# ('DA', loss_DA), ('DB', loss_DB) )
 
     #override
     def onGetPreview(self, sample):
@@ -238,19 +254,19 @@ class AVATARModel(ModelBase):
 
         G_view_result = self.G_view([test_A0, test_B0 ])
 
-        #test_A0f, test_A0r, test_B0f, test_B0r, rec_A0, rec_B0, rec_A0_B0 = [ x[0] / 2 + 0.5 for x in ([test_A0f, test_A0r, test_B0f, test_B0r] + G_view_result)  ]
-        test_A0f, test_A0r, test_B0f, test_B0r, rec_A0, rec_B0, rec_A0_B0 = [ x[0] for x in ([test_A0f, test_A0r, test_B0f, test_B0r] + G_view_result)  ]
+        #test_A0f, test_A0r, test_B0f, test_B0r, rec_A0, rec_B0, rec_A0_B0, rec_C_A0_B0 = [ x[0] / 2 + 0.5 for x in ([test_A0f, test_A0r, test_B0f, test_B0r] + G_view_result)  ]
+        test_A0f, test_A0r, test_B0f, test_B0r, rec_A0, rec_B0, rec_A0_B0, rec_C_A0_B0 = [ x[0] for x in ([test_A0f, test_A0r, test_B0f, test_B0r] + G_view_result)  ]
         #r = np.concatenate ((np.concatenate ( (test_A0f, test_A0r), axis=1),
         #                     np.concatenate ( (test_B0, rec_B0), axis=1)
         #                     ), axis=0)
-        r = np.concatenate ( (test_B0f, rec_B0, test_A0f, rec_A0, rec_A0_B0), axis=1 )
+        r = np.concatenate ( (test_B0f, rec_B0, test_A0f, rec_A0, rec_A0_B0, rec_C_A0_B0), axis=1 )
 
         return [ ('AVATAR', r ) ]
 
     def predictor_func (self, inp_face_bgr):
-        feed = [ inp_face_bgr[np.newaxis,...]*2-1 ]
+        feed = [ inp_face_bgr[np.newaxis,...] ]
         x = self.G_convert (feed)[0]
-        return np.clip ( x[0]/2+0.5, 0, 1)
+        return np.clip ( x[0], 0, 1)
 
     # #override
     # def get_converter(self, **in_options):
@@ -493,5 +509,59 @@ class AVATARModel(ModelBase):
         #    return to_bgr(output_nc) ( x )
             
         return func
+        
+    @staticmethod
+    def ResNet(output_nc, use_batch_norm, ngf=64, n_blocks=6, use_dropout=False):
+        exec (nnlib.import_all(), locals(), globals())
 
+        if not use_batch_norm:
+            use_bias = True
+            def XNormalization(x):
+                return InstanceNormalization (axis=-1)(x)
+        else:
+            use_bias = False
+            def XNormalization(x):
+                return BatchNormalization (axis=-1)(x)
+                
+        XConv2D = partial(Conv2D, padding='same', use_bias=use_bias)
+        XConv2DTranspose = partial(Conv2DTranspose, padding='same', use_bias=use_bias)
+
+        def func(input):
+
+
+            def ResnetBlock(dim, use_dropout=False):
+                def func(input):
+                    x = input
+
+                    x = XConv2D(dim, 3, strides=1)(x)
+                    x = XNormalization(x)
+                    x = ReLU()(x)
+
+                    if use_dropout:
+                        x = Dropout(0.5)(x)
+
+                    x = XConv2D(dim, 3, strides=1)(x)
+                    x = XNormalization(x)
+                    x = ReLU()(x)
+                    return Add()([x,input])
+                return func
+
+            x = input
+
+            x = ReLU()(XNormalization(XConv2D(ngf, 7, strides=1)(x)))
+
+            x = ReLU()(XNormalization(XConv2D(ngf*2, 3, strides=2)(x)))
+            x = ReLU()(XNormalization(XConv2D(ngf*4, 3, strides=2)(x)))
+
+            for i in range(n_blocks):
+                x = ResnetBlock(ngf*4, use_dropout=use_dropout)(x)
+
+            x = ReLU()(XNormalization(XConv2DTranspose(ngf*2, 3, strides=2)(x)))
+            x = ReLU()(XNormalization(XConv2DTranspose(ngf  , 3, strides=2)(x)))
+
+            x = XConv2D(output_nc, 7, strides=1, activation='sigmoid', use_bias=True)(x)
+
+            return x
+
+        return func
 Model = AVATARModel

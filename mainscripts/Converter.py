@@ -30,7 +30,7 @@ class ConvertSubprocessor(Subprocessor):
             self.converter   = client_dict['converter']
             self.output_path = Path(client_dict['output_dir']) if 'output_dir' in client_dict.keys() else None
             self.alignments  = client_dict['alignments']
-            self.avatar_image_paths = client_dict['avatar_image_paths']
+            self.avatar_alignments = client_dict['avatar_alignments']
             self.debug       = client_dict['debug']
 
             #transfer and set stdin in order to work code.interact in debug subprocess
@@ -57,7 +57,7 @@ class ConvertSubprocessor(Subprocessor):
 
             output_filename_path = self.output_path / (filename_path.stem + '.png')
 
-            if (self.converter.type == Converter.TYPE_FACE or self.converter.type == Converter.TYPE_FACE_AVATAR ) \
+            if (self.converter.type == Converter.TYPE_FACE ) \
                    and filename_path.stem not in self.alignments.keys():
                 if not self.debug:
                     self.log_info ( 'no faces found for %s, copying without faces' % (filename_path.name) )
@@ -101,16 +101,24 @@ class ConvertSubprocessor(Subprocessor):
                         faces_processed = 1
                     else:
                         self.log_err ("%s is not a dfl image file" % (filename_path.name) )
-
-                elif self.converter.type == Converter.TYPE_FACE or self.converter.type == Converter.TYPE_FACE_AVATAR:
+                        
+                elif self.converter.type == Converter.TYPE_FACE_AVATAR:
+                    filename_path, image_landmarks = self.avatar_alignments[idx]
+                    image = (cv2_imread(str(filename_path)) / 255.0).astype(np.float32)
+                    image = normalize_channels (image, 3)
                     
-                    """
-                    ava_face = None
-                    if self.converter.type == Converter.TYPE_FACE_AVATAR:
-                        ava_filename_path = self.avatar_image_paths[idx]
-                        ava_face = (cv2_imread(str(ava_filename_path)) / 255.0).astype(np.float32)
-                        ava_face = normalize_channels (ava_face, 3)
-                    """
+                    if self.debug:
+                        debug_images = self.converter.cli_convert_face(image, image_landmarks, self.debug)
+                    else:
+                        image = self.converter.cli_convert_face(image, image_landmarks, self.debug)
+                        
+                    if self.debug:
+                        return (1, debug_images)
+
+                    faces_processed = 1
+                    
+                elif self.converter.type == Converter.TYPE_FACE:
+
                     faces = self.alignments[filename_path.stem]
 
                     if self.debug:
@@ -151,7 +159,7 @@ class ConvertSubprocessor(Subprocessor):
             return filename
 
     #override
-    def __init__(self, converter, input_path_image_paths, output_path, alignments, avatar_image_paths=None, debug = False):
+    def __init__(self, converter, input_path_image_paths, output_path, alignments, avatar_alignments=None, debug = False):
         super().__init__('Converter', ConvertSubprocessor.Cli, 86400 if debug == True else 60)
 
         self.converter = converter
@@ -159,7 +167,7 @@ class ConvertSubprocessor(Subprocessor):
         self.input_data_idxs = [ *range(len(self.input_data)) ]
         self.output_path = output_path
         self.alignments = alignments
-        self.avatar_image_paths = avatar_image_paths
+        self.avatar_alignments = avatar_alignments
         self.debug = debug
 
         self.files_processed = 0
@@ -175,7 +183,7 @@ class ConvertSubprocessor(Subprocessor):
                                       'converter' : self.converter,
                                       'output_dir' : str(self.output_path),
                                       'alignments' : self.alignments,
-                                      'avatar_image_paths' : self.avatar_image_paths,
+                                      'avatar_alignments' : self.avatar_alignments,
                                       'debug': self.debug,
                                       'stdin_fd': sys.stdin.fileno() if self.debug else None
                                       }
@@ -256,7 +264,7 @@ def main (args, device_args):
 
         input_path_image_paths = Path_utils.get_image_paths(input_path)
         alignments = None
-        avatar_image_paths = None
+        avatar_alignments = []
         if converter.type == Converter.TYPE_FACE or converter.type == Converter.TYPE_FACE_AVATAR:
             if aligned_dir is None:
                 io.log_err('Aligned directory not found. Please ensure it exists.')
@@ -289,45 +297,23 @@ def main (args, device_args):
                     alignments[ source_filename_stem ] = []
 
                 alignments[ source_filename_stem ].append (dflimg.get_source_landmarks())
+                avatar_alignments += [ ( str(filepath), dflimg.get_source_landmarks(), dflimg.get_source_filename() ) ]
         
-        """
-        if converter.type == Converter.TYPE_FACE_AVATAR:
-            if avaperator_aligned_dir is None:
-                io.log_err('Avatar operator aligned directory not found. Please ensure it exists.')
-                return
-
-            avaperator_aligned_path = Path(avaperator_aligned_dir)
-            if not avaperator_aligned_path.exists():
-                io.log_err('Avatar operator aligned directory not found. Please ensure it exists.')
-                return
-
-            avatar_image_paths = []
-            for filename in io.progress_bar_generator( Path_utils.get_image_paths(avaperator_aligned_path) , "Sorting avaperator faces"):
-                filepath = Path(filename)
-                if filepath.suffix == '.png':
-                    dflimg = DFLPNG.load( str(filepath) )
-                elif filepath.suffix == '.jpg':
-                    dflimg = DFLJPG.load ( str(filepath) )
-                else:
-                    dflimg = None
-
-                if dflimg is None:
-                    io.log_err ("Fatal error: %s is not a dfl image file" % (filepath.name) )
-                    return
-                
-                avatar_image_paths += [ (filename, dflimg.get_source_filename() ) ]
-            avatar_image_paths = [ p[0] for p in sorted(avatar_image_paths, key=operator.itemgetter(1)) ]
+        avatar_alignments = [ (p[0],p[1]) for p in sorted(avatar_alignments, key=operator.itemgetter(2)) ]
                     
-            if len(input_path_image_paths) < len(avatar_image_paths):
-                io.log_err("Input faces count must be >= avatar operator faces count.")
-                return
-        """        
+        if converter.type == Converter.TYPE_FACE_AVATAR:
+            input_path_image_paths = [ x[0] for x in avatar_alignments ]
+            
+            #if len(input_path_image_paths) < len(avatar_alignments):
+            #    io.log_err("Input faces count must be >= avatar operator faces count.")
+            #    return
+           
         files_processed, faces_processed = ConvertSubprocessor (
                     converter              = converter,
                     input_path_image_paths = input_path_image_paths,                    
                     output_path            = output_path,
                     alignments             = alignments,
-                    avatar_image_paths     = avatar_image_paths,
+                    avatar_alignments      = avatar_alignments,
                     debug                  = args.get('debug',False)
                     ).run()
 
