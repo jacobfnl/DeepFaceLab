@@ -60,7 +60,7 @@ class AVATARModel(ModelBase):
         self.decA64 = modelify(AVATARModel.DFDec64Flow (out_bgr_shape[2])) (dec_Inputs)
         self.decB64 = modelify(AVATARModel.DFDec64Flow (out_bgr_shape[2])) (dec_Inputs)
         
-        self.C = modelify(AVATARModel.ResNet (out_bgr_shape[2], use_batch_norm=False, n_blocks=6, ngf=ngf, use_dropout=True))(Input(out_bgr_shape))
+        self.C = modelify(AVATARModel.ResNet (out_bgr_shape[2], use_batch_norm=False, n_blocks=6, ngf=128, use_dropout=True))(Input(out_bgr_shape))
         
 
         #self.DA = modelify(AVATARModel.PatchDiscriminator(ndf=ndf) ) (Input(out_bgr_shape))
@@ -153,14 +153,14 @@ class AVATARModel(ModelBase):
 
             #loss_A += BVAELoss(4)([warped_A0_mean, warped_A0_log])
 
-            weights_A = self.decA.trainable_weights
+            weights_A = self.enc.trainable_weights + self.decA.trainable_weights
 
             #loss_B = ( DLoss(fake_B0_d_ones, fake_B0_d) + DLoss(rec_A0_B0_d_ones, rec_A0_B0_d) ) * 0.5
             loss_B = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( rec_B0, real_B0*real_B0m + (1-real_B0m)*0.5) )
             #loss_B = 10*K.mean( K.abs ( (rec_B0+1) - ( (real_B0+1)*real_B0m + (1.0-real_B0m)-1.0 ) ) )
             #loss_B += BVAELoss(4)([warped_B0_mean, warped_B0_log])
 
-            weights_B = self.decB.trainable_weights
+            weights_B = self.enc.trainable_weights + self.decB.trainable_weights
             
 
             loss_C = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A0, rec_C_A0 ) )
@@ -495,14 +495,14 @@ class AVATARModel(ModelBase):
             else:
                 return LeakyReLU(alpha=lrelu_alpha)
 
-        def upscale (dim, **kwargs):
+        def upscale (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
-                return Act('relu')( XNormalization(XConv2DTranspose(dim, kernel_size=3, strides=2)(x)))
+                return SubpixelUpscaler()(LeakyReLU(alpha=0.2)(Conv2D(dim * 4, kernel_size=3, strides=1, padding=padding)(x)))
             return func
 
         def to_bgr (output_nc, **kwargs):
             def func(x):
-                return XConv2D(output_nc, kernel_size=5, use_bias=True, activation='sigmoid')(x)
+                return Conv2D(output_nc, kernel_size=5, padding='same', use_bias=True, activation='sigmoid')(x)
             return func
 
         class ResidualBlock(object):
@@ -531,18 +531,14 @@ class AVATARModel(ModelBase):
             x = input[0]
             x = upscale(512)( x )
             x = ResidualBlock(512)(x)
-            x = ResidualBlock(512)(x)
             
             x = upscale(256)( x )
-            x = ResidualBlock(256)(x)
             x = ResidualBlock(256)(x)
 
             x = upscale(128)( x )
             x = ResidualBlock(128)(x)
-            x = ResidualBlock(128)(x)
 
             x = upscale(64)( x )
-            x = ResidualBlock(64)(x)
             x = ResidualBlock(64)(x)
 
             return to_bgr(output_nc) ( x )
