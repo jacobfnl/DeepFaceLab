@@ -43,7 +43,8 @@ class SampleGeneratorImageTemporal(SampleGeneratorBase):
             raise ValueError('No training data provided.')
 
         mult_max = 4
-        samples_sub_len = samples_len - (self.temporal_image_count-1)*mult_max 
+        samples_sub_len = samples_len - ( (self.temporal_image_count)*mult_max - (mult_max-1)  )
+        
         if samples_sub_len <= 0:
             raise ValueError('Not enough samples to fit temporal line.')
 
