@@ -135,8 +135,8 @@ class AVATARModel(ModelBase):
 
             loss_AB = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( rec_A0, real_A0*real_A0m + (1-real_A0m)*0.5 ) ) + \
                       K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( rec_B0, real_B0*real_B0m + (1-real_B0m)*0.5) )
-            weights_AB = self.enc.trainable_weights + self.decA.trainable_weights + self.decB.trainable_weights
-
+            weights_AB = self.decA.trainable_weights + self.decB.trainable_weights
+#
             loss_C = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t0, rec_C_A_t0 ) ) + \
                      K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t1, rec_C_A_t1 ) ) + \
                      K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t2, rec_C_A_t2 ) ) 
@@ -161,12 +161,12 @@ class AVATARModel(ModelBase):
 
             self.set_training_data_generators ([
                     SampleGeneratorFace(self.training_data_src_path, debug=self.is_debug(), batch_size=self.batch_size,
-                        sample_process_options=SampleProcessor.Options(random_flip=False),
+                        sample_process_options=SampleProcessor.Options(random_flip=False, rotation_range=[-20,20]),
                         output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL, t.MODE_BGR), 'resolution':64},
                                               {'types': (t.IMG_TRANSFORMED, t.FACE_TYPE_FULL, t.MODE_BGR), 'resolution':64},
                                             ] ),
                     SampleGeneratorFace(self.training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
-                        sample_process_options=SampleProcessor.Options(random_flip=False),
+                        sample_process_options=SampleProcessor.Options(random_flip=False, rotation_range=[-20,20]),
                         output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL, t.MODE_BGR), 'resolution':64},
                                               {'types': (t.IMG_TRANSFORMED, t.FACE_TYPE_FULL, t.MODE_BGR), 'resolution':64},
                                             ] ),
@@ -260,7 +260,7 @@ class AVATARModel(ModelBase):
 
         test_A0f, test_A0r, test_B0f, test_B0r, t_dst_0, t_dst_1, t_dst_2, rec_A0, rec_B0, rec_AB_t1, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 = [ x[0] for x in ([test_A0f, test_A0r, test_B0f, test_B0r, t_dst_0, t_dst_1, t_dst_2, ] + G_view_result)  ]
 
-
+        #r = sample64x4
         r = np.concatenate ( (sample64x4, test_B0f, rec_B0, test_A0f, rec_A0, rec_AB_t1, t_dst_0, t_dst_1, t_dst_2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 ), axis=1 )
 
         return [ ('AVATAR', r ) ]
