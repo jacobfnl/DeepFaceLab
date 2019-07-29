@@ -36,6 +36,7 @@ class AVATARModel(ModelBase):
 
         resolution = self.options['resolution']
         in_bgr_shape = (64, 64, 3)
+        bgr_64_mask_shape = (64,64,1)
         out_bgr_shape = (resolution, resolution, 3)
         bgr_t_shape = (resolution, resolution, 9)
         mask_shape = (resolution, resolution, 1)
@@ -71,6 +72,7 @@ class AVATARModel(ModelBase):
 
         warped_A064 = Input(in_bgr_shape)
         real_A064 = Input(in_bgr_shape)
+        real_A064m = Input(bgr_64_mask_shape)
         real_A0 = Input(out_bgr_shape)
         real_A0m = Input(mask_shape)
         
@@ -87,6 +89,7 @@ class AVATARModel(ModelBase):
         
         warped_B064 = Input(in_bgr_shape)
         real_B064 = Input(in_bgr_shape)
+        real_B064m = Input(bgr_64_mask_shape)
         real_B0 = Input(out_bgr_shape)
         real_B0m = Input(mask_shape)
         
@@ -126,17 +129,19 @@ class AVATARModel(ModelBase):
         self.G_view = K.function([warped_A064, warped_B064, real_B64_t0, real_B64_t1, real_B64_t2], [rec_A0, rec_B0, rec_AB_t1, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2])
 
         if self.is_training_mode:
-
-            loss_AB64 = K.mean( 10 * dssim(kernel_size=5,max_value=1.0) ( real_A064, rec_A064 ) ) + \
-                        K.mean( 10 * dssim(kernel_size=5,max_value=1.0) ( real_B064, rec_B064 ) )
+            loss_AB64 = K.mean( 10 * dssim(kernel_size=5,max_value=1.0) ( real_A064*real_A064m, rec_A064*real_A064m ) ) + \
+                        K.mean( 10 * dssim(kernel_size=5,max_value=1.0) ( real_B064*real_B064m, rec_B064*real_B064m ) )
+            
+            #loss_AB64 = 50 * K.mean(K.abs (real_A064-rec_A064) ) + \
+            #            50 * K.mean(K.abs (real_B064-rec_B064) )
             
             weights_AB64 = self.enc.trainable_weights + self.decA64.trainable_weights + self.decB64.trainable_weights
 
 
             loss_AB = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( rec_A0, real_A0*real_A0m + (1-real_A0m)*0.5 ) ) + \
                       K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( rec_B0, real_B0*real_B0m + (1-real_B0m)*0.5) )
-            weights_AB = self.decA.trainable_weights + self.decB.trainable_weights
-#
+            weights_AB = self.enc.trainable_weights + self.decA.trainable_weights + self.decB.trainable_weights
+
             loss_C = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t0, rec_C_A_t0 ) ) + \
                      K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t1, rec_C_A_t1 ) ) + \
                      K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t2, rec_C_A_t2 ) ) 
@@ -146,7 +151,7 @@ class AVATARModel(ModelBase):
             def opt(lr=5e-5):
                 return Adam(lr=lr, beta_1=0.5, beta_2=0.999, tf_cpu_mode=2)#, clipnorm=1)
 
-            self.AB64_train = K.function ([warped_A064, real_A064, warped_B064, real_B064], [loss_AB64], opt(lr=5e-5).get_updates(loss_AB64, weights_AB64) )
+            self.AB64_train = K.function ([warped_A064, real_A064, real_A064m, warped_B064, real_B064, real_B064m], [loss_AB64], opt(lr=5e-5).get_updates(loss_AB64, weights_AB64) )
             self.AB_train = K.function ([warped_A064, real_A0, real_A0m, warped_B064, real_B0, real_B0m],[ loss_AB ], opt(lr=5e-5).get_updates(loss_AB, weights_AB) )
             self.C_train = K.function ([ real_A_t0, real_Am_t0, real_A_t1, real_Am_t1, real_A_t2, real_Am_t2 ],[ loss_C ], opt(lr=5e-5).get_updates(loss_C, weights_C) )
             ###########
@@ -161,14 +166,16 @@ class AVATARModel(ModelBase):
 
             self.set_training_data_generators ([
                     SampleGeneratorFace(self.training_data_src_path, debug=self.is_debug(), batch_size=self.batch_size,
-                        sample_process_options=SampleProcessor.Options(random_flip=False, rotation_range=[-20,20]),
-                        output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL, t.MODE_BGR), 'resolution':64},
-                                              {'types': (t.IMG_TRANSFORMED, t.FACE_TYPE_FULL, t.MODE_BGR), 'resolution':64},
+                        sample_process_options=SampleProcessor.Options(random_flip=False),
+                        output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
+                                              {'types': (t.IMG_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
+                                              {'types': (t.IMG_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_M), 'resolution':64}
                                             ] ),
                     SampleGeneratorFace(self.training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
-                        sample_process_options=SampleProcessor.Options(random_flip=False, rotation_range=[-20,20]),
-                        output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL, t.MODE_BGR), 'resolution':64},
-                                              {'types': (t.IMG_TRANSFORMED, t.FACE_TYPE_FULL, t.MODE_BGR), 'resolution':64},
+                        sample_process_options=SampleProcessor.Options(random_flip=False),
+                        output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
+                                              {'types': (t.IMG_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
+                                              {'types': (t.IMG_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_M), 'resolution':64}
                                             ] ),
                                            
                     SampleGeneratorFace(self.training_data_src_path, debug=self.is_debug(), batch_size=self.batch_size,
@@ -210,15 +217,15 @@ class AVATARModel(ModelBase):
 
     #override
     def onTrainOneIter(self, generators_samples, generators_list):
-        warped_src64, src64 = generators_samples[0]
-        warped_dst64, dst64 = generators_samples[1]
+        warped_src64, src64, src64m = generators_samples[0]
+        warped_dst64, dst64, dst64m = generators_samples[1]
         
         warped_src64, _, src, srcm, = generators_samples[2]
         warped_dst64, _, dst, dstm, = generators_samples[3]        
         t_src_0, t_srcm_0, t_src_1, t_srcm_1, t_src_2, t_srcm_2, = generators_samples[4]
         
 
-        loss_AB64, = self.AB64_train ( [warped_src64, src64, warped_dst64, dst64] )
+        loss_AB64, = 0,#= self.AB64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] )
         loss_AB, = self.AB_train ( [warped_src64, src, srcm, warped_dst64, dst, dstm] )
         loss_C, = self.C_train ( [ t_src_0, t_srcm_0, t_src_1, t_srcm_1, t_src_2, t_srcm_2 ] )
 
@@ -228,9 +235,11 @@ class AVATARModel(ModelBase):
     def onGetPreview(self, sample):
         test_A064w  = sample[0][0][0:4]
         test_A064r  = sample[0][1][0:4]
+        test_A064m  = sample[0][2][0:4]
         
         test_B064w  = sample[1][0][0:4]
         test_B064r  = sample[1][1][0:4]
+        test_B064m  = sample[1][2][0:4]
         
         test_A064   = sample[2][0][0:4]
         test_A0f  = sample[2][1][0:4]
@@ -341,10 +350,10 @@ class AVATARModel(ModelBase):
     def DFEncFlow(padding='zero', **kwargs):
         exec (nnlib.import_all(), locals(), globals())
 
-        #use_bias = True
-        #def XNormalization(x):
-        #    return x#BatchNormalization (axis=-1)(x)
-        #XConv2D = partial(Conv2D, padding=padding, use_bias=use_bias)
+        use_bias = False
+        def XNorm(x):
+            return BatchNormalization (axis=-1)(x)
+        XConv2D = partial(Conv2D, padding=padding, use_bias=use_bias)
 
         #def Act(lrelu_alpha=0.1):
         #    return LeakyReLU(alpha=lrelu_alpha)
@@ -357,15 +366,56 @@ class AVATARModel(ModelBase):
         #downscale = partial(downscale)
         def downscale (dim):
             def func(x):
-                return LeakyReLU(0.1)(Conv2D(dim, 5, strides=2, padding='same')(x))
+                return  LeakyReLU(0.1)( Conv2D(dim, 5, strides=2, padding='same')(x))#BlurPool(filt_size=5)(
             return func
 
         def upscale (dim):
             def func(x):
-                return PixelShuffler()(LeakyReLU(0.1)(Conv2D(dim * 4, 3, strides=1, padding='same')(x)))
+                return SubpixelUpscaler()(LeakyReLU(0.1)(Conv2D(dim * 4, 3, strides=1, padding='same')(x)))
             return func
-                
+        """
+        def self_attn_block(inp, nc, squeeze_factor=8):
+            assert nc//squeeze_factor > 0, f"Input channels must be >= {squeeze_factor}, recieved nc={nc}"
+            x = inp
+            shape_x = x.get_shape().as_list()
+            
+            f = Conv2D(nc//squeeze_factor, 1, kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+            g = Conv2D(nc//squeeze_factor, 1, kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+            h = Conv2D(nc, 1, kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+            
+            shape_f = f.get_shape().as_list()
+            shape_g = g.get_shape().as_list()
+            shape_h = h.get_shape().as_list()
+            flat_f = Reshape( (-1, shape_f[-1]) )(f)
+            flat_g = Reshape( (-1, shape_g[-1]) )(g)
+            flat_h = Reshape( (-1, shape_h[-1]) )(h)   
+
+            s = Lambda(lambda x: K.batch_dot(x[0], keras.layers.Permute((2,1))(x[1]) ))([flat_g, flat_f])
+            beta = keras.layers.Softmax(axis=-1)(s)
+            o = Lambda(lambda x: K.batch_dot(x[0], x[1]))([beta, flat_h])
+            
+            o = Reshape(shape_x[1:])(o)
+            o = Scale()(o)
+            
+            out = Add()([o, inp])
+            return out     
+        """
+               
         def func(input):
+            x, = input
+            b,h,w,c = K.int_shape(x)
+            
+            x = downscale(128)(x)
+            x = downscale(256)(x)
+            x = downscale(512)(x)
+            x = downscale(1024)(x)
+
+            x = Dense(256)(Flatten()(x))
+            x = Dense(4 * 4 * 512)(x)
+            x = Reshape((4, 4, 512))(x) 
+            x = upscale(512)(x)   
+            return x
+            
             x, = input
             b,h,w,c = K.int_shape(x)
             
@@ -425,15 +475,36 @@ class AVATARModel(ModelBase):
             def func(x):
                 return Conv2D(output_nc, kernel_size=5, strides=1, padding='same', activation='sigmoid')(x)
             return func
+        class ResidualBlock(object):
+            def __init__(self, filters, kernel_size=3, padding='zero', norm='', act='', **kwargs):
+                self.filters = filters
+                self.kernel_size = kernel_size
+                self.padding = padding
+                self.norm = norm
+                self.act = act
 
+            def __call__(self, inp):
+                x = inp
+                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
+                x = LeakyReLU(alpha=0.2)(x)
+                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
+                x = Add()([x, inp])
+                x = LeakyReLU(alpha=0.2)(x)
+                return x
         upscale = partial(upscale)
         to_bgr = partial(to_bgr)
 
         def func(input):
-            x = input[0]            
-            x = upscale(512)( x )
+            x = input[0]                     
+                       
             x = upscale(256)( x )
+            x = ResidualBlock(256)(x)
+
             x = upscale(128)( x )
+            x = ResidualBlock(128)(x)
+
+            x = upscale(64)( x )
+            x = ResidualBlock(64)(x)
             return to_bgr(output_nc) ( x )
             
         return func
@@ -477,10 +548,10 @@ class AVATARModel(ModelBase):
             def __call__(self, inp):
                 x = inp
                 x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
-                x = Act(lrelu_alpha=0.2)(x)
+                x = LeakyReLU(alpha=0.2)(x)
                 x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
                 x = Add()([x, inp])
-                x = Act(lrelu_alpha=0.2)(x)
+                x = LeakyReLU(alpha=0.2)(x)
                 return x
 
         upscale = partial(upscale)
@@ -489,7 +560,7 @@ class AVATARModel(ModelBase):
         dims = 64
 
         def func(input):
-            x = input[0]
+            x = input[0]            
             x = upscale(512)( x )
             x = ResidualBlock(512)(x)
             

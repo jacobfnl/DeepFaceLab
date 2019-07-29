@@ -461,7 +461,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
             """
             https://arxiv.org/abs/1904.11486 https://github.com/adobe/antialiased-cnns
             """
-            def __init__(self, filt_size=5, stride=2, **kwargs):
+            def __init__(self, filt_size=3, stride=2, **kwargs):
                 self.strides = (stride,stride)
                 self.filt_size = filt_size
                 self.padding = ( (int(1.*(filt_size-1)/2), int(np.ceil(1.*(filt_size-1)/2)) ), (int(1.*(filt_size-1)/2), int(np.ceil(1.*(filt_size-1)/2)) ) )
