@@ -61,7 +61,7 @@ class SampleGeneratorImageTemporal(SampleGeneratorBase):
                 idx = shuffle_idxs.pop()
 
                 temporal_samples = []
-                mult = np.random.randint(mult_max)
+                mult = np.random.randint(mult_max)+1
                 for i in range( self.temporal_image_count ):
                     sample = samples[ idx+i*mult ]
                     try:

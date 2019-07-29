@@ -84,7 +84,15 @@ class AVATARModel(ModelBase):
         real_A0 = Input(out_bgr_shape)
         real_A0m = Input(mask_shape)
         
+        real_A_t0 = Input(out_bgr_shape)
+        real_Am_t0 = Input(mask_shape)
+        real_A_t1 = Input(out_bgr_shape)
+        real_Am_t1 = Input(mask_shape)
+        real_A_t2 = Input(out_bgr_shape)
+        real_Am_t2 = Input(mask_shape)
+        
         warped_B064 = Input(in_bgr_shape)
+        warped_B0 = Input(in_bgr_shape)
         real_B064 = Input(in_bgr_shape)
         real_B0 = Input(out_bgr_shape)
         real_B0m = Input(mask_shape)
@@ -95,13 +103,14 @@ class AVATARModel(ModelBase):
         warped_A0_code = self.enc (warped_A064)
         warped_B0_code = self.enc (warped_B064)
         
+        
         rec_A064 = self.decA64 (warped_A0_code)
         rec_B064 = self.decB64 (warped_B0_code)
         rec_A0B064 = self.decA64 (warped_B0_code)
 
         rec_A0 = self.decA (warped_A0_code)
         rec_B0 = self.decB (warped_B0_code)
-        rec_A0_B0 = self.decA (warped_B0_code)
+        rec_A0_B0 = self.decA ( self.enc (warped_B0) )
 
         #real_A0_d = self.DA(real_A0)
         #real_A0_d_ones = K.ones_like(real_A0_d)
@@ -122,11 +131,27 @@ class AVATARModel(ModelBase):
         #rec_B0_d_zeros = K.zeros_like(rec_B0_d)
 
         rec_C_A0 = self.C ( real_A0*real_A0m + (1-real_A0m)*0.5 )
+
+        #import code
+        #code.interact(local=dict(globals(), **locals()))
+
+        #x = self.C ( K.concatenate ( [real_A_t0*real_Am_t0 + (1-real_Am_t0)*0.5,
+        #                              real_A_t1*real_Am_t1 + (1-real_Am_t1)*0.5,
+        #                              real_A_t2*real_Am_t2 + (1-real_Am_t2)*0.5
+        #                             ] , axis=-1) )
+        #rec_C_A_t0 = Lambda ( lambda x: x[...,0:3], output_shape= ( K.int_shape(x)[1:3], 3 ) ) ()
+        #rec_C_A_t1 = Lambda ( lambda x: x[...,3:6], output_shape= ( K.int_shape(x)[1:3], 3 ) ) ()
+        #rec_C_A_t2 = Lambda ( lambda x: x[...,6:9], output_shape= ( K.int_shape(x)[1:3], 3 ) ) ()
+        #
+        #loss_C = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t0, rec_C_A_t0 ) ) + \
+        #         K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t1, rec_C_A_t1 ) ) + \
+        #         K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t2, rec_C_A_t2 ) ) 
+        
         
         rec_C_A0_B0 = self.C (rec_A0_B0)
         
         self.G64_view = K.function([warped_A064, warped_B064],[rec_A064, rec_B064, rec_A0B064])
-        self.G_view = K.function([warped_A064, warped_B064],[rec_A0, rec_B0, rec_A0_B0, rec_C_A0_B0])
+        self.G_view = K.function([warped_A064, warped_B064, warped_B0],[rec_A0, rec_B0, rec_A0_B0, rec_C_A0_B0])
 
         if self.is_training_mode:
             def BVAELoss(beta=4):
@@ -204,7 +229,7 @@ class AVATARModel(ModelBase):
             t = SampleProcessor.Types
 
             output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
-            
+                                  {'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
                                   {'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':resolution},
                                   {'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution},
                                   {'types': (t.IMG_SOURCE, t.NONE, t.MODE_M), 'resolution':128}
@@ -225,10 +250,25 @@ class AVATARModel(ModelBase):
                     SampleGeneratorFace(self.training_data_src_path, debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=False, rotation_range=[0,0]),
                         output_sample_types=output_sample_types ),
-
+#
                     SampleGeneratorFace(self.training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=False, rotation_range=[0,0]),
-                        output_sample_types=output_sample_types )
+                        output_sample_types=output_sample_types ),
+                        
+                    #SampleGeneratorFaceTemporal(self.training_data_src_path, debug=self.is_debug(), batch_size=self.batch_size, 
+                    #    temporal_image_count=3,
+                    #    sample_process_options=SampleProcessor.Options(random_flip=False), 
+                    #    output_sample_types=[{'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution},
+                    #                         {'types': (t.IMG_SOURCE, t.NONE, t.MODE_M), 'resolution':128}
+                    #                        ] ),
+                        
+                    #SampleGeneratorFaceTemporal(self.training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size, 
+                    #    temporal_image_count=3,
+                    #    sample_process_options=SampleProcessor.Options(random_flip=False), 
+                    #    output_sample_types=[{'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution},
+                    #                         {'types': (t.IMG_SOURCE, t.NONE, t.MODE_M), 'resolution':128}
+                    #                        ] ), ),
+                                            
                    ])
         else:
             self.G_convert = K.function([warped_B064],[rec_C_A0_B0])
@@ -251,17 +291,20 @@ class AVATARModel(ModelBase):
         warped_src64, src64 = generators_samples[0]
         warped_dst64, dst64 = generators_samples[1]
         
-        warped_src, _, src, srcm, = generators_samples[2]
-        warped_dst, _, dst, dstm, = generators_samples[3]
+        warped_src64, _, _, src, srcm, = generators_samples[2]
+        warped_dst64, _, _, dst, dstm, = generators_samples[3]
+        
+        #t_src_0, t_srcm_0, t_src_1, t_srcm_1, t_src_2, t_srcm_2, = generators_samples[4]
+        
         
         loss_A64, = self.A64_train ( [warped_src64, src64] )
         loss_B64, = self.B64_train ( [warped_dst64, dst64] )
         
-        loss_A, = self.A_train ( [warped_src, src, srcm] )
-        loss_B, = self.B_train ( [warped_dst, dst, dstm] )
+        loss_A, = self.A_train ( [warped_src64, src, srcm] )
+        loss_B, = self.B_train ( [warped_dst64, dst, dstm] )
         loss_C, = self.C_train ( [src, srcm] )
-        #loss_DA, = 0,#self.DA_train ( [warped_src, warped_dst, src] )
-        #loss_DB, = 0,#self.DB_train ( [warped_src, warped_dst, dst] )
+        #loss_DA, = 0,#self.DA_train ( [warped_src64, warped_dst64, src] )
+        #loss_DB, = 0,#self.DB_train ( [warped_src64, warped_dst64, dst] )
 
         return ( ('AB64', (loss_A64+loss_B64)/2 ), ('AB', (loss_A+loss_B) / 2), ('C', loss_C) ) # ('DA', loss_DA), ('DB', loss_DB) )
 
@@ -273,14 +316,16 @@ class AVATARModel(ModelBase):
         test_B064w  = sample[1][0][0:4]
         test_B064r  = sample[1][1][0:4]
         
-        test_A0   = sample[2][0][0:4]
-        test_A0f  = sample[2][1][0:4]
-        test_A0r  = sample[2][2][0:4]
+        test_A064   = sample[2][0][0:4]
+        test_A0   = sample[2][1][0:4]
+        test_A0f  = sample[2][2][0:4]
+        test_A0r  = sample[2][3][0:4]
 
-        test_B0  = sample[3][0][0:4]
-        test_B0f  = sample[3][1][0:4]
-        test_B0r  = sample[3][2][0:4]
-        test_B0m  = sample[3][3][0:4]
+        test_B064  = sample[3][0][0:4]
+        test_B0   = sample[3][1][0:4]
+        test_B0f  = sample[3][2][0:4]
+        test_B0r  = sample[3][3][0:4]
+        test_B0m  = sample[3][4][0:4]
         
         G64_view_result = self.G64_view ([test_A064w, test_B064w])
         test_A064r, test_B064r, rec_A064, rec_B064, rec_A0B064 = [ x[0] for x in ([test_A064r, test_B064r] + G64_view_result)  ]
@@ -290,7 +335,7 @@ class AVATARModel(ModelBase):
                                        
         #todo sample64x4 = cv2.resize (sample64x4, (self.resolution, self.resolution) )
         
-        G_view_result = self.G_view([test_A0, test_B0 ])
+        G_view_result = self.G_view([test_A064, test_B064, test_B0 ])
 
         test_A0f, test_A0r, test_B0f, test_B0r, rec_A0, rec_B0, rec_A0_B0, rec_C_A0_B0 = [ x[0] for x in ([test_A0f, test_A0r, test_B0f, test_B0r] + G_view_result)  ]
         
