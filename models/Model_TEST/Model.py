@@ -126,7 +126,7 @@ class AVATARModel(ModelBase):
 
  
         self.G64_view = K.function([warped_A064, warped_B064],[rec_A064, rec_B064, rec_A0B064])
-        self.G_view = K.function([warped_A064, warped_B064, real_B64_t0, real_B64_t1, real_B64_t2], [rec_A0, rec_B0, rec_AB_t1, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2])
+        self.G_view = K.function([warped_A064, warped_B064, real_B64_t0, real_B64_t1, real_B64_t2], [rec_A0, rec_B0, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2])
 
         if self.is_training_mode:
             loss_AB64 = K.mean( 10 * dssim(kernel_size=5,max_value=1.0) ( real_A064*real_A064m, rec_A064*real_A064m ) ) + \
@@ -267,10 +267,10 @@ class AVATARModel(ModelBase):
 
         G_view_result = self.G_view([test_A064, test_B064, t_dst64_0, t_dst64_1, t_dst64_2 ])
 
-        test_A0f, test_A0r, test_B0f, test_B0r, t_dst_0, t_dst_1, t_dst_2, rec_A0, rec_B0, rec_AB_t1, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 = [ x[0] for x in ([test_A0f, test_A0r, test_B0f, test_B0r, t_dst_0, t_dst_1, t_dst_2, ] + G_view_result)  ]
+        test_A0f, test_A0r, test_B0f, test_B0r, t_dst_0, t_dst_1, t_dst_2, rec_A0, rec_B0, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 = [ x[0] for x in ([test_A0f, test_A0r, test_B0f, test_B0r, t_dst_0, t_dst_1, t_dst_2, ] + G_view_result)  ]
 
         #r = sample64x4
-        r = np.concatenate ( (sample64x4, test_B0f, rec_B0, test_A0f, rec_A0, rec_AB_t1, t_dst_0, t_dst_1, t_dst_2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 ), axis=1 )
+        r = np.concatenate ( (sample64x4, test_B0f, rec_B0, test_A0f, rec_A0, t_dst_0, t_dst_1, t_dst_2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 ), axis=1 )
 
         return [ ('AVATAR', r ) ]
 
