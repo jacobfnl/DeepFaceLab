@@ -202,7 +202,7 @@ class AVATARModel(ModelBase):
                                             
                    ])
         else:
-            self.G_convert = K.function([warped_B064],[rec_C_A0_B0])
+            self.G_convert = K.function([real_B64_t0, real_B64_t1, real_B64_t2],[rec_C_AB_t1])
 
     #override
     def onSave(self):
@@ -274,8 +274,8 @@ class AVATARModel(ModelBase):
 
         return [ ('AVATAR', r ) ]
 
-    def predictor_func (self, inp_face_bgr):
-        feed = [ inp_face_bgr[np.newaxis,...] ]
+    def predictor_func (self, inp_f0, inp_f1, inp_f2):        
+        feed = [ inp_f0[np.newaxis,...], inp_f1[np.newaxis,...], inp_f2[np.newaxis,...] ]
         x = self.G_convert (feed)[0]
         return np.clip ( x[0], 0, 1)
 
