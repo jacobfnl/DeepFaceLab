@@ -90,6 +90,7 @@ PixelShuffler = nnlib.PixelShuffler
 SubpixelUpscaler = nnlib.SubpixelUpscaler
 Scale = nnlib.Scale
 BlurPool = nnlib.BlurPool
+SelfAttention = nnlib.SelfAttention
 
 CAInitializerMP = nnlib.CAInitializerMP
 
@@ -533,6 +534,43 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 return dict(list(base_config.items()) + list(config.items()))
         nnlib.Scale = Scale
 
+        class SelfAttention(KL.Layer):
+            def __init__(self, nc, squeeze_factor=8, **kwargs):
+                assert nc//squeeze_factor > 0, f"Input channels must be >= {squeeze_factor}, recieved nc={nc}"
+                
+                self.nc = nc
+                self.squeeze_factor = squeeze_factor
+                super(SelfAttention, self).__init__(**kwargs)
+                
+            def compute_output_shape(self, input_shape):
+                return (input_shape[0], input_shape[1], input_shape[2], self.nc)
+                    
+            def call(self, inp):
+                x = inp
+                shape_x = x.get_shape().as_list()
+                
+                f = Conv2D(self.nc//self.squeeze_factor, 1, kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+                g = Conv2D(self.nc//self.squeeze_factor, 1, kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+                h = Conv2D(self.nc, 1, kernel_regularizer=keras.regularizers.l2(1e-4))(x)
+                
+                shape_f = f.get_shape().as_list()
+                shape_g = g.get_shape().as_list()
+                shape_h = h.get_shape().as_list()
+                flat_f = Reshape( (-1, shape_f[-1]) )(f)
+                flat_g = Reshape( (-1, shape_g[-1]) )(g)
+                flat_h = Reshape( (-1, shape_h[-1]) )(h)   
+
+                s = Lambda(lambda x: K.batch_dot(x[0], keras.layers.Permute((2,1))(x[1]) ))([flat_g, flat_f])
+                beta = keras.layers.Softmax(axis=-1)(s)
+                o = Lambda(lambda x: K.batch_dot(x[0], x[1]))([beta, flat_h])
+                
+                o = Reshape(shape_x[1:])(o)
+                o = Scale()(o)
+                
+                out = Add()([o, inp])
+                return out     
+        nnlib.SelfAttention = SelfAttention
+            
         class Adam(keras.optimizers.Optimizer):
             """Adam optimizer.
 
