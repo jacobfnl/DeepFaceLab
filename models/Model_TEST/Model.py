@@ -49,18 +49,25 @@ class AVATARModel(ModelBase):
         self.decB64 = modelify(AVATARModel.Dec64Flow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )
 
         self.C = modelify(AVATARModel.ResNet (9, use_batch_norm=False, n_blocks=6, ngf=128, use_dropout=True))(Input(bgr_t_shape))
+   
+        self.D = modelify(AVATARModel.PatchDiscriminator(ndf=128) ) (Input(bgr_t_shape))
         
-  
 
         if not self.is_first_run():
             weights_to_load = [
                 [self.enc, 'enc.h5'],
                 [self.decA64, 'decA64.h5'],
                 [self.decB64, 'decB64.h5'],
-                [self.C, 'C.h5']
+                [self.C, 'C.h5'],
+                [self.D, 'D.h5'],
             ]
             self.load_weights_safe(weights_to_load)
-
+        
+        D_ones =  K.ones_like ( K.shape(self.D.outputs[0]) )
+        D_zeros = K.zeros_like ( K.shape(self.D.outputs[0] ))
+        def DLoss(labels,logits):
+            return K.mean(K.binary_crossentropy(labels,logits))
+            
         warped_A064 = Input(in_bgr_shape)
         real_A064 = Input(in_bgr_shape)
         real_A064m = Input(bgr_64_mask_shape)
@@ -72,10 +79,13 @@ class AVATARModel(ModelBase):
         real_B64_t2 = Input(in_bgr_shape)        
         
         real_A64_t0 = Input(in_bgr_shape)
+        real_A64m_t0 = Input(bgr_64_mask_shape)
         real_A_t0 = Input(out_bgr_shape)
         real_A64_t1 = Input(in_bgr_shape)
+        real_A64m_t1 = Input(bgr_64_mask_shape)
         real_A_t1 = Input(out_bgr_shape)
         real_A64_t2 = Input(in_bgr_shape)
+        real_A64m_t2 = Input(bgr_64_mask_shape)
         real_A_t2 = Input(out_bgr_shape)
         
         warped_B064 = Input(in_bgr_shape)
@@ -100,20 +110,30 @@ class AVATARModel(ModelBase):
         rec_AB_t1 = tr64to128( self.decA64 (self.enc (real_B64_t1)) )
         rec_AB_t2 = tr64to128( self.decA64 (self.enc (real_B64_t2)) )
         
-        rec_A_t0 = tr64to128( self.decA64 (self.enc (real_A64_t0)) )
-        rec_A_t1 = tr64to128( self.decA64 (self.enc (real_A64_t1)) )
-        rec_A_t2 = tr64to128( self.decA64 (self.enc (real_A64_t2)) )
-
+        #rec_A_t0 = tr64to128( self.decA64 (self.enc (real_A64_t0)) )
+        #rec_A_t1 = tr64to128( self.decA64 (self.enc (real_A64_t1)) )
+        #rec_A_t2 = tr64to128( self.decA64 (self.enc (real_A64_t2)) )
+        
+        C_in_A_t0 = tr64to128(real_A64_t0*real_A64m_t0 + (1-real_A64m_t0)*0.5)
+        C_in_A_t1 = tr64to128(real_A64_t1*real_A64m_t1 + (1-real_A64m_t1)*0.5)
+        C_in_A_t2 = tr64to128(real_A64_t2*real_A64m_t2 + (1-real_A64m_t2)*0.5)
+        
         def Cto3t(x):
             return Lambda ( lambda x: x[...,0:3], output_shape= ( K.int_shape(x)[1:3], 3 ) ) (x), \
                    Lambda ( lambda x: x[...,3:6], output_shape= ( K.int_shape(x)[1:3], 3 ) ) (x), \
                    Lambda ( lambda x: x[...,6:9], output_shape= ( K.int_shape(x)[1:3], 3 ) ) (x)
             
-        rec_C_A_t0, rec_C_A_t1, rec_C_A_t2 = Cto3t ( self.C ( K.concatenate ( [rec_A_t0, rec_A_t1, rec_A_t2] , axis=-1) ) )
+        rec_C_A_t0, rec_C_A_t1, rec_C_A_t2 = Cto3t ( self.C ( K.concatenate ( [C_in_A_t0, C_in_A_t1, C_in_A_t2] , axis=-1) ) )
         rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 = Cto3t( self.C ( K.concatenate ( [rec_AB_t0, rec_AB_t1, rec_AB_t2] , axis=-1) ) )
 
+        real_A_d = self.D( K.concatenate ( [real_A_t0, real_A_t1, real_A_t2], axis=-1) )
+        real_A_d_ones = K.ones_like(real_A_d)        
+        fake_A_d = self.D( K.concatenate ( [rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2], axis=-1) )
+        fake_A_d_ones = K.ones_like(fake_A_d)
+        fake_A_d_zeros = K.zeros_like(fake_A_d)
+        
         self.G64_view = K.function([warped_A064, warped_B064],[rec_A064, rec_B064, rec_A0B064])
-        self.G_view = K.function([real_A64_t0, real_A64_t1, real_A64_t2, real_B64_t0, real_B64_t1, real_B64_t2], [rec_A_t0, rec_A_t1, rec_A_t2, rec_C_A_t0, rec_C_A_t1, rec_C_A_t2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2])
+        self.G_view = K.function([real_A64_t0, real_A64m_t0, real_A64_t1, real_A64m_t1, real_A64_t2, real_A64m_t2, real_B64_t0, real_B64_t1, real_B64_t2], [C_in_A_t0, C_in_A_t1, C_in_A_t2, rec_C_A_t0, rec_C_A_t1, rec_C_A_t2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2])
         
         if self.is_training_mode:
             loss_AB64 = K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_A064, real_A064*real_A064m + (1-real_A064m)*0.5) ) + \
@@ -122,14 +142,20 @@ class AVATARModel(ModelBase):
 
             loss_C = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t0, rec_C_A_t0 ) ) + \
                      K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t1, rec_C_A_t1 ) ) + \
-                     K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t2, rec_C_A_t2 ) )                  
+                     K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t2, rec_C_A_t2 ) ) #+ DLoss(fake_A_d_ones, fake_A_d )
             weights_C = self.C.trainable_weights
+            
+            loss_D = (DLoss(real_A_d_ones, real_A_d ) + \
+                      DLoss(fake_A_d_zeros, fake_A_d ) ) * 0.5
 
             def opt(lr=5e-5):
                 return Adam(lr=lr, beta_1=0.5, beta_2=0.999, tf_cpu_mode=2)#, clipnorm=1)
 
-            self.AB64_train = K.function ([warped_A064, real_A064, real_A064m, warped_B064, real_B064, real_B064m], [loss_AB64], opt(lr=5e-5).get_updates(loss_AB64, weights_AB64) )
-            self.C_train = K.function ([ real_A64_t0, real_A_t0, real_A64_t1, real_A_t1, real_A64_t2, real_A_t2, ],[ loss_C ], opt(lr=5e-5).get_updates(loss_C, weights_C) )
+            self.AB64_train = K.function ([warped_A064, real_A064, real_A064m, warped_B064, real_B064, real_B064m], [loss_AB64], opt().get_updates(loss_AB64, weights_AB64) )
+            self.C_train = K.function ([real_A64_t0, real_A64m_t0, real_B64_t0, real_A_t0,
+                                        real_A64_t1, real_A64m_t1, real_B64_t1, real_A_t1, 
+                                        real_A64_t2, real_A64m_t2, real_B64_t2, real_A_t2],[ loss_C ], opt().get_updates(loss_C, weights_C) )
+            self.D_train = K.function ([real_A_t0, real_A_t1, real_A_t2, real_B64_t0, real_B64_t1, real_B64_t2],[loss_D], opt().get_updates(loss_D, self.D.trainable_weights) )
             ###########
 
             t = SampleProcessor.Types
@@ -151,16 +177,16 @@ class AVATARModel(ModelBase):
                     SampleGeneratorFaceTemporal(self.training_data_src_path, debug=self.is_debug(), batch_size=self.batch_size, 
                         temporal_image_count=3,
                         sample_process_options=SampleProcessor.Options(random_flip=False), 
-                        output_sample_types=[{'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
+                        output_sample_types=[{'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
+                                             {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_M), 'resolution':64},
                                              {'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution},
-                                             #{'types': (t.IMG_SOURCE, t.NONE, t.MODE_M), 'resolution':resolution}
                                             ] ),
                        
                     SampleGeneratorFaceTemporal(self.training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size, 
                         temporal_image_count=3,
                         sample_process_options=SampleProcessor.Options(random_flip=False), 
                         output_sample_types=[{'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
-                                             {'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':resolution},
+                                             {'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution},
                                             ] ), 
                                             
                    ])
@@ -172,19 +198,23 @@ class AVATARModel(ModelBase):
         self.save_weights_safe( [   [self.enc, 'enc.h5'],
                                     [self.decA64, 'decA64.h5'],
                                     [self.decB64, 'decB64.h5'],
-                                    [self.C, 'C.h5']
+                                    [self.C, 'C.h5'],
+                                    [self.D, 'D.h5'],
                                  ])
 
     #override
     def onTrainOneIter(self, generators_samples, generators_list):
         warped_src64, src64, src64m = generators_samples[0]
         warped_dst64, dst64, dst64m = generators_samples[1]        
-        loss, = self.AB64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] )
+        
+        real_A64_t0, real_A64m_t0, real_A_t0, real_A64_t1, real_A64m_t1, real_A_t1, real_A64_t2, real_A64m_t2, real_A_t2 = generators_samples[2]
+        real_B64_t0, _, real_B64_t1, _, real_B64_t2, _ = generators_samples[3]
 
- 
-        #loss, = self.C_train (generators_samples[2])
+        #loss, = self.AB64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] ) 
+        loss, = self.C_train ( [real_A64_t0, real_A64m_t0, real_B64_t0, real_A_t0, real_A64_t1, real_A64m_t1, real_B64_t1, real_A_t1, real_A64_t2, real_A64m_t2, real_B64_t2, real_A_t2] )
+        loss_D, = 1,#self.D_train ( [real_A_t0, real_A_t1, real_A_t2, real_B64_t0, real_B64_t1, real_B64_t2] )
 
-        return ( ('loss', loss), )
+        return ( ('loss', loss), ('D', loss_D) )
 
     #override
     def onGetPreview(self, sample):
@@ -196,12 +226,15 @@ class AVATARModel(ModelBase):
         test_B064r  = sample[1][1][0:4]
         test_B064m  = sample[1][2][0:4]
         
-        t_src64_0 = sample[2][0][0:4]
-        t_src_0   = sample[2][1][0:4]
-        t_src64_1 = sample[2][2][0:4]
-        t_src_1   = sample[2][3][0:4]
-        t_src64_2 = sample[2][4][0:4]
-        t_src_2   = sample[2][5][0:4]
+        t_src64_0  = sample[2][0][0:4]
+        t_src64m_0 = sample[2][1][0:4]
+        t_src_0    = sample[2][2][0:4]
+        t_src64_1  = sample[2][3][0:4]
+        t_src64m_1 = sample[2][4][0:4]
+        t_src_1    = sample[2][5][0:4]
+        t_src64_2  = sample[2][6][0:4]
+        t_src64m_2 = sample[2][7][0:4]
+        t_src_2    = sample[2][8][0:4]
         
         t_dst64_0 = sample[3][0][0:4]
         t_dst_0   = sample[3][1][0:4]
@@ -218,7 +251,7 @@ class AVATARModel(ModelBase):
                                        
         #todo sample64x4 = cv2.resize (sample64x4, (self.resolution, self.resolution) )
 
-        G_view_result = self.G_view([t_src64_0, t_src64_1, t_src64_2, t_dst64_0, t_dst64_1, t_dst64_2 ])
+        G_view_result = self.G_view([t_src64_0, t_src64m_0, t_src64_1, t_src64m_1, t_src64_2, t_src64m_2, t_dst64_0, t_dst64_1, t_dst64_2 ])
         
         t_dst_0, t_dst_1, t_dst_2, rec_A_t0, rec_A_t1, rec_A_t2, rec_C_A_t0, rec_C_A_t1, rec_C_A_t2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 = [ x[0] for x in ([t_dst_0, t_dst_1, t_dst_2, ] + G_view_result)  ]
         
