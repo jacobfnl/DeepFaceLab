@@ -48,8 +48,9 @@ class AVATARModel(ModelBase):
         self.decA64 = modelify(AVATARModel.Dec64Flow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )        
         self.decB64 = modelify(AVATARModel.Dec64Flow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )
 
-        self.C = modelify(AVATARModel.ResNet (9, use_batch_norm=False, n_blocks=6, ngf=128, use_dropout=True))(Input(bgr_t_shape))
-   
+        self.C = modelify(AVATARModel.ResNet (9, use_batch_norm=False, n_blocks=6, ngf=128, use_dropout=True))(Input( (64, 64, 9) ))
+        
+        self.D64 = modelify(AVATARModel.D64Discriminator(ndf=256) ) (Input(in_bgr_shape))
         self.D = modelify(AVATARModel.PatchDiscriminator(ndf=128) ) (Input(bgr_t_shape))
         
 
@@ -60,6 +61,7 @@ class AVATARModel(ModelBase):
                 [self.decB64, 'decB64.h5'],
                 [self.C, 'C.h5'],
                 [self.D, 'D.h5'],
+                [self.D64, 'D64.h5'],
             ]
             self.load_weights_safe(weights_to_load)
         
@@ -68,11 +70,9 @@ class AVATARModel(ModelBase):
         def DLoss(labels,logits):
             return K.mean(K.binary_crossentropy(labels,logits))
             
-        warped_A064 = Input(in_bgr_shape)
-        real_A064 = Input(in_bgr_shape)
-        real_A064m = Input(bgr_64_mask_shape)
-        real_A0 = Input(out_bgr_shape)
-        real_A0m = Input(mask_shape)
+        warped_A64 = Input(in_bgr_shape)
+        real_A64 = Input(in_bgr_shape)
+        real_A64m = Input(bgr_64_mask_shape)
         
         real_B64_t0 = Input(in_bgr_shape)
         real_B64_t1 = Input(in_bgr_shape)
@@ -88,20 +88,25 @@ class AVATARModel(ModelBase):
         real_A64m_t2 = Input(bgr_64_mask_shape)
         real_A_t2 = Input(out_bgr_shape)
         
-        warped_B064 = Input(in_bgr_shape)
-        real_B064 = Input(in_bgr_shape)
-        real_B064m = Input(bgr_64_mask_shape)
-        real_B0 = Input(out_bgr_shape)
-        real_B0m = Input(mask_shape)
+        warped_B64 = Input(in_bgr_shape)
+        real_B64 = Input(in_bgr_shape)
+        real_B64m = Input(bgr_64_mask_shape)
         
-        warped_A0_code = self.enc (warped_A064)
-        warped_B0_code = self.enc (warped_B064)
+        warped_A_code = self.enc (warped_A64)
+        warped_B_code = self.enc (warped_B64)
 
-        rec_A064 = self.decA64(warped_A0_code)
-        rec_B064 = self.decB64(warped_B0_code)
-        rec_A0B064 = self.decA64(warped_B0_code)
+        rec_A64 = self.decA64(warped_A_code)
+        rec_B64 = self.decB64(warped_B_code)
+        rec_AB64 = self.decA64(warped_B_code)
+        
+        real_A64_d = self.D64( real_A64*real_A64m + (1-real_A64m)*0.5)
+        real_A64_d_ones = K.ones_like(real_A64_d)        
+        fake_A64_d = self.D64(rec_AB64)
+        fake_A64_d_ones = K.ones_like(fake_A64_d)
+        fake_A64_d_zeros = K.zeros_like(fake_A64_d)
 
         def tr64to128(x):
+            return x
             a = np.ones((128,128,3))*0.5
             a[32:-32:,32:-32:,:] = 0
             return K.spatial_2d_padding(x, padding=((32, 32), (32, 32)) ) + K.constant(a, dtype=K.floatx() )
@@ -132,12 +137,13 @@ class AVATARModel(ModelBase):
         fake_A_d_ones = K.ones_like(fake_A_d)
         fake_A_d_zeros = K.zeros_like(fake_A_d)
         
-        self.G64_view = K.function([warped_A064, warped_B064],[rec_A064, rec_B064, rec_A0B064])
-        self.G_view = K.function([real_A64_t0, real_A64m_t0, real_A64_t1, real_A64m_t1, real_A64_t2, real_A64m_t2, real_B64_t0, real_B64_t1, real_B64_t2], [C_in_A_t0, C_in_A_t1, C_in_A_t2, rec_C_A_t0, rec_C_A_t1, rec_C_A_t2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2])
+        self.G64_view = K.function([warped_A64, warped_B64],[rec_A64, rec_B64, rec_AB64])
+        self.G_view = K.function([real_A64_t0, real_A64m_t0, real_A64_t1, real_A64m_t1, real_A64_t2, real_A64m_t2, real_B64_t0, real_B64_t1, real_B64_t2], [rec_C_A_t0, rec_C_A_t1, rec_C_A_t2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2])
         
         if self.is_training_mode:
-            loss_AB64 = K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_A064, real_A064*real_A064m + (1-real_A064m)*0.5) ) + \
-                        K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_B064, real_B064*real_B064m + (1-real_B064m)*0.5) )         
+            loss_AB64 = K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_A64, real_A64*real_A64m + (1-real_A64m)*0.5) ) + \
+                        K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_B64, real_B64*real_B64m + (1-real_B64m)*0.5) ) + 0.1*DLoss(fake_A64_d_ones, fake_A64_d )
+                        
             weights_AB64 = self.enc.trainable_weights + self.decA64.trainable_weights + self.decB64.trainable_weights
 
             loss_C = K.mean( 10 * dssim(kernel_size=int(resolution/11.6),max_value=1.0) ( real_A_t0, rec_C_A_t0 ) ) + \
@@ -148,14 +154,19 @@ class AVATARModel(ModelBase):
             loss_D = (DLoss(real_A_d_ones, real_A_d ) + \
                       DLoss(fake_A_d_zeros, fake_A_d ) ) * 0.5
 
+            loss_D64 = (DLoss(real_A64_d_ones, real_A64_d ) + \
+                        DLoss(fake_A64_d_zeros, fake_A64_d ) ) * 0.5
+                      
             def opt(lr=5e-5):
                 return Adam(lr=lr, beta_1=0.5, beta_2=0.999, tf_cpu_mode=2)#, clipnorm=1)
 
-            self.AB64_train = K.function ([warped_A064, real_A064, real_A064m, warped_B064, real_B064, real_B064m], [loss_AB64], opt().get_updates(loss_AB64, weights_AB64) )
-            self.C_train = K.function ([real_A64_t0, real_A64m_t0, real_B64_t0, real_A_t0,
-                                        real_A64_t1, real_A64m_t1, real_B64_t1, real_A_t1, 
-                                        real_A64_t2, real_A64m_t2, real_B64_t2, real_A_t2],[ loss_C ], opt().get_updates(loss_C, weights_C) )
-            self.D_train = K.function ([real_A_t0, real_A_t1, real_A_t2, real_B64_t0, real_B64_t1, real_B64_t2],[loss_D], opt().get_updates(loss_D, self.D.trainable_weights) )
+            self.AB64_train = K.function ([warped_A64, real_A64, real_A64m, warped_B64, real_B64, real_B64m], [loss_AB64], opt().get_updates(loss_AB64, weights_AB64) )
+            self.C_train = K.function ([real_A64_t0, real_A64m_t0, real_A_t0,
+                                        real_A64_t1, real_A64m_t1, real_A_t1, 
+                                        real_A64_t2, real_A64m_t2, real_A_t2],[ loss_C ], opt().get_updates(loss_C, weights_C) )
+            #self.D_train = K.function ([real_A_t0, real_A_t1, real_A_t2, real_B64_t0, real_B64_t1, real_B64_t2],[loss_D], opt().get_updates(loss_D, self.D.trainable_weights) )
+            self.D64_train = K.function ([warped_A64, real_A64, real_A64m, warped_B64, real_B64, real_B64m],[loss_D64], opt().get_updates(loss_D64, self.D64.trainable_weights) )
+            
             ###########
 
             t = SampleProcessor.Types
@@ -192,7 +203,17 @@ class AVATARModel(ModelBase):
                    ])
         else:
             self.G_convert = K.function([real_B64_t0, real_B64_t1, real_B64_t2],[rec_C_AB_t1])
-
+            
+    #override , return [ [model, filename],... ]  list
+    def get_model_filename_list(self):
+        return [   [self.enc, 'enc.h5'],
+                    [self.decA64, 'decA64.h5'],
+                    [self.decB64, 'decB64.h5'],
+                    [self.C, 'C.h5'],
+                    [self.D, 'D.h5'],
+                    [self.D64, 'D64.h5'],
+               ]
+        
     #override
     def onSave(self):
         self.save_weights_safe( [   [self.enc, 'enc.h5'],
@@ -200,6 +221,7 @@ class AVATARModel(ModelBase):
                                     [self.decB64, 'decB64.h5'],
                                     [self.C, 'C.h5'],
                                     [self.D, 'D.h5'],
+                                    [self.D64, 'D64.h5'],
                                  ])
 
     #override
@@ -210,11 +232,12 @@ class AVATARModel(ModelBase):
         real_A64_t0, real_A64m_t0, real_A_t0, real_A64_t1, real_A64m_t1, real_A_t1, real_A64_t2, real_A64m_t2, real_A_t2 = generators_samples[2]
         real_B64_t0, _, real_B64_t1, _, real_B64_t2, _ = generators_samples[3]
 
-        #loss, = self.AB64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] ) 
-        loss, = self.C_train ( [real_A64_t0, real_A64m_t0, real_B64_t0, real_A_t0, real_A64_t1, real_A64m_t1, real_B64_t1, real_A_t1, real_A64_t2, real_A64m_t2, real_B64_t2, real_A_t2] )
-        loss_D, = 1,#self.D_train ( [real_A_t0, real_A_t1, real_A_t2, real_B64_t0, real_B64_t1, real_B64_t2] )
+        loss, = self.AB64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] ) 
+        loss_D, = self.D64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] )
+        loss_C, = self.C_train ( [real_A64_t0, real_A64m_t0, real_A_t0, real_A64_t1, real_A64m_t1, real_A_t1, real_A64_t2, real_A64m_t2, real_A_t2] )
+        #loss_D, = self.D_train ( [real_A_t0, real_A_t1, real_A_t2, real_B64_t0, real_B64_t1, real_B64_t2] )
 
-        return ( ('loss', loss), ('D', loss_D) )
+        return ( ('loss', loss), ('D', loss_D), ('C', loss_C) )
 
     #override
     def onGetPreview(self, sample):
@@ -244,19 +267,19 @@ class AVATARModel(ModelBase):
         t_dst_2   = sample[3][5][0:4]
         
         G64_view_result = self.G64_view ([test_A064r, test_B064r])
-        test_A064r, test_B064r, rec_A064, rec_B064, rec_AB64 = [ x[0] for x in ([test_A064r, test_B064r] + G64_view_result)  ]
+        test_A064r, test_B064r, rec_A64, rec_B64, rec_AB64 = [ x[0] for x in ([test_A064r, test_B064r] + G64_view_result)  ]
         
-        sample64x4 = np.concatenate ([ np.concatenate ( [rec_B064, rec_A064], axis=1 ),
+        sample64x4 = np.concatenate ([ np.concatenate ( [rec_B64, rec_A64], axis=1 ),
                                        np.concatenate ( [test_B064r, rec_AB64], axis=1) ], axis=0 )
                                        
         #todo sample64x4 = cv2.resize (sample64x4, (self.resolution, self.resolution) )
 
         G_view_result = self.G_view([t_src64_0, t_src64m_0, t_src64_1, t_src64m_1, t_src64_2, t_src64m_2, t_dst64_0, t_dst64_1, t_dst64_2 ])
         
-        t_dst_0, t_dst_1, t_dst_2, rec_A_t0, rec_A_t1, rec_A_t2, rec_C_A_t0, rec_C_A_t1, rec_C_A_t2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 = [ x[0] for x in ([t_dst_0, t_dst_1, t_dst_2, ] + G_view_result)  ]
+        t_dst_0, t_dst_1, t_dst_2, rec_C_A_t0, rec_C_A_t1, rec_C_A_t2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 = [ x[0] for x in ([t_dst_0, t_dst_1, t_dst_2, ] + G_view_result)  ]
         
 
-        r = np.concatenate ( (sample64x4,rec_A_t0, rec_A_t1, rec_A_t2, rec_C_A_t0, rec_C_A_t1, rec_C_A_t2,  t_dst_0, t_dst_1, t_dst_2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 ), axis=1 )
+        r = np.concatenate ( (sample64x4, rec_C_A_t0, rec_C_A_t1, rec_C_A_t2,  t_dst_0, t_dst_1, t_dst_2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 ), axis=1 )
 
         #r = sample64x4
         return [ ('AVATAR', r ) ]
@@ -286,7 +309,31 @@ class AVATARModel(ModelBase):
         return ConverterAvatar(self.predictor_func,
                                predictor_input_size=64)
 
+    @staticmethod
+    def D64Discriminator(ndf=64):
+        exec (nnlib.import_all(), locals(), globals())
 
+        def func(input):
+            b,h,w,c = K.int_shape(input)
+
+            x = input
+
+            x = ZeroPadding2D((1,1))(x)
+            x = Conv2D( ndf, 4, strides=2, padding='valid')(x)
+            x = ReLU()(x)
+
+            x = ZeroPadding2D((1,1))(x)
+            x = Conv2D( ndf*2, 4, strides=2, padding='valid')(x)
+            x = ReLU()(x)
+
+            x = ZeroPadding2D((1,1))(x)
+            x = Conv2D( ndf*4, 4, strides=2, padding='valid')(x)
+            x = ReLU()(x)
+
+            x = ZeroPadding2D((1,1))(x)
+            return Conv2D( 1, 4, strides=1, padding='valid', activation='sigmoid')(x)
+        return func
+        
     @staticmethod
     def PatchDiscriminator(ndf=64):
         exec (nnlib.import_all(), locals(), globals())
@@ -342,15 +389,6 @@ class AVATARModel(ModelBase):
             return BatchNormalization (axis=-1)(x)
         XConv2D = partial(Conv2D, padding=padding, use_bias=use_bias)
 
-        #def Act(lrelu_alpha=0.1):
-        #    return LeakyReLU(alpha=lrelu_alpha)
-
-        #def downscale (dim, **kwargs):
-        #    def func(x):
-        #        return Act() ( XNormalization(XConv2D(dim, kernel_size=5, strides=2)(x)) )
-        #    return func
-
-        #downscale = partial(downscale)
         def downscale (dim):
             def func(x):
                 return LeakyReLU(0.1)( Conv2D(dim, 5, strides=2, padding='same')(x))
@@ -376,62 +414,6 @@ class AVATARModel(ModelBase):
             x = upscale(512)(x)   
             return x
             
-            x = downscale(128)(x)
-            x = downscale(256)(x)
-            x = downscale(512)(x)
-            x = downscale(1024)(x)
-
-            x = Dense(256)(Flatten()(x))
-            x = Dense(4 * 4 * 512)(x)
-            x = Reshape((4, 4, 512))(x) 
-            x = upscale(512)(x)   
-            return x
-            
-            x, = input
-            b,h,w,c = K.int_shape(x)
-            
-            x = downscale(128)(x)
-            x = downscale(256)(x)
-            x = downscale(512)(x)
-            x = downscale(1024)(x)
-#
-            x = Dense(256)(Flatten()(x))
-            x = Dense(4 * 4 * 256)(x)
-            x = Reshape((4, 4, 256))(x)
-            x = upscale(256)(x)
-            return x
-
-            x = Conv2D(64, kernel_size=5, strides=1, padding='same')(x)
-            x = Conv2D(64, kernel_size=5, strides=1, padding='same')(x)
-            x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
-
-            x = Conv2D(128, kernel_size=3, strides=1, padding='same')(x)
-            x = Conv2D(128, kernel_size=3, strides=1, padding='same')(x)
-            x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
-
-            x = Conv2D(256, kernel_size=3, strides=1, padding='same')(x)
-            x = Conv2D(256, kernel_size=3, strides=1, padding='same')(x)
-            x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
-
-            x = Conv2D(512, kernel_size=3, strides=1, padding='same')(x)
-            x = Conv2D(512, kernel_size=3, strides=1, padding='same')(x)
-            x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
-
-            x = Flatten()(x)
-
-            x = Dense(128)(x)
-            return x
-
-            x = Dense(256)(x)
-            x = ReLU()(x)
-            x = Dense(256)(x)
-            x = ReLU()(x)
-
-            mean = Dense(128)(x)
-            logvar = Dense(128)(x)
-
-            return mean, logvar
-
         return func
 
     @staticmethod
@@ -446,8 +428,11 @@ class AVATARModel(ModelBase):
             x = input[0]
             
             x = upscale(256)(x)
+            x = ResidualBlock(256)(x)
             x = upscale(128)(x)
+            x = ResidualBlock(128)(x)
             x = upscale(64)(x)
+            x = ResidualBlock(64)(x)
             return to_bgr(output_nc) (x)
 
         return func
@@ -498,6 +483,7 @@ class AVATARModel(ModelBase):
             for i in range(n_blocks):
                 x = ResnetBlock(ngf*4, use_dropout=use_dropout)(x)
 
+            x = ReLU()(XNormalization(XConv2DTranspose(ngf*4, 3, strides=2)(x)))
             x = ReLU()(XNormalization(XConv2DTranspose(ngf*2, 3, strides=2)(x)))
             x = ReLU()(XNormalization(XConv2DTranspose(ngf  , 3, strides=2)(x)))
 
