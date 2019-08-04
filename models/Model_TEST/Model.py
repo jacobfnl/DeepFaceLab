@@ -50,7 +50,7 @@ class AVATARModel(ModelBase):
 
         self.C = modelify(AVATARModel.ResNet (9, use_batch_norm=False, n_blocks=6, ngf=128, use_dropout=True))(Input( (64, 64, 9) ))
         
-        self.D64 = modelify(AVATARModel.D64Discriminator(ndf=256) ) (Input(in_bgr_shape))
+        self.D64 = modelify(AVATARModel.NLayerDiscriminator(ndf=128) ) (Input(in_bgr_shape))
         self.D = modelify(AVATARModel.PatchDiscriminator(ndf=128) ) (Input(bgr_t_shape))
         
 
@@ -142,7 +142,7 @@ class AVATARModel(ModelBase):
         
         if self.is_training_mode:
             loss_AB64 = K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_A64, real_A64*real_A64m + (1-real_A64m)*0.5) ) + \
-                        K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_B64, real_B64*real_B64m + (1-real_B64m)*0.5) ) + 0.1*DLoss(fake_A64_d_ones, fake_A64_d )
+                        K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_B64, real_B64*real_B64m + (1-real_B64m)*0.5) ) + 0.5*DLoss(fake_A64_d_ones, fake_A64_d )
                         
             weights_AB64 = self.enc.trainable_weights + self.decA64.trainable_weights + self.decB64.trainable_weights
 
@@ -234,7 +234,7 @@ class AVATARModel(ModelBase):
 
         loss, = self.AB64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] ) 
         loss_D, = self.D64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] )
-        loss_C, = self.C_train ( [real_A64_t0, real_A64m_t0, real_A_t0, real_A64_t1, real_A64m_t1, real_A_t1, real_A64_t2, real_A64m_t2, real_A_t2] )
+        loss_C, = 3,#self.C_train ( [real_A64_t0, real_A64m_t0, real_A_t0, real_A64_t1, real_A64m_t1, real_A_t1, real_A64_t2, real_A64m_t2, real_A_t2] )
         #loss_D, = self.D_train ( [real_A_t0, real_A_t1, real_A_t2, real_B64_t0, real_B64_t1, real_B64_t2] )
 
         return ( ('loss', loss), ('D', loss_D), ('C', loss_C) )
@@ -308,30 +308,54 @@ class AVATARModel(ModelBase):
         from converters import ConverterAvatar
         return ConverterAvatar(self.predictor_func,
                                predictor_input_size=64)
-
+                               
     @staticmethod
-    def D64Discriminator(ndf=64):
+    def NLayerDiscriminator(ndf=64, n_layers=3):
+        """
+        16 if n=1
+        34 if n=2
+        70 if n=3
+        142 if n=4
+        286 if n=5
+        574 if n=6
+        """
         exec (nnlib.import_all(), locals(), globals())
 
+        #use_bias = True
+        #def XNormalization(x):
+        #    return InstanceNormalization (axis=-1)(x)
+        use_bias = False
+        def XNormalization(x):
+            return BatchNormalization (axis=-1)(x)
+                
+        XConv2D = partial(Conv2D, use_bias=use_bias)
+ 
         def func(input):
             b,h,w,c = K.int_shape(input)
 
             x = input
+            
+            f = ndf
 
             x = ZeroPadding2D((1,1))(x)
-            x = Conv2D( ndf, 4, strides=2, padding='valid')(x)
-            x = ReLU()(x)
+            x = XConv2D( f, 4, strides=2, padding='valid', use_bias=True)(x)
+            f = min( ndf*8, f*2 )
+            x = LeakyReLU(0.2)(x)
+            
+            for i in range(n_layers):
+                x = ZeroPadding2D((1,1))(x)
+                x = XConv2D( f, 4, strides=2, padding='valid')(x)               
+                f = min( ndf*8, f*2 )
+                x = XNormalization(x)
+                x = LeakyReLU(0.2)(x)
+            
+            x = ZeroPadding2D((1,1))(x)
+            x = XConv2D( f, 4, strides=1, padding='valid')(x)
+            x = XNormalization(x)
+            x = LeakyReLU(0.2)(x)
 
             x = ZeroPadding2D((1,1))(x)
-            x = Conv2D( ndf*2, 4, strides=2, padding='valid')(x)
-            x = ReLU()(x)
-
-            x = ZeroPadding2D((1,1))(x)
-            x = Conv2D( ndf*4, 4, strides=2, padding='valid')(x)
-            x = ReLU()(x)
-
-            x = ZeroPadding2D((1,1))(x)
-            return Conv2D( 1, 4, strides=1, padding='valid', activation='sigmoid')(x)
+            return XConv2D( 1, 4, strides=1, padding='valid', use_bias=True, activation='sigmoid')(x)#
         return func
         
     @staticmethod
