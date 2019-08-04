@@ -50,7 +50,7 @@ class AVATARModel(ModelBase):
 
         self.C = modelify(AVATARModel.ResNet (9, use_batch_norm=False, n_blocks=6, ngf=128, use_dropout=True))(Input( (64, 64, 9) ))
         
-        self.D64 = modelify(AVATARModel.NLayerDiscriminator(ndf=128) ) (Input(in_bgr_shape))
+        self.D64 = modelify(AVATARModel.NLayerDiscriminator(ndf=64, n_layers=3) ) (Input(in_bgr_shape))
         self.D = modelify(AVATARModel.PatchDiscriminator(ndf=128) ) (Input(bgr_t_shape))
         
 
