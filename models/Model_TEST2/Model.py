@@ -193,7 +193,7 @@ class AVATARModel(ModelBase):
                                   {'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_M), 'resolution':64}
                                 ]
 
-            self.set_training_data_generators ([
+            generators = [
                                            
                     SampleGeneratorFace(self.training_data_src_path, debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=False, rotation_range=[0,0]),
@@ -216,9 +216,11 @@ class AVATARModel(ModelBase):
                         sample_process_options=SampleProcessor.Options(random_flip=False), 
                         output_sample_types=[{'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
                                              {'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution},
-                                            ] ), 
-                                            
-                   ])
+                                            ] ),                                             
+                   ]
+            generators[2].set_active(False)
+            generators[3].set_active(False)
+            self.set_training_data_generators (generators)
         else:
             self.G_convert = K.function([warped_B064],[rec_C_A0_B0])
 
