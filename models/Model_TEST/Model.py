@@ -48,12 +48,20 @@ class AVATARModel(ModelBase):
         self.decA64 = modelify(AVATARModel.Dec64Flow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )        
         self.decB64 = modelify(AVATARModel.Dec64Flow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )
 
-        self.C = modelify(AVATARModel.ResNet (9, use_batch_norm=False, n_blocks=6, ngf=128, use_dropout=True))(Input( (64, 64, 9) ))
+        self.C = modelify(AVATARModel.ResNet (9, use_batch_norm=False, n_blocks=6, ngf=128, use_dropout=True))(Input(bgr_t_shape))
         
-        self.D64 = modelify(AVATARModel.NLayerDiscriminator(ndf=64, n_layers=3) ) (Input(in_bgr_shape))
-        self.D = modelify(AVATARModel.PatchDiscriminator(ndf=128) ) (Input(bgr_t_shape))
+        self.D64 = modelify(AVATARModel.D64Discriminator() ) (Input(in_bgr_shape))
+        self.D = modelify(AVATARModel.NLayerDiscriminator(ndf=128) ) (Input(bgr_t_shape))
         
-
+         
+        if self.is_first_run():
+            conv_weights_list = []
+            for model in [self.enc, self.decA64, self.decB64, self.C, self.D64]:
+                for layer in model.layers:
+                    if type(layer) == keras.layers.Conv2D:
+                        conv_weights_list += [layer.weights[0]] #Conv2D kernel_weights
+            #CAInitializerMP ( conv_weights_list )
+                
         if not self.is_first_run():
             weights_to_load = [
                 [self.enc, 'enc.h5'],
@@ -106,7 +114,6 @@ class AVATARModel(ModelBase):
         fake_A64_d_zeros = K.zeros_like(fake_A64_d)
 
         def tr64to128(x):
-            return x
             a = np.ones((128,128,3))*0.5
             a[32:-32:,32:-32:,:] = 0
             return K.spatial_2d_padding(x, padding=((32, 32), (32, 32)) ) + K.constant(a, dtype=K.floatx() )
@@ -142,7 +149,7 @@ class AVATARModel(ModelBase):
         
         if self.is_training_mode:
             loss_AB64 = K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_A64, real_A64*real_A64m + (1-real_A64m)*0.5) ) + \
-                        K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_B64, real_B64*real_B64m + (1-real_B64m)*0.5) ) + 0.5*DLoss(fake_A64_d_ones, fake_A64_d )
+                        K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_B64, real_B64*real_B64m + (1-real_B64m)*0.5) ) + 0.1*DLoss(fake_A64_d_ones, fake_A64_d )
                         
             weights_AB64 = self.enc.trainable_weights + self.decA64.trainable_weights + self.decB64.trainable_weights
 
@@ -168,10 +175,9 @@ class AVATARModel(ModelBase):
             self.D64_train = K.function ([warped_A64, real_A64, real_A64m, warped_B64, real_B64, real_B64m],[loss_D64], opt().get_updates(loss_D64, self.D64.trainable_weights) )
             
             ###########
-
             t = SampleProcessor.Types
 
-            self.set_training_data_generators ([
+            generators = [
                     SampleGeneratorFace(self.training_data_src_path, debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=False),
                         output_sample_types=[ {'types': (t.IMG_WARPED_TRANSFORMED, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
@@ -199,8 +205,10 @@ class AVATARModel(ModelBase):
                         output_sample_types=[{'types': (t.IMG_SOURCE, t.FACE_TYPE_FULL_NO_ROTATION, t.MODE_BGR), 'resolution':64},
                                              {'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution},
                                             ] ), 
-                                            
-                   ])
+                   ]
+            generators[2].set_active(False)
+            generators[3].set_active(False)
+            self.set_training_data_generators (generators)
         else:
             self.G_convert = K.function([real_B64_t0, real_B64_t1, real_B64_t2],[rec_C_AB_t1])
             
@@ -232,8 +240,8 @@ class AVATARModel(ModelBase):
         real_A64_t0, real_A64m_t0, real_A_t0, real_A64_t1, real_A64m_t1, real_A_t1, real_A64_t2, real_A64m_t2, real_A_t2 = generators_samples[2]
         real_B64_t0, _, real_B64_t1, _, real_B64_t2, _ = generators_samples[3]
 
-        loss, = self.AB64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] ) 
-        loss_D, = self.D64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] )
+        loss,   = self.AB64_train ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] ) 
+        loss_D, = self.D64_train  ( [warped_src64, src64, src64m, warped_dst64, dst64, dst64m] )
         loss_C, = 3,#self.C_train ( [real_A64_t0, real_A64m_t0, real_A_t0, real_A64_t1, real_A64m_t1, real_A_t1, real_A64_t2, real_A64m_t2, real_A_t2] )
         #loss_D, = self.D_train ( [real_A_t0, real_A_t1, real_A_t2, real_B64_t0, real_B64_t1, real_B64_t2] )
 
@@ -311,14 +319,6 @@ class AVATARModel(ModelBase):
                                
     @staticmethod
     def NLayerDiscriminator(ndf=64, n_layers=3):
-        """
-        16 if n=1
-        34 if n=2
-        70 if n=3
-        142 if n=4
-        286 if n=5
-        574 if n=6
-        """
         exec (nnlib.import_all(), locals(), globals())
 
         #use_bias = True
@@ -330,36 +330,28 @@ class AVATARModel(ModelBase):
                 
         XConv2D = partial(Conv2D, use_bias=use_bias)
  
-        def func(input):
-            b,h,w,c = K.int_shape(input)
-
-            x = input
-            
+        def func(x):
             f = ndf
 
-            x = ZeroPadding2D((1,1))(x)
-            x = XConv2D( f, 4, strides=2, padding='valid', use_bias=True)(x)
+            x = XConv2D( f, 4, strides=2, padding='same', use_bias=True)(x)
             f = min( ndf*8, f*2 )
             x = LeakyReLU(0.2)(x)
-            
+
             for i in range(n_layers):
-                x = ZeroPadding2D((1,1))(x)
-                x = XConv2D( f, 4, strides=2, padding='valid')(x)               
-                f = min( ndf*8, f*2 )
+                x = XConv2D( f, 4, strides=2, padding='same')(x)               
                 x = XNormalization(x)
                 x = LeakyReLU(0.2)(x)
-            
-            x = ZeroPadding2D((1,1))(x)
-            x = XConv2D( f, 4, strides=1, padding='valid')(x)
+                f = min( ndf*8, f*2 )
+                
+            x = XConv2D( f, 4, strides=1, padding='same')(x)
             x = XNormalization(x)
             x = LeakyReLU(0.2)(x)
 
-            x = ZeroPadding2D((1,1))(x)
-            return XConv2D( 1, 4, strides=1, padding='valid', use_bias=True, activation='sigmoid')(x)#
+            return XConv2D( 1, 4, strides=1, padding='same', use_bias=True, activation='sigmoid')(x)#
         return func
         
     @staticmethod
-    def PatchDiscriminator(ndf=64):
+    def D64Discriminator(ndf=256):
         exec (nnlib.import_all(), locals(), globals())
 
         #use_bias = True
@@ -376,32 +368,18 @@ class AVATARModel(ModelBase):
 
             x = input
 
-            x = ZeroPadding2D((1,1))(x)
-            x = XConv2D( ndf, 4, strides=2, padding='valid', use_bias=True)(x)
+            x = XConv2D( ndf, 4, strides=2, padding='same', use_bias=True)(x)
             x = LeakyReLU(0.2)(x)
 
-            x = ZeroPadding2D((1,1))(x)
-            x = XConv2D( ndf*2, 4, strides=2, padding='valid')(x)
+            x = XConv2D( ndf*2, 4, strides=2, padding='same')(x)
             x = XNormalization(x)
             x = LeakyReLU(0.2)(x)
 
-            x = ZeroPadding2D((1,1))(x)
-            x = XConv2D( ndf*4, 4, strides=2, padding='valid')(x)
+            x = XConv2D( ndf*4, 4, strides=2, padding='same')(x)
             x = XNormalization(x)
             x = LeakyReLU(0.2)(x)
-
-            x = ZeroPadding2D((1,1))(x)
-            x = XConv2D( ndf*8, 4, strides=2, padding='valid')(x)
-            x = XNormalization(x)
-            x = LeakyReLU(0.2)(x)
-
-            x = ZeroPadding2D((1,1))(x)
-            x = XConv2D( ndf*8, 4, strides=2, padding='valid')(x)
-            x = XNormalization(x)
-            x = LeakyReLU(0.2)(x)
-
-            x = ZeroPadding2D((1,1))(x)
-            return XConv2D( 1, 4, strides=1, padding='valid', use_bias=True, activation='sigmoid')(x)#
+            
+            return XConv2D( 1, 4, strides=1, padding='same', use_bias=True, activation='sigmoid')(x)#
         return func
 
     @staticmethod
@@ -427,10 +405,10 @@ class AVATARModel(ModelBase):
         def func(input):
             x, = input
             b,h,w,c = K.int_shape(x)
+            x = downscale(64)(x)
             x = downscale(128)(x)
             x = downscale(256)(x)
             x = downscale(512)(x)
-            x = downscale(1024)(x)
 
             x = Dense(512)(Flatten()(x))
             x = Dense(4 * 4 * 512)(x)
@@ -451,12 +429,9 @@ class AVATARModel(ModelBase):
         def func(input):
             x = input[0]
             
+            x = upscale(512)(x)
             x = upscale(256)(x)
-            x = ResidualBlock(256)(x)
             x = upscale(128)(x)
-            x = ResidualBlock(128)(x)
-            x = upscale(64)(x)
-            x = ResidualBlock(64)(x)
             return to_bgr(output_nc) (x)
 
         return func
@@ -507,7 +482,6 @@ class AVATARModel(ModelBase):
             for i in range(n_blocks):
                 x = ResnetBlock(ngf*4, use_dropout=use_dropout)(x)
 
-            x = ReLU()(XNormalization(XConv2DTranspose(ngf*4, 3, strides=2)(x)))
             x = ReLU()(XNormalization(XConv2DTranspose(ngf*2, 3, strides=2)(x)))
             x = ReLU()(XNormalization(XConv2DTranspose(ngf  , 3, strides=2)(x)))
 
