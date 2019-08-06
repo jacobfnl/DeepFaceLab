@@ -33,7 +33,8 @@ class AVATARModel(ModelBase):
     def onInitialize(self, batch_size=-1, **in_options):
         exec(nnlib.code_import_all, locals(), globals())
         self.set_vram_batch_requirements({2:1})
-
+        AVATARModel.initialize_nn_functions()
+        
         resolution = self.options['resolution']
         in_bgr_shape = (64, 64, 3)
         bgr_64_mask_shape = (64,64,1)
@@ -47,11 +48,13 @@ class AVATARModel(ModelBase):
 
         use_batch_norm = True
         
-        #dec_Inputs = [ Input(K.int_shape( self.enc.outputs[0] )[1:]) ]
-        #self.GA = modelify(AVATARModel.UNet (out_bgr_shape[2], use_batch_norm=False, ngf=64, use_dropout=True))(Input(out_bgr_shape))
-        #self.GB = modelify(AVATARModel.UNet (out_bgr_shape[2], use_batch_norm=False, ngf=64, use_dropout=True))(Input(out_bgr_shape))
-        self.GA = modelify(AVATARModel.ResNet (in_bgr_shape[2], use_batch_norm=False, ngf=64, use_dropout=True))(Input(in_bgr_shape))
-        self.GB = modelify(AVATARModel.ResNet (in_bgr_shape[2], use_batch_norm=False, ngf=64, use_dropout=True))(Input(in_bgr_shape))
+        self.enc = modelify(AVATARModel.EncFlow())( [Input(in_bgr_shape),] )
+        self.decA64 = modelify(AVATARModel.Dec64Flow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )        
+        self.decB64 = modelify(AVATARModel.Dec64Flow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )
+        
+        #self.GA = modelify(AVATARModel.ResNet (in_bgr_shape[2], use_batch_norm=False, ngf=64, use_dropout=True))(Input(in_bgr_shape))
+        #self.GB = modelify(AVATARModel.ResNet (in_bgr_shape[2], use_batch_norm=False, ngf=64, use_dropout=True))(Input(in_bgr_shape))
+        
         self.DA = modelify(AVATARModel.D64Discriminator() ) (Input(out_bgr_shape))
         self.DB = modelify(AVATARModel.D64Discriminator() ) (Input(out_bgr_shape))
 
@@ -60,9 +63,10 @@ class AVATARModel(ModelBase):
         
         if not self.is_first_run():
             weights_to_load = [
-                [self.GA, 'GA.h5'],
+                [self.enc, 'enc.h5'],                
+                [self.decA64, 'decA64.h5'],
+                [self.decB64, 'decB64.h5'],
                 [self.DA, 'DA.h5'],
-                [self.GB, 'GB.h5'],
                 [self.DB, 'DB.h5'],
                 [self.C, 'C.h5']
             ]
@@ -76,19 +80,19 @@ class AVATARModel(ModelBase):
             return K.mean(K.binary_crossentropy(labels,logits))
 
 
-        real_A_in = Input(out_bgr_shape)
-        real_Am = Input(mask_shape)
-        real_B_in = Input(out_bgr_shape)
-        real_Bm = Input(mask_shape)
+        real_A_in = Input(in_bgr_shape)
+        real_Am = Input(bgr_64_mask_shape)
+        real_B_in = Input(in_bgr_shape)
+        real_Bm = Input(bgr_64_mask_shape)
         
         real_A = ( (real_A_in+1)*real_Am + (1-real_Am) ) -1
         real_B = ( (real_B_in+1)*real_Bm + (1-real_Bm) ) -1
         
-        fake_B = self.GA(real_A)        
-        fake_A = self.GB(real_B)  
+        fake_B = self.decA64(self.enc(real_A))       
+        fake_A = self.decB64(self.enc(real_B))
         
-        rec_A = self.GB(fake_B)        
-        rec_B = self.GA(fake_A) 
+        rec_A = self.decB64(self.enc(fake_B))        
+        rec_B = self.decA64(self.enc(fake_A)) 
          
         real_A_d = self.DA(real_A)
         real_A_d_ones = K.ones_like(real_A_d)        
@@ -128,9 +132,9 @@ class AVATARModel(ModelBase):
         rec_C_A_t1 = Lambda ( lambda x: x[...,3:6], output_shape= ( K.int_shape(x)[1:3], 3 ) ) (x)
         rec_C_A_t2 = Lambda ( lambda x: x[...,6:9], output_shape= ( K.int_shape(x)[1:3], 3 ) ) (x)
 
-        rec_AB_t0 = self.GB (real_B_t0)
-        rec_AB_t1 = self.GB (real_B_t1)
-        rec_AB_t2 = self.GB (real_B_t2)
+        rec_AB_t0 = self.decB64(self.enc(real_B_t0))
+        rec_AB_t1 = self.decB64(self.enc(real_B_t1))
+        rec_AB_t2 = self.decB64(self.enc(real_B_t2))
         
         x = self.C ( K.concatenate ( [rec_AB_t0, rec_AB_t1, rec_AB_t2] , axis=-1) )
         rec_C_AB_t0 = Lambda ( lambda x: x[...,0:3], output_shape= ( K.int_shape(x)[1:3], 3 ) ) (x)
@@ -148,9 +152,9 @@ class AVATARModel(ModelBase):
                 #return K.mean( 50 * dssim(kernel_size=int(resolution/11.6),max_value=1.0)(t1, t2) )
                 
             loss_GA = DLoss(fake_B_d_ones, fake_B_d ) + CycleLoss(rec_B, real_B)
-            weights_GA = self.GA.trainable_weights
+            weights_GA = self.enc.trainable_weights + self.decA64.trainable_weights
             loss_GB = DLoss(fake_A_d_ones, fake_A_d ) + CycleLoss(rec_A, real_A)
-            weights_GB = self.GB.trainable_weights
+            weights_GB = self.enc.trainable_weights + self.decB64.trainable_weights
         
             self.GA_train = K.function ([real_A_in, real_Am, real_B_in, real_Bm],[loss_GA],
                                         opt().get_updates(loss_GA, weights_GA) )
@@ -224,13 +228,23 @@ class AVATARModel(ModelBase):
         else:
             self.G_convert = K.function([warped_B064],[rec_C_A0_B0])
 
+    def get_model_filename_list(self):
+        return [[self.enc, 'enc.h5'],                
+                [self.decA64, 'decA64.h5'],
+                [self.decB64, 'decB64.h5'],
+                [self.DA, 'DA.h5'],
+                [self.DB, 'DB.h5'],
+                [self.C, 'C.h5']
+              ]
+               
     #override
     def onSave(self):
-        self.save_weights_safe( [  [self.GA, 'GA.h5'],
-                                   [self.DA, 'DA.h5'],
-                                   [self.GB, 'GB.h5'],
-                                   [self.DB, 'DB.h5'],
-                                   [self.C, 'C.h5']
+        self.save_weights_safe( [  [self.enc, 'enc.h5'],                
+                                    [self.decA64, 'decA64.h5'],
+                                    [self.decB64, 'decB64.h5'],
+                                    [self.DA, 'DA.h5'],
+                                    [self.DB, 'DB.h5'],
+                                    [self.C, 'C.h5']
                                 ])
 
     #override
@@ -380,7 +394,61 @@ class AVATARModel(ModelBase):
 
             return XConv2D( 1, 5, strides=1, padding='same', use_bias=True, activation='sigmoid')(x)#
         return func
-    
+   
+    @staticmethod
+    def EncFlow(padding='zero', **kwargs):
+        exec (nnlib.import_all(), locals(), globals())
+
+        use_bias = False
+        def XNorm(x):
+            return BatchNormalization (axis=-1)(x)
+        XConv2D = partial(Conv2D, padding=padding, use_bias=use_bias)
+
+        def downscale (dim):
+            def func(x):
+                return LeakyReLU(0.1)( Conv2D(dim, 5, strides=2, padding='same')(x))
+            return func
+
+        def upscale (dim):
+            def func(x):
+                return SubpixelUpscaler()(LeakyReLU(0.1)(Conv2D(dim * 4, 3, strides=1, padding='same')(x)))
+            return func
+
+               
+        def func(input):
+            x, = input
+            b,h,w,c = K.int_shape(x)
+            x = downscale(64)(x)
+            x = downscale(128)(x)
+            x = downscale(256)(x)
+            x = downscale(512)(x)
+
+            x = Dense(512)(Flatten()(x))
+            x = Dense(4 * 4 * 512)(x)
+            x = Reshape((4, 4, 512))(x) 
+            x = upscale(512)(x)   
+            return x
+            
+        return func
+
+    @staticmethod
+    def Dec64Flow(output_nc=3, **kwargs):
+        exec (nnlib.import_all(), locals(), globals())
+
+        ResidualBlock = AVATARModel.ResidualBlock
+        upscale = AVATARModel.upscale
+        to_bgr = AVATARModel.to_bgr
+
+        def func(input):
+            x = input[0]
+            
+            x = upscale(512)(x)
+            x = upscale(256)(x)
+            x = upscale(128)(x)
+            return to_bgr(output_nc, activation="tanh") (x)
+
+        return func
+        
     @staticmethod
     def D64Discriminator(ndf=256):
         exec (nnlib.import_all(), locals(), globals())
@@ -413,264 +481,6 @@ class AVATARModel(ModelBase):
             return XConv2D( 1, 4, strides=1, padding='same', use_bias=True, activation='sigmoid')(x)#
         return func
             
-    @staticmethod
-    def DFEncFlow(padding='zero', **kwargs):
-        exec (nnlib.import_all(), locals(), globals())
-
-        use_bias = False
-        def XNorm(x):
-            return BatchNormalization (axis=-1)(x)
-        XConv2D = partial(Conv2D, padding=padding, use_bias=use_bias)
-
-        #def Act(lrelu_alpha=0.1):
-        #    return LeakyReLU(alpha=lrelu_alpha)
-
-        #def downscale (dim, **kwargs):
-        #    def func(x):
-        #        return Act() ( XNormalization(XConv2D(dim, kernel_size=5, strides=2)(x)) )
-        #    return func
-
-        #downscale = partial(downscale)
-        def downscale (dim):
-            def func(x):
-                return  LeakyReLU(0.1)( Conv2D(dim, 5, strides=2, padding='same')(x))#BlurPool(filt_size=5)(
-            return func
-
-        def upscale (dim):
-            def func(x):
-                return SubpixelUpscaler()(LeakyReLU(0.1)(Conv2D(dim * 4, 3, strides=1, padding='same')(x)))
-            return func
-        """
-        def self_attn_block(inp, nc, squeeze_factor=8):
-            assert nc//squeeze_factor > 0, f"Input channels must be >= {squeeze_factor}, recieved nc={nc}"
-            x = inp
-            shape_x = x.get_shape().as_list()
-            
-            f = Conv2D(nc//squeeze_factor, 1, kernel_regularizer=keras.regularizers.l2(1e-4))(x)
-            g = Conv2D(nc//squeeze_factor, 1, kernel_regularizer=keras.regularizers.l2(1e-4))(x)
-            h = Conv2D(nc, 1, kernel_regularizer=keras.regularizers.l2(1e-4))(x)
-            
-            shape_f = f.get_shape().as_list()
-            shape_g = g.get_shape().as_list()
-            shape_h = h.get_shape().as_list()
-            flat_f = Reshape( (-1, shape_f[-1]) )(f)
-            flat_g = Reshape( (-1, shape_g[-1]) )(g)
-            flat_h = Reshape( (-1, shape_h[-1]) )(h)   
-
-            s = Lambda(lambda x: K.batch_dot(x[0], keras.layers.Permute((2,1))(x[1]) ))([flat_g, flat_f])
-            beta = keras.layers.Softmax(axis=-1)(s)
-            o = Lambda(lambda x: K.batch_dot(x[0], x[1]))([beta, flat_h])
-            
-            o = Reshape(shape_x[1:])(o)
-            o = Scale()(o)
-            
-            out = Add()([o, inp])
-            return out     
-        """
-               
-        def func(input):
-            x, = input
-            b,h,w,c = K.int_shape(x)
-            
-            x = downscale(128)(x)
-            x = downscale(256)(x)
-            x = downscale(512)(x)
-            x = downscale(1024)(x)
-
-            x = Dense(256)(Flatten()(x))
-            x = Dense(4 * 4 * 512)(x)
-            x = Reshape((4, 4, 512))(x) 
-            x = upscale(512)(x)   
-            return x
-            
-            x, = input
-            b,h,w,c = K.int_shape(x)
-            
-            x = downscale(128)(x)
-            x = downscale(256)(x)
-            x = downscale(512)(x)
-            x = downscale(1024)(x)
-#
-            x = Dense(256)(Flatten()(x))
-            x = Dense(4 * 4 * 256)(x)
-            x = Reshape((4, 4, 256))(x)
-            x = upscale(256)(x)
-            return x
-
-            x = Conv2D(64, kernel_size=5, strides=1, padding='same')(x)
-            x = Conv2D(64, kernel_size=5, strides=1, padding='same')(x)
-            x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
-
-            x = Conv2D(128, kernel_size=3, strides=1, padding='same')(x)
-            x = Conv2D(128, kernel_size=3, strides=1, padding='same')(x)
-            x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
-
-            x = Conv2D(256, kernel_size=3, strides=1, padding='same')(x)
-            x = Conv2D(256, kernel_size=3, strides=1, padding='same')(x)
-            x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
-
-            x = Conv2D(512, kernel_size=3, strides=1, padding='same')(x)
-            x = Conv2D(512, kernel_size=3, strides=1, padding='same')(x)
-            x = MaxPooling2D(pool_size=(3, 3), strides=2, padding='same')(x)
-
-            x = Flatten()(x)
-
-            x = Dense(128)(x)
-            return x
-
-            x = Dense(256)(x)
-            x = ReLU()(x)
-            x = Dense(256)(x)
-            x = ReLU()(x)
-
-            mean = Dense(128)(x)
-            logvar = Dense(128)(x)
-
-            return mean, logvar
-
-        return func
-
-    @staticmethod
-    def DFDec64Flow(output_nc, padding='zero', **kwargs):
-        exec (nnlib.import_all(), locals(), globals())
-
-        def upscale (dim, padding='zero', norm='', act='', **kwargs):
-            def func(x):
-                return SubpixelUpscaler()(LeakyReLU(alpha=0.1)(Conv2D(dim * 4, kernel_size=3, strides=1, padding=padding)(x)))
-            return func
-        def to_bgr (output_nc, **kwargs):
-            def func(x):
-                return Conv2D(output_nc, kernel_size=5, strides=1, padding='same', activation='sigmoid')(x)
-            return func
-        class ResidualBlock(object):
-            def __init__(self, filters, kernel_size=3, padding='zero', norm='', act='', **kwargs):
-                self.filters = filters
-                self.kernel_size = kernel_size
-                self.padding = padding
-                self.norm = norm
-                self.act = act
-
-            def __call__(self, inp):
-                x = inp
-                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
-                x = LeakyReLU(alpha=0.2)(x)
-                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
-                x = Add()([x, inp])
-                x = LeakyReLU(alpha=0.2)(x)
-                return x
-        upscale = partial(upscale)
-        to_bgr = partial(to_bgr)
-
-        def func(input):
-            x = input[0]                     
-                       
-            x = upscale(256)( x )
-            x = ResidualBlock(256)(x)
-
-            x = upscale(128)( x )
-            x = ResidualBlock(128)(x)
-
-            x = upscale(64)( x )
-            x = ResidualBlock(64)(x)
-            return to_bgr(output_nc) ( x )
-            
-        return func
-        
-    @staticmethod
-    def DFDecFlow(output_nc, padding='zero', **kwargs):
-        exec (nnlib.import_all(), locals(), globals())
-
-        use_bias = False
-        def XNormalization(x):
-            return BatchNormalization (axis=-1)(x)
-        XConv2D = partial(Conv2D, padding=padding, use_bias=use_bias)
-        XConv2DTranspose = partial(Conv2DTranspose, padding='same', use_bias=use_bias)
-
-        def Act(act='', lrelu_alpha=0.1):
-            if act == 'prelu':
-                return PReLU()
-            elif act == 'relu':
-                return ReLU()
-            else:
-                return LeakyReLU(alpha=lrelu_alpha)
-
-        def upscale (dim, padding='zero', norm='', act='', **kwargs):
-            def func(x):
-                return SubpixelUpscaler()(LeakyReLU(alpha=0.1)(Conv2D(dim * 4, kernel_size=3, strides=1, padding=padding)(x)))
-            return func
-
-        def to_bgr (output_nc, **kwargs):
-            def func(x):
-                return Conv2D(output_nc, kernel_size=5, padding='same', use_bias=True, activation='sigmoid')(x)
-            return func
-
-        class ResidualBlock(object):
-            def __init__(self, filters, kernel_size=3, padding='zero', norm='', act='', **kwargs):
-                self.filters = filters
-                self.kernel_size = kernel_size
-                self.padding = padding
-                self.norm = norm
-                self.act = act
-
-            def __call__(self, inp):
-                x = inp
-                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
-                x = LeakyReLU(alpha=0.2)(x)
-                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
-                x = Add()([x, inp])
-                x = LeakyReLU(alpha=0.2)(x)
-                return x
-
-        upscale = partial(upscale)
-        to_bgr = partial(to_bgr)
-
-        dims = 64
-
-        def func(input):
-            x = input[0]            
-            x = upscale(512)( x )
-            x = ResidualBlock(512)(x)
-            
-            x = upscale(256)( x )
-            x = ResidualBlock(256)(x)
-
-            x = upscale(128)( x )
-            x = ResidualBlock(128)(x)
-
-            x = upscale(64)( x )
-            x = ResidualBlock(64)(x)
-
-            return to_bgr(output_nc) ( x )
-            
-        #def func(input):
-        #    x = input[0]
-        #    x = Dense(8 * 8 * dims*8, activation="relu")(x)
-        #    x = Reshape((8, 8, dims*8))(x)
-#
-        #    x = upscale(dims*8)( x )
-        #    x = ResidualBlock(dims*8)(x)
-        #    x = ResidualBlock(dims*8)(x)
-#
-        #    x = upscale(dims*4)( x )
-        #    x = ResidualBlock(dims*4)(x)
-        #    x = ResidualBlock(dims*4)(x)
-#
-        #    x = upscale(dims*2)( x )
-        #    x = ResidualBlock(dims*2)(x)
-        #    x = ResidualBlock(dims*2)(x)
-#
-        #    x = upscale(dims)( x )
-        #    x = ResidualBlock(dims)(x)
-        #    x = ResidualBlock(dims)(x)
-#
-        #    #x = upscale(dims*4)( x )
-        #    #x = ResidualBlock(dims*4)(x)
-        #    #x = ResidualBlock(dims*4)(x)
-#
-        #    return to_bgr(output_nc) ( x )
-            
-        return func
-        
     @staticmethod
     def ResNet(output_nc, use_batch_norm, ngf=64, n_blocks=6, use_dropout=False):
         exec (nnlib.import_all(), locals(), globals())
@@ -727,68 +537,43 @@ class AVATARModel(ModelBase):
         return func
         
     @staticmethod
-    def UNet(output_nc, use_batch_norm, ngf=64, use_dropout=False):
+    def initialize_nn_functions():
         exec (nnlib.import_all(), locals(), globals())
 
-        if not use_batch_norm:
-            use_bias = True
-            def XNormalizationL():
-                return InstanceNormalization (axis=-1)
-        else:
-            use_bias = False
-            def XNormalizationL():
-                return BatchNormalization (axis=-1)
-                
-        def XNormalization(x):
-            return XNormalizationL()(x)
-                
-        XConv2D = partial(Conv2D, padding='same', use_bias=use_bias)
-        XConv2DTranspose = partial(Conv2DTranspose, padding='same', use_bias=use_bias)
-      
-        def func(input):
-            
-            b,h,w,c = K.int_shape(input)
-            
-            n_downs = get_power_of_two(w) - 4
-            
-            Norm = XNormalizationL()
-            Norm2 = XNormalizationL()
-            Norm4 = XNormalizationL()
-            Norm8 = XNormalizationL()
-            
-            x = input
-            
-            x = e1 = XConv2D( ngf, 4, strides=2, use_bias=True ) (x)
+        class ResidualBlock(object):
+            def __init__(self, filters, kernel_size=3, padding='zero', **kwargs):
+                self.filters = filters
+                self.kernel_size = kernel_size
+                self.padding = padding
 
-            x = e2 = Norm2( XConv2D( ngf*2, 4, strides=2  )( LeakyReLU(0.2)(x) ) )
-            x = e3 = Norm4( XConv2D( ngf*4, 4, strides=2  )( LeakyReLU(0.2)(x) ) )
-            
-            l = []
-            for i in range(n_downs):
-                x = Norm8( XConv2D( ngf*8, 4, strides=2  )( LeakyReLU(0.2)(x) ) )
-                l += [x]
-            
-            x = XConv2D( ngf*8, 4, strides=2, use_bias=True  )( LeakyReLU(0.2)(x) )
-            
-            for i in range(n_downs):
-                x = Norm8( XConv2DTranspose( ngf*8, 4, strides=2  )( ReLU()(x) ) )
-                if i <= n_downs-2:
-                    x = Dropout(0.5)(x)                
-                x = Concatenate(axis=-1)([x, l[-i-1] ])
-  
-            x = Norm4( XConv2DTranspose( ngf*4, 4, strides=2  )( ReLU()(x) ) )
-            x = Concatenate(axis=-1)([x, e3])
+            def __call__(self, inp):
+                x = inp
+                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
+                x = LeakyReLU(0.2)(x)
+                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
+                x = Add()([x, inp])
+                x = LeakyReLU(0.2)(x)
+                return x
+        AVATARModel.ResidualBlock = ResidualBlock
 
-            x = Norm2( XConv2DTranspose( ngf*2, 4, strides=2  )( ReLU()(x) ) )
-            x = Concatenate(axis=-1)([x, e2])  
-            
-            x = Norm( XConv2DTranspose( ngf, 4, strides=2  )( ReLU()(x) ) )
-            x = Concatenate(axis=-1)([x, e1])   
-            
-            x = XConv2DTranspose(output_nc, 4, strides=2, activation='tanh', use_bias=True)( ReLU()(x) )
+        def downscale (dim, padding='zero', act='', **kwargs):
+            def func(x):
+                return LeakyReLU(0.2) (Conv2D(dim, kernel_size=5, strides=2, padding=padding)(x))
+            return func
+        AVATARModel.downscale = downscale
 
-            return x
-        return func
+        def upscale (dim, padding='zero', norm='', act='', **kwargs):
+            def func(x):
+                return SubpixelUpscaler()( LeakyReLU(0.2)(Conv2D(dim * 4, kernel_size=3, strides=1, padding=padding)(x)))
+            return func
+        AVATARModel.upscale = upscale
+
+        def to_bgr (output_nc, padding='zero', activation='sigmoid', **kwargs):
+            def func(x):
+                return Conv2D(output_nc, kernel_size=5, padding=padding, activation=activation)(x)
+            return func
+        AVATARModel.to_bgr = to_bgr
+              
         
 Model = AVATARModel
 
