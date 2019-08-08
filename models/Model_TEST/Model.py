@@ -194,10 +194,14 @@ class AVATARModel(ModelBase):
                                              {'types': (t.IMG_SOURCE, t.NONE, t.MODE_BGR), 'resolution':resolution},
                                             ] ), 
                    ]
-            #generators[0].set_active(False)
-            #generators[1].set_active(False)
-            #generators[2].set_active(False)
-            #generators[3].set_active(False)
+                   
+            if self.stage == 1:
+                generators[2].set_active(False)
+                generators[3].set_active(False)
+            elif self.stage == 2:
+                generators[0].set_active(False)
+                generators[1].set_active(False)
+            
             self.set_training_data_generators (generators)
         else:
             self.G_convert = K.function([real_B64_t0, real_B64_t1, real_B64_t2],[rec_C_AB_t1])
