@@ -121,6 +121,7 @@ def get_transform_mat (image_landmarks, output_size, face_type, scale=1.0):
     if not isinstance(image_landmarks, np.ndarray):
         image_landmarks = np.array (image_landmarks)
 
+    """
     if face_type == FaceType.AVATAR:
         centroid = np.mean (image_landmarks, axis=0)
 
@@ -136,35 +137,36 @@ def get_transform_mat (image_landmarks, output_size, face_type, scale=1.0):
         mat = mat * scale * (output_size / 3)
         mat[:,2] += output_size / 2
     else:
-        remove_rotation = False
-        if face_type == FaceType.FULL_NO_ROTATION:
-            face_type = FaceType.FULL
-            remove_rotation = True
-        
-        if face_type == FaceType.HALF:
-            padding = 0
-        elif face_type == FaceType.FULL:
-            padding = (output_size / 64) * 12
-        elif face_type == FaceType.HEAD:
-            padding = (output_size / 64) * 24
-        else:
-            raise ValueError ('wrong face_type: ', face_type)
+    """
+    remove_align = False
+    if face_type == FaceType.FULL_NO_ALIGN:
+        face_type = FaceType.FULL
+        remove_align = True
+    
+    if face_type == FaceType.HALF:
+        padding = 0
+    elif face_type == FaceType.FULL:
+        padding = (output_size / 64) * 12
+    elif face_type == FaceType.HEAD:
+        padding = (output_size / 64) * 24
+    else:
+        raise ValueError ('wrong face_type: ', face_type)
 
-        mat = umeyama(image_landmarks[17:], landmarks_2D, True)[0:2]
-        mat = mat * (output_size - 2 * padding)
-        mat[:,2] += padding
-        mat *= (1 / scale)
-        mat[:,2] += -output_size*( ( (1 / scale) - 1.0 ) / 2 )
+    mat = umeyama(image_landmarks[17:], landmarks_2D, True)[0:2]
+    mat = mat * (output_size - 2 * padding)
+    mat[:,2] += padding
+    mat *= (1 / scale)
+    mat[:,2] += -output_size*( ( (1 / scale) - 1.0 ) / 2 )
+    
+    if remove_align:
+        bbox = transform_points ( [ (0,0), (0,output_size-1), (output_size-1, output_size-1), (output_size-1,0) ], mat, True)
+        area = mathlib.polygon_area(bbox[:,0], bbox[:,1] )
+        side = math.sqrt(area) / 2
+        center = transform_points ( [(output_size/2,output_size/2)], mat, True)
         
-        if remove_rotation:
-            bbox = transform_points ( [ (0,0), (0,output_size-1), (output_size-1, output_size-1), (output_size-1,0) ], mat, True)
-            area = mathlib.polygon_area(bbox[:,0], bbox[:,1] )
-            side = math.sqrt(area) / 2
-            center = transform_points ( [(output_size/2,output_size/2)], mat, True)
-            
-            pts1 = np.float32([ center+[-side,-side], center+[side,-side], center+[-side,side] ])
-            pts2 = np.float32([[0,0],[output_size-1,0],[0,output_size-1]])
-            mat = cv2.getAffineTransform(pts1,pts2)
+        pts1 = np.float32([ center+[-side,-side], center+[side,-side], center+[-side,side] ])
+        pts2 = np.float32([[0,0],[output_size-1,0],[0,output_size-1]])
+        mat = cv2.getAffineTransform(pts1,pts2)
 
     return mat
 

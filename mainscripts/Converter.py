@@ -126,6 +126,8 @@ class ConvertSubprocessor(Subprocessor):
                 f0, f1, f2 = [ normalize_channels (f, 3) for f in [f0,f1,f2] ]
                 
                 image = self.converter.cli_convert_face(f0, f0_lmrk, f1, f1_lmrk, f2, f2_lmrk,  self.debug)
+                
+                output_filename_path = self.output_path / self.input_data[idx][2] 
 
                 if self.debug:
                     return (1, image)
@@ -300,9 +302,9 @@ def main (args, device_args):
                 if dflimg is None:
                     io.log_err ("%s is not a dfl image file" % (filepath.name) )
                     continue
-                input_data += [ ( str(filepath), dflimg.get_source_landmarks(), dflimg.get_source_filename() ) ]
+                input_data += [ ( str(filepath), dflimg.get_landmarks(), dflimg.get_source_filename() ) ]
                     
-            input_data = [ (p[0],p[1]) for p in sorted(input_data, key=operator.itemgetter(2)) ]
+            input_data = sorted(input_data, key=operator.itemgetter(2))
         else:
             input_data = [ (p,) for p in input_path_image_paths ]          
                    

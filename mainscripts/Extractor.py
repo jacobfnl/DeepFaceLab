@@ -808,7 +808,6 @@ def main(input_dir,
 
     input_path = Path(input_dir)
     output_path = Path(output_dir)
-    #face_type = 'mark_only'
     face_type = FaceType.fromString(face_type)
 
     multi_gpu = device_args.get('multi_gpu', False)

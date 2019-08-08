@@ -4,9 +4,8 @@ class FaceType(IntEnum):
     HALF = 0,
     FULL = 1,
     HEAD = 2,
-    AVATAR = 3,    #centered nose only
     
-    FULL_NO_ROTATION = 5,
+    FULL_NO_ALIGN = 5,
     MARK_ONLY = 10, #no align at all, just embedded faceinfo
     
     @staticmethod
@@ -23,14 +22,12 @@ class FaceType(IntEnum):
 from_string_dict = {'half_face': FaceType.HALF,
                     'full_face': FaceType.FULL,
                     'head' : FaceType.HEAD,
-                    'avatar' : FaceType.AVATAR,
                     'mark_only' : FaceType.MARK_ONLY,
-                    'full_face_no_rotation' : FaceType.FULL_NO_ROTATION,
+                    'full_face_no_align' : FaceType.FULL_NO_ALIGN,
                     }
 to_string_dict = { FaceType.HALF : 'half_face',
                    FaceType.FULL : 'full_face',
                    FaceType.HEAD : 'head',
-                   FaceType.AVATAR : 'avatar',
                    FaceType.MARK_ONLY :'mark_only',
-                   FaceType.FULL_NO_ROTATION : 'full_face_no_rotation'                   
+                   FaceType.FULL_NO_ALIGN : 'full_face_no_align'                   
                  }

@@ -40,9 +40,9 @@ class ConverterAvatar(Converter):
             
         inp_size = self.predictor_input_size
           
-        f0_mat = LandmarksProcessor.get_transform_mat (f0_lmrk, inp_size, face_type=FaceType.FULL_NO_ROTATION)
-        f1_mat = LandmarksProcessor.get_transform_mat (f1_lmrk, inp_size, face_type=FaceType.FULL_NO_ROTATION)
-        f2_mat = LandmarksProcessor.get_transform_mat (f2_lmrk, inp_size, face_type=FaceType.FULL_NO_ROTATION)
+        f0_mat = LandmarksProcessor.get_transform_mat (f0_lmrk, inp_size, face_type=FaceType.FULL_NO_ALIGN)
+        f1_mat = LandmarksProcessor.get_transform_mat (f1_lmrk, inp_size, face_type=FaceType.FULL_NO_ALIGN)
+        f2_mat = LandmarksProcessor.get_transform_mat (f2_lmrk, inp_size, face_type=FaceType.FULL_NO_ALIGN)
         
         inp_f0 = cv2.warpAffine( f0, f0_mat, (inp_size, inp_size), flags=cv2.INTER_CUBIC )
         inp_f1 = cv2.warpAffine( f1, f1_mat, (inp_size, inp_size), flags=cv2.INTER_CUBIC )
@@ -52,7 +52,7 @@ class ConverterAvatar(Converter):
 
         out_img = np.clip(prd_f, 0.0, 1.0)
 
-        out_img = np.concatenate ( [cv2.resize ( f1, (prd_f.shape[1], prd_f.shape[0])  ), 
+        out_img = np.concatenate ( [cv2.resize ( inp_f1, (prd_f.shape[1], prd_f.shape[0])  ), 
                                 out_img], axis=1 )
         
         if debug:
