@@ -155,7 +155,7 @@ class AVATARModel(ModelBase):
                         DLoss(fake_A64_d_zeros, fake_A64_d ) ) * 0.5
                       
             def opt(lr=5e-5):
-                return Adam(lr=lr, beta_1=0.5, beta_2=0.999, tf_cpu_mode=2 is 'tensorflow' in self.device_config.backend else 0 )
+                return Adam(lr=lr, beta_1=0.5, beta_2=0.999, tf_cpu_mode=2 if 'tensorflow' in self.device_config.backend else 0 )
 
             self.AB64_train = K.function ([warped_A64, real_A64, real_A64m, warped_B64, real_B64, real_B64m], [loss_AB64], opt().get_updates(loss_AB64, weights_AB64) )
             self.C_train = K.function ([real_A64_t0, real_A64m_t0, real_A_t0,
