@@ -29,8 +29,10 @@ class AVATARModel(ModelBase):
         #    self.options['resolution'] = self.options.get('resolution', def_resolution)
 
         if is_first_run or ask_override:
-            self.options['stage'] = io.input_int("Stage (1 or 2 ?:help skip:1) : ", 1, [1,2], help_message="Train first stage, then second. Tune batch size to maximum possible for both stages.")
+            def_stage = self.options.get('stage', 1)
+            self.options['stage'] = io.input_int("Stage (1 or 2 ?:help skip:%d) : " % def_stage, def_stage, [1,2], help_message="Train first stage, then second. Tune batch size to maximum possible for both stages.")
         else:
+            
             self.options['stage'] = self.options.get('stage', 1)
             
     #override
@@ -42,7 +44,7 @@ class AVATARModel(ModelBase):
 
         resolution = self.resolution = 256#self.options['resolution']
         stage = self.stage = self.options['stage']
-        df_res = 64
+        df_res = 128
         in_bgr_shape = (df_res, df_res, 3)
         bgr_64_mask_shape = (df_res, df_res, 1)
         out_bgr_shape = (resolution, resolution, 3)
@@ -50,8 +52,8 @@ class AVATARModel(ModelBase):
 
         self.enc = modelify(AVATARModel.EncFlow())( [Input(in_bgr_shape),] )
 
-        self.decA64 = modelify(AVATARModel.Dec64Flow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )        
-        self.decB64 = modelify(AVATARModel.Dec64Flow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )
+        self.decA64 = modelify(AVATARModel.DecFlow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )        
+        self.decB64 = modelify(AVATARModel.DecFlow()) ( [ Input(K.int_shape(self.enc.outputs[0])[1:]) ] )
 
         self.C = modelify(AVATARModel.ResNet (9, use_batch_norm=False, n_blocks=6, ngf=128, use_dropout=True))( Input(bgr_t_shape))
         self.D64 = modelify(AVATARModel.D64Discriminator() ) (Input(in_bgr_shape))        
@@ -62,7 +64,7 @@ class AVATARModel(ModelBase):
                 for layer in model.layers:
                     if type(layer) == keras.layers.Conv2D:
                         conv_weights_list += [layer.weights[0]] #Conv2D kernel_weights
-            CAInitializerMP ( conv_weights_list )
+            #CAInitializerMP ( conv_weights_list )
                 
         if not self.is_first_run():
             weights_to_load = [
@@ -113,9 +115,9 @@ class AVATARModel(ModelBase):
         fake_A64_d_zeros = K.zeros_like(fake_A64_d)
 
         
-        def trXtoY(x):
+        def gray_pad(x):
             a = np.ones((resolution,resolution,3))*0.5
-            pad = ( resolution - 64 ) // 2
+            pad = ( resolution - df_res ) // 2
             a[pad:-pad:,pad:-pad:,:] = 0
             return K.spatial_2d_padding(x, padding=((pad, pad), (pad, pad)) ) + K.constant(a, dtype=K.floatx() )
             
@@ -124,19 +126,19 @@ class AVATARModel(ModelBase):
                    Lambda ( lambda x: x[...,3:6], output_shape= ( K.int_shape(x)[1:3], 3 ) ) (x), \
                    Lambda ( lambda x: x[...,6:9], output_shape= ( K.int_shape(x)[1:3], 3 ) ) (x)
                    
-        rec_AB_t0 = trXtoY( self.decA64 (self.enc (real_B64_t0)) )
-        rec_AB_t1 = trXtoY( self.decA64 (self.enc (real_B64_t1)) )
-        rec_AB_t2 = trXtoY( self.decA64 (self.enc (real_B64_t2)) )
+        rec_AB_t0 = gray_pad( self.decA64 (self.enc (real_B64_t0)) )
+        rec_AB_t1 = gray_pad( self.decA64 (self.enc (real_B64_t1)) )
+        rec_AB_t2 = gray_pad( self.decA64 (self.enc (real_B64_t2)) )
         
-        C_in_A_t0 = trXtoY(real_A64_t0*real_A64m_t0 + (1-real_A64m_t0)*0.5)
-        C_in_A_t1 = trXtoY(real_A64_t1*real_A64m_t1 + (1-real_A64m_t1)*0.5)
-        C_in_A_t2 = trXtoY(real_A64_t2*real_A64m_t2 + (1-real_A64m_t2)*0.5)
+        C_in_A_t0 = gray_pad(real_A64_t0*real_A64m_t0 + (1-real_A64m_t0)*0.5)
+        C_in_A_t1 = gray_pad(real_A64_t1*real_A64m_t1 + (1-real_A64m_t1)*0.5)
+        C_in_A_t2 = gray_pad(real_A64_t2*real_A64m_t2 + (1-real_A64m_t2)*0.5)
        
         rec_C_A_t0, rec_C_A_t1, rec_C_A_t2 = Cto3t ( self.C ( K.concatenate ( [C_in_A_t0, C_in_A_t1, C_in_A_t2] , axis=-1) ) )
         rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 = Cto3t( self.C ( K.concatenate ( [rec_AB_t0, rec_AB_t1, rec_AB_t2] , axis=-1) ) )
 
         self.G64_view = K.function([warped_A64, warped_B64],[rec_A64, rec_B64, rec_AB64])
-        self.G_view = K.function([real_A64_t0, real_A64m_t0, real_A64_t1, real_A64m_t1, real_A64_t2, real_A64m_t2, real_B64_t0, real_B64_t1, real_B64_t2], [rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2])
+        self.G_view = K.function([real_A64_t0, real_A64m_t0, real_A64_t1, real_A64m_t1, real_A64_t2, real_A64m_t2, real_B64_t0, real_B64_t1, real_B64_t2], [rec_C_A_t0, rec_C_A_t1, rec_C_A_t2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2])
         
         if self.is_training_mode:
             loss_AB64 = K.mean(10 * dssim(kernel_size=5,max_value=1.0) ( rec_A64, real_A64*real_A64m + (1-real_A64m)*0.5) ) + \
@@ -153,7 +155,7 @@ class AVATARModel(ModelBase):
                         DLoss(fake_A64_d_zeros, fake_A64_d ) ) * 0.5
                       
             def opt(lr=5e-5):
-                return Adam(lr=lr, beta_1=0.5, beta_2=0.999, tf_cpu_mode=2)
+                return Adam(lr=lr, beta_1=0.5, beta_2=0.999, tf_cpu_mode=2 is 'tensorflow' in self.device_config.backend else 0 )
 
             self.AB64_train = K.function ([warped_A64, real_A64, real_A64m, warped_B64, real_B64, real_B64m], [loss_AB64], opt().get_updates(loss_AB64, weights_AB64) )
             self.C_train = K.function ([real_A64_t0, real_A64m_t0, real_A_t0,
@@ -281,14 +283,14 @@ class AVATARModel(ModelBase):
 
         G_view_result = self.G_view([t_src64_0, t_src64m_0, t_src64_1, t_src64m_1, t_src64_2, t_src64m_2, t_dst64_0, t_dst64_1, t_dst64_2 ])
         
-        t_dst_0, t_dst_1, t_dst_2,  rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 = [ x[0] for x in ([t_dst_0, t_dst_1, t_dst_2, ] + G_view_result)  ]
+        t_dst_0, t_dst_1, t_dst_2, rec_C_A_t0, rec_C_A_t1, rec_C_A_t2, rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 = [ x[0] for x in ([t_dst_0, t_dst_1, t_dst_2, ] + G_view_result)  ]
         
 
-        l1 = np.concatenate ( (sample64x4, sample64x4, sample64x4 ), axis=1 )
-        l2 = np.concatenate ( (t_dst_0, t_dst_1, t_dst_2), axis=1 )
-        l3 = np.concatenate ( (rec_C_AB_t0, rec_C_AB_t1, rec_C_AB_t2 ), axis=1 )
+        c1 = np.concatenate ( (sample64x4, rec_C_A_t0, t_dst_0, rec_C_AB_t0 ), axis=1 )
+        c2 = np.concatenate ( (sample64x4, rec_C_A_t1, t_dst_1, rec_C_AB_t1 ), axis=1 )
+        c3 = np.concatenate ( (sample64x4, rec_C_A_t2, t_dst_2, rec_C_AB_t2 ), axis=1 )
         
-        r = np.concatenate ( [l1,l2,l3], axis=0 )
+        r = np.concatenate ( [c1,c2,c3], axis=0 )
         #r = sample64x4
         return [ ('AVATAR', r ) ]
 
@@ -405,21 +407,24 @@ class AVATARModel(ModelBase):
         def func(input):
             x, = input
             b,h,w,c = K.int_shape(x)
+            
+            dim_res = w // 16
+            
             x = downscale(64)(x)
             x = downscale(128)(x)
             x = downscale(256)(x)
             x = downscale(512)(x)
 
             x = Dense(512)(Flatten()(x))
-            x = Dense(4 * 4 * 512)(x)
-            x = Reshape((4, 4, 512))(x) 
+            x = Dense(dim_res * dim_res * 512)(x)
+            x = Reshape((dim_res, dim_res, 512))(x) 
             x = upscale(512)(x)   
             return x
             
         return func
 
     @staticmethod
-    def Dec64Flow(output_nc=3, **kwargs):
+    def DecFlow(output_nc=3, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
 
         ResidualBlock = AVATARModel.ResidualBlock
