@@ -64,7 +64,7 @@ class AVATARModel(ModelBase):
                 for layer in model.layers:
                     if type(layer) == keras.layers.Conv2D:
                         conv_weights_list += [layer.weights[0]] #Conv2D kernel_weights
-            #CAInitializerMP ( conv_weights_list )
+            CAInitializerMP ( conv_weights_list )
                 
         if not self.is_first_run():
             weights_to_load = [
