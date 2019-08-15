@@ -7,8 +7,7 @@ from facelib import FaceType
 from samplelib import *
 from interact import interact as io
 
-from samplelib.SampleProcessor import ColorTransferMode
-
+from samplelib.SampleProcessor import ColorTransferMode, FilterMode
 
 
 # SAE - Styled AutoEncoder
@@ -135,6 +134,13 @@ class SAEModel(ModelBase):
                              "but the training time may be longer, due to the src faceset is becoming more diverse."),
                 ColorTransferMode.NONE, ColorTransferMode.MASKED_RCT_PAPER_CLIP)
 
+            default_apply_filter: FilterMode = FilterMode.NONE if is_first_run else self.options.get('apply_filter', FilterMode.NONE)
+            self.options['apply_filter'] = np.clip(io.input_int(
+                "Apply filters? (0) None, (1) High Pass (Lapacian), (2) Sobel-x, (3) Sobel-y ?:help skip:%s) : " % default_apply_filter,
+                default_apply_filter,
+                help_message=""),
+                FilterMode.NONE, FilterMode.SOBEL_Y)
+
             if nnlib.device.backend != 'plaidML':  # todo https://github.com/plaidml/plaidml/issues/301
                 default_clipgrad = False if is_first_run else self.options.get('clipgrad', False)
                 self.options['clipgrad'] = io.input_bool(
@@ -148,6 +154,7 @@ class SAEModel(ModelBase):
             self.options['face_style_power'] = self.options.get('face_style_power', default_face_style_power)
             self.options['bg_style_power'] = self.options.get('bg_style_power', default_bg_style_power)
             self.options['apply_random_ct'] = self.options.get('apply_random_ct', ColorTransferMode.NONE)
+            self.options['apply_filter'] = self.options.get('apply_filter', FilterMode.NONE)
             self.options['clipgrad'] = self.options.get('clipgrad', False)
 
         if is_first_run:
@@ -177,9 +184,8 @@ class SAEModel(ModelBase):
         global ms_count
         self.ms_count = ms_count = 3 if (self.options['multiscale_decoder']) else 1
 
-
-
         apply_random_ct = self.options.get('apply_random_ct', ColorTransferMode.NONE)
+        apply_filter: FilterMode = self.options.get('apply_filter', FilterMode.NONE)
         masked_training = True
 
         warped_src = Input(bgr_shape)
@@ -475,8 +481,10 @@ class SAEModel(ModelBase):
                                     random_ct_samples_path=training_data_dst_path if apply_random_ct != ColorTransferMode.NONE else None,
                                     debug=self.is_debug(), batch_size=self.batch_size,
                                     sample_process_options=SampleProcessor.Options(random_flip=self.random_flip,
-                                                                                   scale_range=np.array([-0.05,
-                                                                                                         0.05]) + self.src_scale_mod / 100.0),
+                                                                                   scale_range=np.array([-0.05, 0.05]) +
+                                                                                               self.src_scale_mod / 100.0,
+                                                                                   apply_filter=apply_filter),
+
                                     output_sample_types=[{'types': (
                                         t.IMG_WARPED_TRANSFORMED, face_type, t_mode_bgr),
                                         'resolution': resolution, 'apply_ct': apply_random_ct}] + \
@@ -489,7 +497,8 @@ class SAEModel(ModelBase):
                                     ),
 
                 SampleGeneratorFace(training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
-                                    sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, ),
+                                    sample_process_options=SampleProcessor.Options(random_flip=self.random_flip,
+                                                                                   apply_filter=apply_filter),
                                     output_sample_types=[{'types': (
                                         t.IMG_WARPED_TRANSFORMED, face_type, t_mode_bgr),
                                         'resolution': resolution}] + \

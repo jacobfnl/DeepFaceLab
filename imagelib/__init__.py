@@ -25,3 +25,5 @@ from .common import normalize_channels
 from .IEPolys import IEPolys
 
 from .blur import LinearMotionBlur
+
+from .filters import high_pass_filter

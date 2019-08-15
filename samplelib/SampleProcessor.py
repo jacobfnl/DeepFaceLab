@@ -6,6 +6,8 @@ import numpy as np
 
 import imagelib
 from facelib import FaceType, LandmarksProcessor
+from imagelib import high_pass_filter
+from imagelib.filters import sobel_x, sobel_y
 
 """
 output_sample_types = [
@@ -55,6 +57,13 @@ class ColorTransferMode(IntEnum):
     MASKED_RCT_PAPER_CLIP = 9
 
 
+class FilterMode(IntEnum):
+    NONE = 0
+    HIGH_PASS = 1
+    SOBEL_X = 2
+    SOBEL_Y = 3
+
+
 class SampleProcessor(object):
     class Types(IntEnum):
         NONE = 0
@@ -87,15 +96,16 @@ class SampleProcessor(object):
     class Options(object):
 
         def __init__(self, random_flip=True, rotation_range=[-10, 10], scale_range=[-0.05, 0.05],
-                     tx_range=[-0.05, 0.05], ty_range=[-0.05, 0.05]):
+                     tx_range=[-0.05, 0.05], ty_range=[-0.05, 0.05], apply_filter: FilterMode = FilterMode.NONE):
             self.random_flip = random_flip
             self.rotation_range = rotation_range
             self.scale_range = scale_range
             self.tx_range = tx_range
             self.ty_range = ty_range
+            self.apply_filter: FilterMode = apply_filter
 
     @staticmethod
-    def process(sample, sample_process_options, output_sample_types, debug, ct_sample=None):
+    def process(sample, sample_process_options: Options, output_sample_types, debug, ct_sample=None):
         SPTF = SampleProcessor.Types
 
         sample_bgr = sample.load_bgr()
@@ -232,6 +242,15 @@ class SampleProcessor(object):
                 img = np.clip(img, 0, 1)
                 img_bgr = img[..., 0:3]
                 img_mask = img[..., 3:4]
+
+                if sample_process_options.apply_filter is not None and sample_process_options.apply_filter > FilterMode.NONE:
+                    filter_options = {
+                        FilterMode.HIGH_PASS: high_pass_filter,
+                        FilterMode.SOBEL_X: sobel_x,
+                        FilterMode.SOBEL_Y: sobel_y,
+                    }
+                    filter_func = filter_options[sample_process_options.apply_filter]
+                    img_bgr = filter_func(img_bgr)
 
                 if apply_ct and ct_sample is not None:
                     if ct_sample_bgr is None:
