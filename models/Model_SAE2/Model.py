@@ -1,7 +1,7 @@
-from functools import partial
 import numpy as np
 
-from models.Model_SAE2 import df
+from models.Model_SAE2 import df, liae
+from models.Model_SAE2.df import DF
 from nnlib import nnlib
 from models import ModelBase
 from facelib import FaceType
@@ -9,8 +9,6 @@ from samplelib import *
 from interact import interact as io
 
 from samplelib.SampleProcessor import ColorTransferMode
-
-
 
 
 # SAE - Styled AutoEncoder
@@ -126,7 +124,8 @@ class SAEModel2(ModelBase):
                                 help_message="Learn to transfer image around face. This can make face more like dst. Enabling this option increases the chance of model collapse."),
                 0.0, 100.0)
 
-            default_apply_random_ct = ColorTransferMode.NONE if is_first_run else self.options.get('apply_random_ct', ColorTransferMode.NONE)
+            default_apply_random_ct = ColorTransferMode.NONE if is_first_run else self.options.get('apply_random_ct',
+                                                                                                   ColorTransferMode.NONE)
             self.options['apply_random_ct'] = np.clip(io.input_int(
                 "Apply random color transfer to src faceset? (0) None, (1) LCT, (2) RCT, (3) RCT-c, (4) RCT-p, "
                 "(5) RCT-pc, (6) mRTC, (7) mRTC-c, (8) mRTC-p, (9) mRTC-pc ?:help skip:%s) : " % default_apply_random_ct,
@@ -161,11 +160,10 @@ class SAEModel2(ModelBase):
     # override
     def onInitialize(self):
         exec(nnlib.import_all(), locals(), globals())
-        SAEModel2.initialize_nn_functions()
         self.set_vram_batch_requirements({1.5: 4})
 
         global resolution
-        resolution= self.options['resolution']
+        resolution = self.options['resolution']
         ae_dims = self.options['ae_dims']
         e_ch_dims = self.options['e_ch_dims']
         d_ch_dims = self.options['d_ch_dims']
@@ -178,8 +176,6 @@ class SAEModel2(ModelBase):
         mask_shape = (resolution, resolution, 1)
         global ms_count
         self.ms_count = ms_count = 3 if (self.options['multiscale_decoder']) else 1
-
-
 
         global apply_random_ct
         apply_random_ct = self.options.get('apply_random_ct', ColorTransferMode.NONE)
@@ -220,7 +216,7 @@ class SAEModel2(ModelBase):
 
             self.decoder = modelify(
                 SAEModel2.LIAEDecFlow(bgr_shape[2], ch_dims=d_ch_dims, multiscale_count=self.ms_count,
-                                     add_residual_blocks=d_residual_blocks, **common_flow_kwargs))(inter_output_Inputs)
+                                      add_residual_blocks=d_residual_blocks, **common_flow_kwargs))(inter_output_Inputs)
             models_list += [self.encoder, self.inter_B, self.inter_AB, self.decoder]
 
             if self.options['learn_mask']:
@@ -258,14 +254,16 @@ class SAEModel2(ModelBase):
                 pred_src_dstm = self.decoderm(warped_src_dst_inter_code)
 
         elif 'df' in self.options['archi']:
-            self.encoder = df.encoder(bgr_shape, resolution, ae_dims, e_ch_dims, **common_flow_kwargs)
-            self.decoder_src = df.decoder(self.encoder.outputs, bgr_shape, d_ch_dims, self.ms_count, d_residual_blocks, **common_flow_kwargs)
-            self.decoder_dst = df.decoder(self.encoder.outputs, bgr_shape, d_ch_dims, self.ms_count, d_residual_blocks, **common_flow_kwargs)
+            self.DF = DF(bgr_shape, mask_shape, resolution, ae_dims, e_ch_dims, d_ch_dims, self.ms_count, d_residual_blocks, **common_flow_kwargs)
+            self.encoder = self.DF.encoder()
+            print(self.encoder.summary())
+            self.decoder_src = self.DF.decoder(**common_flow_kwargs)
+            self.decoder_dst = self.DF.decoder(**common_flow_kwargs)
             models_list += [self.encoder, self.decoder_src, self.decoder_dst]
 
             if self.options['learn_mask']:
-                self.decoder_srcm = df.decoder_mask(self.encoder.outputs, mask_shape, d_ch_dims, **common_flow_kwargs)
-                self.decoder_dstm = df.decoder_mask(self.encoder.outputs, mask_shape, d_ch_dims, **common_flow_kwargs)
+                self.decoder_srcm = self.DF.decoder_mask(**common_flow_kwargs)
+                self.decoder_dstm = self.DF.decoder_mask(**common_flow_kwargs)
                 models_list += [self.decoder_srcm, self.decoder_dstm]
 
             if not self.is_first_run():
@@ -452,14 +450,14 @@ class SAEModel2(ModelBase):
             global training_data_src_path
             training_data_src_path = self.training_data_src_path
             global training_data_dst_path
-            training_data_dst_path= self.training_data_dst_path
+            training_data_dst_path = self.training_data_dst_path
 
             global sort_by_yaw
             sort_by_yaw = self.sort_by_yaw
 
             if self.pretrain and self.pretraining_data_path is not None:
                 training_data_src_path = self.pretraining_data_path
-                training_data_dst_path= self.pretraining_data_path
+                training_data_dst_path = self.pretraining_data_path
                 sort_by_yaw = False
 
             self.set_training_data_generators([
@@ -648,152 +646,3 @@ class SAEModel2(ModelBase):
                                default_erode_mask_modifier=default_erode_mask_modifier,
                                default_blur_mask_modifier=default_blur_mask_modifier,
                                clip_hborder_mask_per=0.0625 if (self.options['face_type'] == 'f') else 0)
-
-    @staticmethod
-    def initialize_nn_functions():
-        exec(nnlib.import_all(), locals(), globals())
-
-        def NormPass(x):
-            return x
-
-        def Norm(norm=''):
-            if norm == 'bn':
-                return BatchNormalization(axis=-1)
-            else:
-                return NormPass
-
-        def Act(act='', lrelu_alpha=0.1):
-            if act == 'prelu':
-                return PReLU()
-            else:
-                return LeakyReLU(alpha=lrelu_alpha)
-
-        class ResidualBlock(object):
-            def __init__(self, filters, kernel_size=3, padding='zero', norm='', act='', **kwargs):
-                self.filters = filters
-                self.kernel_size = kernel_size
-                self.padding = padding
-                self.norm = norm
-                self.act = act
-
-            def __call__(self, inp):
-                x = inp
-                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
-                x = Act(self.act, lrelu_alpha=0.2)(x)
-                x = Norm(self.norm)(x)
-                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
-                x = Add()([x, inp])
-                x = Act(self.act, lrelu_alpha=0.2)(x)
-                x = Norm(self.norm)(x)
-                return x
-
-        SAEModel2.ResidualBlock = ResidualBlock
-
-        def downscale(dim, padding='zero', norm='', act='', **kwargs):
-            def func(x):
-                return Norm(norm)(Act(act)(Conv2D(dim, kernel_size=5, strides=2, padding=padding)(x)))
-
-            return func
-
-        SAEModel2.downscale = downscale
-
-        #def downscale (dim, padding='zero', norm='', act='', **kwargs):
-        #    def func(x):
-        #        return BlurPool()( Norm(norm)( Act(act) (Conv2D(dim, kernel_size=5, strides=1, padding=padding)(x)) ) )
-        #    return func
-        #SAEModel2.downscale = downscale
-
-        def upscale(dim, padding='zero', norm='', act='', **kwargs):
-            def func(x):
-                return SubpixelUpscaler()(
-                    Norm(norm)(Act(act)(Conv2D(dim * 4, kernel_size=3, strides=1, padding=padding)(x))))
-
-            return func
-
-        SAEModel2.upscale = upscale
-
-        def to_bgr(output_nc, padding='zero', **kwargs):
-            def func(x):
-                return Conv2D(output_nc, kernel_size=5, padding=padding, activation='sigmoid')(x)
-
-            return func
-
-        SAEModel2.to_bgr = to_bgr
-
-    @staticmethod
-    def LIAEEncFlow(resolution, ch_dims, **kwargs):
-        exec(nnlib.import_all(), locals(), globals())
-        upscale = partial(SAEModel2.upscale, **kwargs)
-        downscale = partial(SAEModel2.downscale, **kwargs)
-
-        def func(input):
-            dims = K.int_shape(input)[-1] * ch_dims
-
-            x = input
-            x = downscale(dims)(x)
-            x = downscale(dims * 2)(x)
-            x = downscale(dims * 4)(x)
-            x = downscale(dims * 8)(x)
-
-            x = Flatten()(x)
-            return x
-
-        return func
-
-    @staticmethod
-    def LIAEInterFlow(resolution, ae_dims=256, **kwargs):
-        exec(nnlib.import_all(), locals(), globals())
-        upscale = partial(SAEModel2.upscale, **kwargs)
-        lowest_dense_res = resolution // 16
-
-        def func(input):
-            x = input[0]
-            x = Dense(ae_dims)(x)
-            x = Dense(lowest_dense_res * lowest_dense_res * ae_dims * 2)(x)
-            x = Reshape((lowest_dense_res, lowest_dense_res, ae_dims * 2))(x)
-            x = upscale(ae_dims * 2)(x)
-            return x
-
-        return func
-
-    @staticmethod
-    def LIAEDecFlow(output_nc, ch_dims, multiscale_count=1, add_residual_blocks=False, **kwargs):
-        exec(nnlib.import_all(), locals(), globals())
-        upscale = partial(SAEModel2.upscale, **kwargs)
-        to_bgr = partial(SAEModel2.to_bgr, **kwargs)
-        dims = output_nc * ch_dims
-        ResidualBlock = partial(SAEModel2.ResidualBlock, **kwargs)
-
-        def func(input):
-            x = input[0]
-
-            outputs = []
-            x1 = upscale(dims * 8)(x)
-
-            if add_residual_blocks:
-                x1 = ResidualBlock(dims * 8)(x1)
-                x1 = ResidualBlock(dims * 8)(x1)
-
-            if multiscale_count >= 3:
-                outputs += [to_bgr(output_nc)(x1)]
-
-            x2 = upscale(dims * 4)(x1)
-
-            if add_residual_blocks:
-                x2 = ResidualBlock(dims * 4)(x2)
-                x2 = ResidualBlock(dims * 4)(x2)
-
-            if multiscale_count >= 2:
-                outputs += [to_bgr(output_nc)(x2)]
-
-            x3 = upscale(dims * 2)(x2)
-
-            if add_residual_blocks:
-                x3 = ResidualBlock(dims * 2)(x3)
-                x3 = ResidualBlock(dims * 2)(x3)
-
-            outputs += [to_bgr(output_nc)(x3)]
-
-            return outputs
-
-        return func

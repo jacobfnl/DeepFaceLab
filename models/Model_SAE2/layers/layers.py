@@ -1,5 +1,5 @@
 import keras
-from keras.layers import PReLU, LeakyReLU, K, BatchNormalization, Add
+from keras.layers import PReLU, LeakyReLU, K, BatchNormalization, Add, np
 
 
 class Upscale(object):
@@ -64,12 +64,12 @@ class Act(object):
 
 
 class ToBgr(object):
-    def __init__(self, output_nc, padding='zero'):
+    def __init__(self, output_nc, padding='zero', **kwargs):
         self.output_nc = output_nc,
         self.padding = padding
 
     def __call__(self, x):
-        return Conv2D(self.output_nc, kernel_size=5, padding=self.padding, activation='sigmoid')(x)
+        return Conv2D(self.output_nc[0], kernel_size=5, padding=self.padding, activation='sigmoid')(x)
 
 
 class Conv2D(object):
@@ -88,7 +88,7 @@ class Conv2D(object):
 
     def __call__(self, x):
         if self.reflect_pad:
-            x = ReflectionPadding2D(self.pad)(x)
+            return ReflectionPadding2D(self.pad)(x)
         return self.func(x)
 
 
