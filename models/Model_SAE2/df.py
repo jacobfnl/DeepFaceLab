@@ -1,9 +1,8 @@
 from functools import partial
 
-from keras.layers import Input, Dense, K
+from keras.layers import Input, Dense, K, Flatten, Reshape
 from keras.models import Model
 
-from nnlib import nnlib
 from models import Model_SAE2
 
 
@@ -27,9 +26,8 @@ def decoder_mask(encoder_outputs, mask_shape, d_ch_dims, **common_flow_kwargs):
 
 
 def DFEncFlow(resolution, ae_dims, ch_dims, **kwargs):
-    exec(nnlib.import_all(), locals(), globals())
     upscale = partial(Model_SAE2.Model.upscale, **kwargs)
-    downscale = partial(Model_SAE2.Model.downscale, **kwargs)  # , kernel_regularizer=keras.regularizers.l2(0.0),
+    downscale = partial(Model_SAE2.Model.downscale, **kwargs)
     lowest_dense_res = resolution // 16
 
     def func(input):
@@ -51,7 +49,6 @@ def DFEncFlow(resolution, ae_dims, ch_dims, **kwargs):
 
 
 def DFDecFlow(output_nc, ch_dims, multiscale_count=1, add_residual_blocks=False, **kwargs):
-    exec(nnlib.import_all(), locals(), globals())
     upscale = partial(Model_SAE2.Model.upscale, **kwargs)
     to_bgr = partial(Model_SAE2.Model.to_bgr, **kwargs)
     dims = output_nc * ch_dims
@@ -66,6 +63,7 @@ def DFDecFlow(output_nc, ch_dims, multiscale_count=1, add_residual_blocks=False,
         if add_residual_blocks:
             x1 = ResidualBlock(dims * 8)(x1)
             x1 = ResidualBlock(dims * 8)(x1)
+
 
         if multiscale_count >= 3:
             outputs += [to_bgr(output_nc)(x1)]
