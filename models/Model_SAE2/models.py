@@ -1,10 +1,7 @@
-from functools import partial
-
-from keras.layers import Input, Dense, K, Flatten, Reshape, np
+from keras.layers import Input, Dense, Flatten, Reshape
 from keras.models import Model
 
-from models import Model_SAE2
-from models.Model_SAE2.layers.layers import Downscale, Upscale, ResidualBlock, ToBgr
+from models.Model_SAE2.layers import Downscale, Upscale, ResidualBlock, ToBgr
 
 
 class DF(object):

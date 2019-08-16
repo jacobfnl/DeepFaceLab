@@ -1,7 +1,8 @@
 import numpy as np
+from keras.datasets import mnist, cifar10
 
-from models.Model_SAE2 import df, liae
-from models.Model_SAE2.df import DF
+from models.Model_SAE2.autoencoder import Autoencoder
+from models.Model_SAE2.models import DF
 from nnlib import nnlib
 from models import ModelBase
 from facelib import FaceType
@@ -30,14 +31,14 @@ class SAEModel2(ModelBase):
     def onInitializeOptions(self, is_first_run, ask_override):
         yn_str = {True: 'y', False: 'n'}
 
-        default_resolution = 128
+        default_resolution = 32
         default_archi = 'df'
         default_face_type = 'f'
 
         if is_first_run:
             resolution = io.input_int("Resolution ( 64-256 ?:help skip:128) : ", default_resolution,
                                       help_message="More resolution requires more VRAM and time to train. Value will be adjusted to multiple of 16.")
-            resolution = np.clip(resolution, 64, 256)
+            resolution = np.clip(resolution, 32, 256)
             while np.modf(resolution / 16)[0] != 0.0:
                 resolution -= 1
             self.options['resolution'] = resolution
@@ -254,6 +255,10 @@ class SAEModel2(ModelBase):
                 pred_src_dstm = self.decoderm(warped_src_dst_inter_code)
 
         elif 'df' in self.options['archi']:
+
+            # (x_train, y_train), (x_test, y_test) = cifar10.load_data()
+            # Autoencoder().create_model(bgr_shape, mask_shape, resolution, ae_dims, e_ch_dims, d_ch_dims, self.ms_count, d_residual_blocks, x_train, x_test, **common_flow_kwargs)
+
             self.DF = DF(bgr_shape, mask_shape, resolution, ae_dims, e_ch_dims, d_ch_dims, self.ms_count, d_residual_blocks, **common_flow_kwargs)
             self.encoder = self.DF.encoder()
             print(self.encoder.summary())
