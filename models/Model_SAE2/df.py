@@ -4,6 +4,7 @@ from keras.layers import Input, Dense, K, Flatten, Reshape
 from keras.models import Model
 
 from models import Model_SAE2
+from models.Model_SAE2.layers.layers import Downscale, Upscale, ResidualBlock
 
 
 def encoder(bgr_shape, resolution, ae_dims, e_ch_dims, **common_flow_kwargs):
@@ -26,39 +27,35 @@ def decoder_mask(encoder_outputs, mask_shape, d_ch_dims, **common_flow_kwargs):
 
 
 def DFEncFlow(resolution, ae_dims, ch_dims, **kwargs):
-    upscale = partial(Model_SAE2.Model.upscale, **kwargs)
-    downscale = partial(Model_SAE2.Model.downscale, **kwargs)
     lowest_dense_res = resolution // 16
 
     def func(input):
         x = input
 
         dims = K.int_shape(input)[-1] * ch_dims
-        x = downscale(dims)(x)
-        x = downscale(dims * 2)(x)
-        x = downscale(dims * 4)(x)
-        x = downscale(dims * 8)(x)
+        x = Downscale(dims)(x)
+        x = Downscale(dims * 2)(x)
+        x = Downscale(dims * 4)(x)
+        x = Downscale(dims * 8)(x)
 
         x = Dense(ae_dims)(Flatten()(x))
         x = Dense(lowest_dense_res * lowest_dense_res * ae_dims)(x)
         x = Reshape((lowest_dense_res, lowest_dense_res, ae_dims))(x)
-        x = upscale(ae_dims)(x)
+        x = Upscale(ae_dims)(x)
         return x
 
     return func
 
 
 def DFDecFlow(output_nc, ch_dims, multiscale_count=1, add_residual_blocks=False, **kwargs):
-    upscale = partial(Model_SAE2.Model.upscale, **kwargs)
     to_bgr = partial(Model_SAE2.Model.to_bgr, **kwargs)
     dims = output_nc * ch_dims
-    ResidualBlock = partial(Model_SAE2.Model.ResidualBlock, **kwargs)
 
     def func(input):
         x = input[0]
 
         outputs = []
-        x1 = upscale(dims * 8)(x)
+        x1 = Upscale(dims * 8)(x)
 
         if add_residual_blocks:
             x1 = ResidualBlock(dims * 8)(x1)
@@ -68,7 +65,7 @@ def DFDecFlow(output_nc, ch_dims, multiscale_count=1, add_residual_blocks=False,
         if multiscale_count >= 3:
             outputs += [to_bgr(output_nc)(x1)]
 
-        x2 = upscale(dims * 4)(x1)
+        x2 = Upscale(dims * 4)(x1)
 
         if add_residual_blocks:
             x2 = ResidualBlock(dims * 4)(x2)
@@ -77,7 +74,7 @@ def DFDecFlow(output_nc, ch_dims, multiscale_count=1, add_residual_blocks=False,
         if multiscale_count >= 2:
             outputs += [to_bgr(output_nc)(x2)]
 
-        x3 = upscale(dims * 2)(x2)
+        x3 = Upscale(dims * 2)(x2)
 
         if add_residual_blocks:
             x3 = ResidualBlock(dims * 2)(x3)
