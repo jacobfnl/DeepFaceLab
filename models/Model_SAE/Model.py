@@ -135,11 +135,6 @@ class SAEModel(ModelBase):
                              "but the training time may be longer, due to the src faceset is becoming more diverse."),
                 ColorTransferMode.NONE, ColorTransferMode.MASKED_RCT_PAPER_CLIP)
 
-            default_extend_forehead = False if is_first_run else self.options.get('extend_forehead', False)
-            self.options['extend_forehead'] = io.input_bool("Apply extended foreheads? (y/n ?:help skip:%s) : "
-                                                            % default_extend_forehead, default_extend_forehead,
-                                                            help_message="Extends mask to include foreheads of faces")
-
             if nnlib.device.backend != 'plaidML':  # todo https://github.com/plaidml/plaidml/issues/301
                 default_clipgrad = False if is_first_run else self.options.get('clipgrad', False)
                 self.options['clipgrad'] = io.input_bool(
