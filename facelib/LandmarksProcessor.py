@@ -194,6 +194,14 @@ def get_image_hull_mask (image_shape, image_landmarks, ie_polys=None):
     int_lmrks[17:22] = top_l + ((top_l - bot_l) // 2)
     int_lmrks[22:27] = top_r + ((top_r - bot_r) // 2)
 
+    # forehead top
+    forehead_l = int_lmrks[19] + (top_l - bot_l) // 2
+    forehead_r = int_lmrks[24] + (top_r - bot_r) // 2
+    forehead_ml = int_lmrks[17] + (forehead_l - int_lmrks[17]) // 2
+    forehead_mr = int_lmrks[26] + (forehead_r - int_lmrks[26]) // 2
+    forehead_ml2 = int_lmrks[17] + (forehead_ml - int_lmrks[17]) // 2
+    forehead_mr2 = int_lmrks[26] + (forehead_mr - int_lmrks[26]) // 2
+
     r_jaw = (int_lmrks[0:9], int_lmrks[17:18])
     l_jaw = (int_lmrks[8:17], int_lmrks[26:27])
     r_cheek = (int_lmrks[17:20], int_lmrks[8:9])
@@ -202,7 +210,9 @@ def get_image_hull_mask (image_shape, image_landmarks, ie_polys=None):
     r_eye = (int_lmrks[17:22], int_lmrks[27:28], int_lmrks[31:36], int_lmrks[8:9])
     l_eye = (int_lmrks[22:27], int_lmrks[27:28], int_lmrks[31:36], int_lmrks[8:9])
     nose = (int_lmrks[27:31], int_lmrks[31:36])
-    parts = [r_jaw, l_jaw, r_cheek, l_cheek, nose_ridge, r_eye, l_eye, nose]
+    forehead = (forehead_ml2, forehead_ml, forehead_l, forehead_r, forehead_mr, forehead_mr2)
+
+    parts = [r_jaw, l_jaw, r_cheek, l_cheek, nose_ridge, forehead, nose]
 
     for item in parts:
         merged = np.concatenate(item)
