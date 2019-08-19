@@ -88,12 +88,14 @@ class SampleProcessor(object):
     class Options(object):
 
         def __init__(self, random_flip=True, rotation_range=[-10, 10], scale_range=[-0.05, 0.05],
-                     tx_range=[-0.05, 0.05], ty_range=[-0.05, 0.05]):
+                     tx_range=[-0.05, 0.05], ty_range=[-0.05, 0.05], extend_forehead=False):
             self.random_flip = random_flip
             self.rotation_range = rotation_range
             self.scale_range = scale_range
             self.tx_range = tx_range
             self.ty_range = ty_range
+            self.extend_forehead = extend_forehead
+
 
     @staticmethod
     def process(sample, sample_process_options, output_sample_types, debug, ct_sample=None):
@@ -189,7 +191,7 @@ class SampleProcessor(object):
 
                         img = np.concatenate( (img, mask ), -1 )
                     return img
-                    
+
                 img = cached_images.get(img_type, None)
                 if img is None:
 
@@ -210,11 +212,12 @@ class SampleProcessor(object):
                         mask = cur_sample.load_fanseg_mask()  # using fanseg_mask if exist
 
                         if mask is None:
-                            mask = LandmarksProcessor.get_image_hull_mask(img.shape, cur_sample.landmarks)
+                            mask = LandmarksProcessor.get_image_hull_mask(img.shape, cur_sample.landmarks,
+                                                                          extend_forehead=sample_process_options.extend_forehead)
 
                         if cur_sample.ie_polys is not None:
                             cur_sample.ie_polys.overlay_mask(mask)
-                
+
                     if sample.face_type == FaceType.MARK_ONLY:
                         if mask is not None:
                             img = np.concatenate( (img, mask), -1 )
@@ -227,17 +230,17 @@ class SampleProcessor(object):
                     ft = SPTF_FACETYPE_TO_FACETYPE[target_face_type]
                     if ft > sample.face_type:
                         raise Exception ('sample %s type %s does not match model requirement %s. Consider extract necessary type of faces.' % (sample.filename, sample.face_type, ft) )
-                    
-                    if sample.face_type == FaceType.MARK_ONLY:               
+
+                    if sample.face_type == FaceType.MARK_ONLY:
                         img = cv2.warpAffine( img, LandmarksProcessor.get_transform_mat (sample.landmarks, sample.shape[0], ft), (sample.shape[0],sample.shape[0]), flags=cv2.INTER_CUBIC )
-                             
+
                         mask = img[...,3:4] if img.shape[2] > 3 else None
                         img  = img[...,0:3]
                         img = do_transform (img, mask)
                         img = cv2.resize( img, (resolution,resolution), cv2.INTER_CUBIC )
                     else:
                         img = cv2.warpAffine( img, LandmarksProcessor.get_transform_mat (sample.landmarks, resolution, ft), (resolution,resolution), flags=cv2.INTER_CUBIC )
-                    
+
                 else:
                     img = cv2.resize(img, (resolution, resolution), cv2.INTER_CUBIC)
 

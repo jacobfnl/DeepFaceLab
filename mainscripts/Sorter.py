@@ -233,7 +233,7 @@ def sort_by_face_pitch(input_path):
             io.log_err ("%s is not a dfl image file" % (filepath.name) )
             trash_img_list.append ( [str(filepath)] )
             continue
-            
+
         pitch_yaw_roll = dflimg.get_pitch_yaw_roll()
         if pitch_yaw_roll is not None:
             pitch, yaw, roll = pitch_yaw_roll
@@ -410,6 +410,8 @@ class HistDissimSubprocessor(Subprocessor):
 
 def sort_by_hist_dissim(input_path):
     io.log_info ("Sorting by histogram dissimilarity...")
+    extend_forehead = io.input_bool("Apply extended foreheads? (y/n ?:help skip:n) : ", False,
+                                    help_message="Extends mask to include foreheads of faces")
 
     img_list = []
     trash_img_list = []
@@ -426,7 +428,8 @@ def sort_by_hist_dissim(input_path):
         image = cv2_imread(str(filepath))
 
         if dflimg is not None:
-            face_mask = LandmarksProcessor.get_image_hull_mask (image.shape, dflimg.get_landmarks())
+            face_mask = LandmarksProcessor.get_image_hull_mask(image.shape, dflimg.get_landmarks(),
+                                                               extend_forehead=extend_forehead)
             image = (image*face_mask).astype(np.uint8)
 
         img_list.append ([str(filepath), cv2.calcHist([cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)], [0], None, [256], [0, 256]), 0 ])

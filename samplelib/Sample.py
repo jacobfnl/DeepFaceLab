@@ -23,7 +23,7 @@ class SampleType(IntEnum):
     QTY = 5
 
 class Sample(object):
-    def __init__(self, sample_type=None, filename=None, face_type=None, shape=None, landmarks=None, ie_polys=None, pitch_yaw_roll=None, source_filename=None, mirror=None, close_target_list=None, fanseg_mask_exist=False):
+    def __init__(self, sample_type=None, filename=None, face_type=None, shape=None, landmarks=None, ie_polys=None, extend_forehead=False, pitch_yaw_roll=None, source_filename=None, mirror=None, close_target_list=None, fanseg_mask_exist=False):
         self.sample_type = sample_type if sample_type is not None else SampleType.IMAGE
         self.filename = filename
         self.face_type = face_type
@@ -35,8 +35,9 @@ class Sample(object):
         self.mirror = mirror
         self.close_target_list = close_target_list
         self.fanseg_mask_exist = fanseg_mask_exist
+        self.extend_forehead = extend_forehead
 
-    def copy_and_set(self, sample_type=None, filename=None, face_type=None, shape=None, landmarks=None, ie_polys=None, pitch_yaw_roll=None, source_filename=None, mirror=None, close_target_list=None, fanseg_mask=None, fanseg_mask_exist=None):
+    def copy_and_set(self, sample_type=None, filename=None, face_type=None, shape=None, landmarks=None, ie_polys=None, extend_forehead=None, pitch_yaw_roll=None, source_filename=None, mirror=None, close_target_list=None, fanseg_mask=None, fanseg_mask_exist=None):
         return Sample(
             sample_type=sample_type if sample_type is not None else self.sample_type,
             filename=filename if filename is not None else self.filename,
@@ -48,7 +49,8 @@ class Sample(object):
             source_filename=source_filename if source_filename is not None else self.source_filename,
             mirror=mirror if mirror is not None else self.mirror,
             close_target_list=close_target_list if close_target_list is not None else self.close_target_list,
-            fanseg_mask_exist=fanseg_mask_exist if fanseg_mask_exist is not None else self.fanseg_mask_exist)
+            fanseg_mask_exist=fanseg_mask_exist if fanseg_mask_exist is not None else self.fanseg_mask_exist,
+            extend_forehead=extend_forehead if extend_forehead is not None else self.extend_forehead)
 
     def load_bgr(self):
         img = cv2_imread (self.filename).astype(np.float32) / 255.0
@@ -70,7 +72,8 @@ class Sample(object):
         return None
 
     def load_image_hull_mask(self):
-        return LandmarksProcessor.get_image_hull_mask(self.load_bgr().shape, self.landmarks)
+        return LandmarksProcessor.get_image_hull_mask(self.load_bgr().shape, self.landmarks,
+                                                      extend_forehead=self.extend_forehead)
 
     def load_mask(self):
         return self.load_fanseg_mask() or self.load_image_hull_mask()

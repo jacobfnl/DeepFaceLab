@@ -135,6 +135,11 @@ class SAEModel(ModelBase):
                              "but the training time may be longer, due to the src faceset is becoming more diverse."),
                 ColorTransferMode.NONE, ColorTransferMode.MASKED_RCT_PAPER_CLIP)
 
+            default_extend_forehead = False if is_first_run else self.options.get('extend_forehead', False)
+            self.options['extend_forehead'] = io.input_bool("Apply extended foreheads? (y/n ?:help skip:%s) : "
+                                                            % default_extend_forehead, default_extend_forehead,
+                                                            help_message="Extends mask to include foreheads of faces")
+
             if nnlib.device.backend != 'plaidML':  # todo https://github.com/plaidml/plaidml/issues/301
                 default_clipgrad = False if is_first_run else self.options.get('clipgrad', False)
                 self.options['clipgrad'] = io.input_bool(
@@ -477,8 +482,8 @@ class SAEModel(ModelBase):
                                     random_ct_samples_path=training_data_dst_path if apply_random_ct != ColorTransferMode.NONE else None,
                                     debug=self.is_debug(), batch_size=self.batch_size,
                                     sample_process_options=SampleProcessor.Options(random_flip=self.random_flip,
-                                                                                   scale_range=np.array([-0.05,
-                                                                                                         0.05]) + self.src_scale_mod / 100.0),
+                                                                                   extend_forehead=self.options['extend_forehead'],
+                                                                                   scale_range=np.array([-0.05, 0.05]) + self.src_scale_mod / 100.0),
                                     output_sample_types=[{'types': (
                                         t.IMG_WARPED_TRANSFORMED, face_type, t_mode_bgr),
                                         'resolution': resolution, 'apply_ct': apply_random_ct}] + \
@@ -491,7 +496,8 @@ class SAEModel(ModelBase):
                                     ),
 
                 SampleGeneratorFace(training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
-                                    sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, ),
+                                    sample_process_options=SampleProcessor.Options(random_flip=self.random_flip,
+                                                                                   extend_forehead=self.options['extend_forehead']),
                                     output_sample_types=[{'types': (
                                         t.IMG_WARPED_TRANSFORMED, face_type, t_mode_bgr),
                                         'resolution': resolution}] + \
@@ -547,6 +553,7 @@ class SAEModel(ModelBase):
                                 random_ct_samples_path=training_data_dst_path if apply_random_ct != ColorTransferMode.NONE else None,
                                 debug=self.is_debug(), batch_size=self.batch_size,
                                 sample_process_options=SampleProcessor.Options(random_flip=self.random_flip,
+                                                                               extend_forehead=self.options['extend_forehead'],
                                                                                scale_range=np.array([-0.05,
                                                                                                      0.05]) + self.src_scale_mod / 100.0),
                                 output_sample_types=[{'types': (
@@ -561,7 +568,8 @@ class SAEModel(ModelBase):
                                 ),
 
             SampleGeneratorFace(training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
-                                sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, ),
+                                sample_process_options=SampleProcessor.Options(random_flip=self.random_flip,
+                                                                               extend_forehead=self.options['extend_forehead']),
                                 output_sample_types=[{'types': (
                                     t.IMG_WARPED_TRANSFORMED, face_type, t_mode_bgr),
                                     'resolution': resolution}] + \
@@ -705,7 +713,7 @@ class SAEModel(ModelBase):
             return func
 
         SAEModel.downscale = downscale
-        
+
         #def downscale (dim, padding='zero', norm='', act='', **kwargs):
         #    def func(x):
         #        return BlurPool()( Norm(norm)( Act(act) (Conv2D(dim, kernel_size=5, strides=1, padding=padding)(x)) ) )

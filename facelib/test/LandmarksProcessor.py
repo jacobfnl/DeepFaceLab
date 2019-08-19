@@ -33,7 +33,7 @@ class LandmarksProcessorTests(unittest.TestCase):
         grid = []
         for src_sample in src_samples:
             src_img = src_sample.load_bgr()
-            src_mask = src_sample.load_image_hull_mask()
+            src_mask = src_sample.load_image_hull_mask(extend_forehead=True)
             src_landmarks = src_sample.landmarks
             print('landmarks:', src_landmarks)
             for landmark in src_landmarks:
