@@ -213,7 +213,7 @@ def sort_by_face_yaw(input_path):
     io.log_info ("Sorting...")
     img_list = sorted(img_list, key=operator.itemgetter(1), reverse=True)
     for filepath, yaw in img_list:
-        print(f'{yaw:6.3f}{filepath}')
+        print(f'{yaw:>7.3f} {filepath}')
 
     return img_list, trash_img_list
 
@@ -247,7 +247,7 @@ def sort_by_face_pitch(input_path):
     io.log_info ("Sorting...")
     img_list = sorted(img_list, key=operator.itemgetter(1), reverse=True)
     for filepath, pitch in img_list:
-        print(f'{pitch:6.3f}{filepath}')
+        print(f'{pitch:>7.3f} {filepath}')
 
     return img_list, trash_img_list
 
