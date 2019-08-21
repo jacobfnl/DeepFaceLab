@@ -246,6 +246,8 @@ def sort_by_face_pitch(input_path):
 
     io.log_info ("Sorting...")
     img_list = sorted(img_list, key=operator.itemgetter(1), reverse=True)
+    for filepath, pitch in img_list:
+        print(f'{pitch:6.3f}{filepath}')
 
     return img_list, trash_img_list
 
