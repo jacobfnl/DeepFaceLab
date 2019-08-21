@@ -247,6 +247,39 @@ def sort_by_face_pitch(input_path):
 
     return img_list, trash_img_list
 
+
+def sort_by_face_roll(input_path):
+    io.log_info ("Sorting by face roll...")
+    img_list = []
+    trash_img_list = []
+    for filepath in io.progress_bar_generator( Path_utils.get_image_paths(input_path), "Loading"):
+        filepath = Path(filepath)
+
+        if filepath.suffix == '.png':
+            dflimg = DFLPNG.load( str(filepath) )
+        elif filepath.suffix == '.jpg':
+            dflimg = DFLJPG.load ( str(filepath) )
+        else:
+            dflimg = None
+
+        if dflimg is None:
+            io.log_err ("%s is not a dfl image file" % (filepath.name) )
+            trash_img_list.append ( [str(filepath)] )
+            continue
+
+        pitch_yaw_roll = dflimg.get_pitch_yaw_roll()
+        if pitch_yaw_roll is not None:
+            pitch, yaw, roll = pitch_yaw_roll
+        else:
+            pitch, yaw, roll = LandmarksProcessor.estimate_pitch_yaw_roll ( dflimg.get_landmarks() )
+
+        img_list.append( [str(filepath), roll ] )
+
+    io.log_info ("Sorting...")
+    img_list = sorted(img_list, key=operator.itemgetter(1), reverse=True)
+
+    return img_list, trash_img_list
+
 class HistSsimSubprocessor(Subprocessor):
     class Cli(Subprocessor.Cli):
         #override
@@ -790,6 +823,7 @@ def main (input_path, sort_by_method):
     elif sort_by_method == 'face-dissim':   img_list, trash_img_list = sort_by_face_dissim (input_path)
     elif sort_by_method == 'face-yaw':      img_list, trash_img_list = sort_by_face_yaw (input_path)
     elif sort_by_method == 'face-pitch':    img_list, trash_img_list = sort_by_face_pitch (input_path)
+    elif sort_by_method == 'face-roll':     img_list, trash_img_list = sort_by_face_roll (input_path)
     elif sort_by_method == 'hist':          img_list = sort_by_hist (input_path)
     elif sort_by_method == 'hist-dissim':   img_list, trash_img_list = sort_by_hist_dissim (input_path)
     elif sort_by_method == 'brightness':    img_list = sort_by_brightness (input_path)
