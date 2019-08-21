@@ -212,6 +212,8 @@ def sort_by_face_yaw(input_path):
 
     io.log_info ("Sorting...")
     img_list = sorted(img_list, key=operator.itemgetter(1), reverse=True)
+    for filepath, yaw in img_list:
+        print(f'{yaw:6.3f}{filepath}')
 
     return img_list, trash_img_list
 
@@ -233,7 +235,7 @@ def sort_by_face_pitch(input_path):
             io.log_err ("%s is not a dfl image file" % (filepath.name) )
             trash_img_list.append ( [str(filepath)] )
             continue
-            
+
         pitch_yaw_roll = dflimg.get_pitch_yaw_roll()
         if pitch_yaw_roll is not None:
             pitch, yaw, roll = pitch_yaw_roll
