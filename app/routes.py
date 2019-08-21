@@ -1,6 +1,4 @@
-from app import app
-
-@app.route('/')
-@app.route('/index')
-def index():
-    return "Hello, World!"
+from templates import app
+#Load this config object for development mode
+app.config.from_object('configurations.DevelopmentConfig')
+app.run()
