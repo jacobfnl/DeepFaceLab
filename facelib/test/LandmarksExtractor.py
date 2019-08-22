@@ -10,7 +10,7 @@ from facelib import LandmarksExtractor, S3FDExtractor
 
 class LandmarkExtractorTest(unittest.TestCase):
     def test_extract(self):
-        im = cv2.imread('../../imagelib/test/test_src/rami/rami.png')
+        im = cv2.imread('../../imagelib/test/test_src/carrey/carrey.jpg')
         h, w, _ = im.shape
 
         device_config = nnlib.DeviceConfig(cpu_only=True)
@@ -42,7 +42,7 @@ class LandmarkExtractorTest(unittest.TestCase):
         cv2.waitKey(0)
 
         font_face = cv2.FONT_HERSHEY_SIMPLEX
-        font_scale = 0.5
+        font_scale = 0.25
 
         def pt(arr=None, x=None, y=None):
             if x and y:
@@ -52,7 +52,7 @@ class LandmarkExtractorTest(unittest.TestCase):
 
         for i, m in enumerate(landmarks):
             print(i, m)
-            cv2.circle(im, pt(m), 3, (0, 255, 0))
+            cv2.circle(im, pt(m), 3, (0, 255, 0), thickness=-1)
             cv2.putText(im, str(i), pt(m), font_face, font_scale, (0, 255, 0), thickness=1)
         cv2.imshow('test output', im)
         cv2.waitKey(0)
@@ -61,15 +61,26 @@ class LandmarkExtractorTest(unittest.TestCase):
         l_eyebrow = np.mean(landmarks[17:22, :], axis=0)
         r_eyebrow = np.mean(landmarks[22:27, :], axis=0)
         print(l_eyebrow, r_eyebrow)
+        cv2.circle(im, pt(l_eyebrow), 5, (0, 0, 255))
+        cv2.circle(im, pt(r_eyebrow), 5, (0, 0, 255))
         cv2.line(im, pt(l_eyebrow), pt(r_eyebrow), (0, 0, 255), thickness=4)
 
         brow_slope = (r_eyebrow[1] - l_eyebrow[1]) / (r_eyebrow[0] - l_eyebrow[0])
         print(brow_slope)
+        c_brow = np.mean([l_eyebrow, r_eyebrow], axis=0)
+        cv2.circle(im, pt(c_brow), 5, (0, 0, 255))
         nose = np.mean([landmarks[31], landmarks[35]], axis=0)
-        l_nose_line = nose - (10 * brow_slope, 10)
-        r_nose_line = nose + (10 * brow_slope, 10)
+        cv2.circle(im, pt(nose), 5, (0, 0, 255))
+        l_nose_line = nose - np.array([100, 100 * brow_slope])
+        r_nose_line = nose + np.array([100, 100 * brow_slope])
         print(l_nose_line, r_nose_line)
-        cv2.line(im, pt(l_nose_line), pt(r_nose_line), (0, 0, 255), thickness=2)
+        cv2.line(im, pt(l_nose_line), pt(r_nose_line), (0, 0, 255), thickness=1)
+
+        c_forehead = c_brow - (nose - c_brow)
+        cv2.circle(im, pt(c_forehead), 5, (0, 0, 255))
+        l_forehead_line = c_forehead - np.array([100, 100 * brow_slope])
+        r_forehead_line = c_forehead + np.array([100, 100 * brow_slope])
+        cv2.line(im, pt(l_forehead_line), pt(r_forehead_line), (0, 0, 255), thickness=1)
 
         cv2.imshow('test output', im)
         cv2.waitKey(0)
