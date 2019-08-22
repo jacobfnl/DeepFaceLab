@@ -33,7 +33,7 @@ class LandmarksProcessorTests(unittest.TestCase):
         grid = []
         for src_sample in src_samples:
             src_img = src_sample.load_bgr()
-            src_mask = src_sample.load_image_hull_mask(extend_forehead=True)
+            src_mask = src_sample.load_image_hull_mask()
             src_landmarks = src_sample.landmarks
             print('landmarks:', src_landmarks)
             for landmark in src_landmarks:
@@ -48,6 +48,7 @@ class LandmarksProcessorTests(unittest.TestCase):
         cv2.imshow('test output', np.concatenate(grid, axis=0))
         cv2.waitKey(0)
         cv2.destroyAllWindows()
+
 
 
 if __name__ == '__main__':
