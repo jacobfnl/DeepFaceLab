@@ -57,20 +57,27 @@ class LandmarkExtractorTest(unittest.TestCase):
         cv2.imshow('test output', im)
         cv2.waitKey(0)
 
-        cv2.line(im, pt(landmarks[8]), pt(landmarks[27]), (0, 0, 255), thickness=4)
         l_eyebrow = np.mean(landmarks[17:22, :], axis=0)
         r_eyebrow = np.mean(landmarks[22:27, :], axis=0)
         print(l_eyebrow, r_eyebrow)
         cv2.circle(im, pt(l_eyebrow), 5, (0, 0, 255))
         cv2.circle(im, pt(r_eyebrow), 5, (0, 0, 255))
-        cv2.line(im, pt(l_eyebrow), pt(r_eyebrow), (0, 0, 255), thickness=4)
 
-        brow_slope = (r_eyebrow[1] - l_eyebrow[1]) / (r_eyebrow[0] - l_eyebrow[0])
-        print(brow_slope)
         c_brow = np.mean([l_eyebrow, r_eyebrow], axis=0)
+        brow_slope = (r_eyebrow[1] - l_eyebrow[1]) / (r_eyebrow[0] - l_eyebrow[0])
+        l_brow_line = c_brow - np.array([1000, 1000 * brow_slope])
+        r_brow_line = c_brow + np.array([1000, 1000 * brow_slope])
+        cv2.line(im, pt(l_brow_line), pt(r_brow_line), (0, 0, 255), thickness=4)
+
         cv2.circle(im, pt(c_brow), 5, (0, 0, 255))
         nose = np.mean([landmarks[31], landmarks[35]], axis=0)
         cv2.circle(im, pt(nose), 5, (0, 0, 255))
+
+        nose_brow_slope = (c_brow[1] - nose[1]) / (c_brow[0] - nose[0])
+        t_nose_brow_line = c_brow - np.array([100, 100 * nose_brow_slope])
+        b_nose_brow_line = c_brow + np.array([100, 100 * nose_brow_slope])
+        cv2.line(im, pt(b_nose_brow_line), pt(t_nose_brow_line), (0, 0, 255), thickness=4)
+
         l_nose_line = nose - np.array([100, 100 * brow_slope])
         r_nose_line = nose + np.array([100, 100 * brow_slope])
         print(l_nose_line, r_nose_line)
@@ -81,6 +88,9 @@ class LandmarkExtractorTest(unittest.TestCase):
         l_forehead_line = c_forehead - np.array([100, 100 * brow_slope])
         r_forehead_line = c_forehead + np.array([100, 100 * brow_slope])
         cv2.line(im, pt(l_forehead_line), pt(r_forehead_line), (0, 0, 255), thickness=1)
+
+        def mirrorUsingLine(pts, line_pt1, line_pt2):
+            pass
 
         cv2.imshow('test output', im)
         cv2.waitKey(0)
