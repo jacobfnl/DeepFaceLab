@@ -301,8 +301,6 @@ def main(args, device_args):
                         update_preview = True
                 elif op == 'close':
                     break
-                elif op == "closen't":
-                    break
 
             if update_preview:
                 update_preview = False
@@ -376,5 +374,3 @@ def main(args, device_args):
                 s2c.put ( {'op': 'close'} )
 
         io.destroy_all_windows()
-        if op == "closen't":
-            return True

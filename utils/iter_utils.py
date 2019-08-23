@@ -73,7 +73,3 @@ class SubprocessGenerator(object):
         self.sc_queue.put (1)
         return gen_data
 
-    def get_param(self):
-        return self.user_param
-    def set_param(self, pampamparam):
-        self.user_param = pampamparam
