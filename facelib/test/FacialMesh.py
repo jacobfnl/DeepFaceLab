@@ -32,8 +32,8 @@ class MyTestCase(unittest.TestCase):
         landmark_extractor.__exit__()
         print('landmarks shape:', np.shape(landmarks))
 
-        mesh_points = get_mesh_landmarks(landmarks, bbox)
-        print('mesh_points:', mesh_points)
+        mesh_points = get_mesh_landmarks(landmarks, im, bbox)
+        print('mesh_points:', np.shape(mesh_points))
 
         cv2.namedWindow('test output', cv2.WINDOW_NORMAL)
         for i, pt in enumerate(mesh_points):
