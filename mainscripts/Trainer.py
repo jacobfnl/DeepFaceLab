@@ -204,9 +204,10 @@ def trainerThread (s2c, c2s, e, args, device_args):
                 if i == -1:
                     break
                 elif i == -2:
-                    #model.finalize()
-                    #model = model_new()
-                    break
+                    i = 0
+                    model.finalize()
+                    model = model_new()
+                    #break
 
 
 
