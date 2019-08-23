@@ -126,14 +126,14 @@ def trainerThread (s2c, c2s, e, args, device_args):
                         try:
                             old_batch_size = batch_size
                         except:
-                            print('premarital sex')
+                            pass
                         iter, iter_time, batch_size = model.train_one_iter()
                         try:
                             if old_batch_size != batch_size:
-                               print('niggy new')
+
                                s2c.put({'op': "closen't"})
                         except:
-                            print('postmarital sex')
+                            pass
 
 
                         loss_history = model.get_loss_history()

@@ -48,8 +48,6 @@ class SubprocessGenerator(object):
     def __iter__(self):
         return self
 
-    def __del__(self):
-        print('cool')
 
     def __getstate__(self):
         self_dict = self.__dict__.copy()

@@ -156,17 +156,3 @@ class SampleGeneratorFace(SampleGeneratorBase):
                         break
             yield [np.array(batch) for batch in batches]
 
-    def update_batch(self, batch_size):
-        self.batch_size = batch_size
-        if self.generators is not None:
-            for process in self.generators:
-
-                a = process.get_param()
-                if a is not None:
-                    a[len(a)-1] = batch_size
-                    print(a[len(a)-1])
-                    process.set_param(a)
-                else:
-                    print('a be none')
-        else:
-            print('nigga be none')

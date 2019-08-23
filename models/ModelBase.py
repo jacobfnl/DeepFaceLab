@@ -212,12 +212,9 @@ class ModelBase(object):
 
         nnlib.import_all(self.device_config)
         self.keras = nnlib.keras
-        try:
-            self.K = nnlib.keras.backend
-        except:
-            print("baby make boom boom. your move, creep")
-            nnlib.import_all(self.device_config)
-            self.keras = nnlib.keras
+
+        self.K = nnlib.keras.backend
+
 
         self.onInitialize()
 

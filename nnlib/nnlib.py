@@ -1099,7 +1099,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
             clear_session()
             sess.close()
         except:
-            print('This is normal-lich')
+            print('Swapping to new Model')
 
 
 
