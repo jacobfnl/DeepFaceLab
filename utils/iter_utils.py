@@ -1,7 +1,6 @@
-import threading
-import queue as Queue
 import multiprocessing
-import time
+from multiprocessing import Queue
+
 
 
 class ThisThreadGenerator(object):
@@ -30,6 +29,7 @@ class SubprocessGenerator(object):
         self.sc_queue = multiprocessing.Queue()
         self.cs_queue = multiprocessing.Queue()
         self.p = None
+        self.suicide = False
 
     def process_func(self, user_param):
         self.generator_func = self.generator_func(user_param)
@@ -48,12 +48,18 @@ class SubprocessGenerator(object):
     def __iter__(self):
         return self
 
+    def __del__(self):
+        print('cool')
+
     def __getstate__(self):
         self_dict = self.__dict__.copy()
         del self_dict['p']
         return self_dict
 
     def __next__(self):
+        if self.suicide:
+            self.p.terminate()
+            return
         if self.p == None:
             user_param = self.user_param
             self.user_param = None
@@ -68,3 +74,8 @@ class SubprocessGenerator(object):
             raise StopIteration()
         self.sc_queue.put (1)
         return gen_data
+
+    def get_param(self):
+        return self.user_param
+    def set_param(self, pampamparam):
+        self.user_param = pampamparam

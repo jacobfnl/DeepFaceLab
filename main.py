@@ -131,7 +131,9 @@ if __name__ == "__main__":
                        'force_gpu_idx' : arguments.force_gpu_idx,
                        }
         from mainscripts import Trainer
-        Trainer.main(args, device_args)
+        while Trainer.main(args, device_args):
+            print('holy nutcrackers batman')
+
 
     p = subparsers.add_parser( "train", help="Trainer")
     p.add_argument('--training-data-src-dir', required=True, action=fixPathAction, dest="training_data_src_dir",
@@ -149,7 +151,7 @@ if __name__ == "__main__":
     p.add_argument('--cpu-only', action="store_true", dest="cpu_only", default=False, help="Train on CPU.")
     p.add_argument('--force-gpu-idx', type=int, dest="force_gpu_idx", default=-1, help="Force to choose this GPU idx.")
     p.add_argument('--execute-program', dest="execute_program", default=[], action='append', nargs='+')
-    p.add_argument('--pingpong', dest="ping_pong", default=False,
+    p.add_argument('--pingpong', action="store_true", dest="ping_pong", default=False,
                    help="Cycle between a batch size of 1 and the chosen batch size")
     p.set_defaults (func=process_train)
 

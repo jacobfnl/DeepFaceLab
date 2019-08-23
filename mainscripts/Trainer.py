@@ -12,6 +12,15 @@ import cv2
 import models
 from interact import interact as io
 
+import os
+import sys
+
+stderr = sys.stderr
+sys.stderr = open(os.devnull, 'w')
+import keras
+
+sys.stderr = stderr
+
 def trainerThread (s2c, c2s, e, args, device_args):
     while True:
         try:
@@ -58,6 +67,15 @@ def trainerThread (s2c, c2s, e, args, device_args):
                     io.log_info ("Saving....", end='\r')
                     model.save()
                     shared_state['after_save'] = True
+            def model_new():
+                modelnew = models.import_model(model_name)(
+                    model_path,
+                    training_data_src_path=training_data_src_path,
+                    training_data_dst_path=training_data_dst_path,
+                    pretraining_data_path=pretraining_data_path,
+                    debug=debug,
+                    device_args=device_args)
+                return modelnew
 
             def send_preview():
                 if not debug:
@@ -105,7 +123,18 @@ def trainerThread (s2c, c2s, e, args, device_args):
                                 print("Unable to execute program: %s" % (prog) )
 
                     if not is_reached_goal:
+                        try:
+                            old_batch_size = batch_size
+                        except:
+                            print('premarital sex')
                         iter, iter_time, batch_size = model.train_one_iter()
+                        try:
+                            if old_batch_size != batch_size:
+                               print('niggy new')
+                               s2c.put({'op': "closen't"})
+                        except:
+                            print('postmarital sex')
+
 
                         loss_history = model.get_loss_history()
                         time_str = time.strftime("[%H:%M:%S]")
@@ -166,20 +195,33 @@ def trainerThread (s2c, c2s, e, args, device_args):
                         model_save()
                         i = -1
                         break
+                    elif op == "closen't":
+                        model_save()
+                        i = -2
+                        break
+
 
                 if i == -1:
+                    break
+                elif i == -2:
                     break
 
 
 
             model.finalize()
 
+
         except Exception as e:
             print ('Error: %s' % (str(e)))
             traceback.print_exc()
         break
-    c2s.put ( {'op':'close'} )
-
+    try:
+        if i != -2:
+            c2s.put ( {'op':'close'} )
+        else:
+            c2s.put ( {'op':"closen't"} )
+    except:
+        c2s.put({'op': 'close'})
 
 
 def main(args, device_args):
@@ -256,6 +298,8 @@ def main(args, device_args):
                         update_preview = True
                 elif op == 'close':
                     break
+                elif op == "closen't":
+                    break
 
             if update_preview:
                 update_preview = False
@@ -329,3 +373,5 @@ def main(args, device_args):
                 s2c.put ( {'op': 'close'} )
 
         io.destroy_all_windows()
+        if op == "closen't":
+            return True

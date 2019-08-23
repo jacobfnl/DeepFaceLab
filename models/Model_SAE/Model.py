@@ -1,5 +1,6 @@
 from functools import partial
 import numpy as np
+import multiprocessing
 
 from nnlib import nnlib
 from models import ModelBase
@@ -540,38 +541,42 @@ class SAEModel(ModelBase):
     # override
     def set_batch_size(self, batch_size):
         self.batch_size = batch_size
-        self.set_training_data_generators(None)
-        self.set_training_data_generators([
-            SampleGeneratorFace(training_data_src_path,
-                                sort_by_yaw_target_samples_path=training_data_dst_path if sort_by_yaw else None,
-                                random_ct_samples_path=training_data_dst_path if apply_random_ct != ColorTransferMode.NONE else None,
-                                debug=self.is_debug(), batch_size=self.batch_size,
-                                sample_process_options=SampleProcessor.Options(random_flip=self.random_flip,
-                                                                               scale_range=np.array([-0.05,
-                                                                                                     0.05]) + self.src_scale_mod / 100.0),
-                                output_sample_types=[{'types': (
-                                    t.IMG_WARPED_TRANSFORMED, face_type, t_mode_bgr),
-                                    'resolution': resolution, 'apply_ct': apply_random_ct}] + \
-                                                    [{'types': (t.IMG_TRANSFORMED, face_type, t_mode_bgr),
-                                                      'resolution': resolution // (2 ** i),
-                                                      'apply_ct': apply_random_ct} for i in range(ms_count)] + \
-                                                    [{'types': (t.IMG_TRANSFORMED, face_type, t.MODE_M),
-                                                      'resolution': resolution // (2 ** i)} for i in
-                                                     range(ms_count)]
-                                ),
-
-            SampleGeneratorFace(training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
-                                sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, ),
-                                output_sample_types=[{'types': (
-                                    t.IMG_WARPED_TRANSFORMED, face_type, t_mode_bgr),
-                                    'resolution': resolution}] + \
-                                                    [{'types': (t.IMG_TRANSFORMED, face_type, t_mode_bgr),
-                                                      'resolution': resolution // (2 ** i)} for i in
-                                                     range(ms_count)] + \
-                                                    [{'types': (t.IMG_TRANSFORMED, face_type, t.MODE_M),
-                                                      'resolution': resolution // (2 ** i)} for i in
-                                                     range(ms_count)])
-        ])
+        for generator in self.get_training_data_generators():
+            generator.update_batch(batch_size)
+        # for generator in self.get_training_data_generators():
+        #     generator.__del__()
+        #
+        # self.set_training_data_generators([
+        #     SampleGeneratorFace(training_data_src_path,
+        #                         sort_by_yaw_target_samples_path=training_data_dst_path if sort_by_yaw else None,
+        #                         random_ct_samples_path=training_data_dst_path if apply_random_ct != ColorTransferMode.NONE else None,
+        #                         debug=self.is_debug(), batch_size=self.batch_size,
+        #                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip,
+        #                                                                        scale_range=np.array([-0.05,
+        #                                                                                              0.05]) + self.src_scale_mod / 100.0),
+        #                         output_sample_types=[{'types': (
+        #                             t.IMG_WARPED_TRANSFORMED, face_type, t_mode_bgr),
+        #                             'resolution': resolution, 'apply_ct': apply_random_ct}] + \
+        #                                             [{'types': (t.IMG_TRANSFORMED, face_type, t_mode_bgr),
+        #                                               'resolution': resolution // (2 ** i),
+        #                                               'apply_ct': apply_random_ct} for i in range(ms_count)] + \
+        #                                             [{'types': (t.IMG_TRANSFORMED, face_type, t.MODE_M),
+        #                                               'resolution': resolution // (2 ** i)} for i in
+        #                                              range(ms_count)]
+        #                         ),
+        #
+        #     SampleGeneratorFace(training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
+        #                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, ),
+        #                         output_sample_types=[{'types': (
+        #                             t.IMG_WARPED_TRANSFORMED, face_type, t_mode_bgr),
+        #                             'resolution': resolution}] + \
+        #                                             [{'types': (t.IMG_TRANSFORMED, face_type, t_mode_bgr),
+        #                                               'resolution': resolution // (2 ** i)} for i in
+        #                                              range(ms_count)] + \
+        #                                             [{'types': (t.IMG_TRANSFORMED, face_type, t.MODE_M),
+        #                                               'resolution': resolution // (2 ** i)} for i in
+        #                                              range(ms_count)])
+        # ])
 
     # override
     def onTrainOneIter(self, generators_samples, generators_list):

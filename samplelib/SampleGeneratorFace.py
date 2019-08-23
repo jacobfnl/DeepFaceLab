@@ -53,7 +53,8 @@ class SampleGeneratorFace(SampleGeneratorBase):
         else:
             self.generators_count = min(generators_count, len(samples))
             self.generators = [
-                iter_utils.SubprocessGenerator(self.batch_func, (i, samples[i::self.generators_count], ct_samples)) for
+                iter_utils.SubprocessGenerator(self.batch_func, [i, samples[i::self.generators_count], ct_samples, self.batch_size
+                                                                 ]) for
                 i in range(self.generators_count)]
 
         self.generator_counter = -1
@@ -66,8 +67,12 @@ class SampleGeneratorFace(SampleGeneratorBase):
         generator = self.generators[self.generator_counter % len(self.generators)]
         return next(generator)
 
+    def __del__(self):
+        for process in self.generators:
+            process.__del__()
+
     def batch_func(self, param):
-        generator_id, samples, ct_samples = param
+        generator_id, samples, ct_samples, batch_size = param
 
         if self.generators_random_seed is not None:
             np.random.seed(self.generators_random_seed[generator_id])
@@ -92,7 +97,7 @@ class SampleGeneratorFace(SampleGeneratorBase):
 
         while True:
             batches = None
-            for n_batch in range(self.batch_size):
+            for n_batch in range(batch_size):
                 while True:
                     sample = None
 
@@ -153,4 +158,15 @@ class SampleGeneratorFace(SampleGeneratorBase):
 
     def update_batch(self, batch_size):
         self.batch_size = batch_size
+        if self.generators is not None:
+            for process in self.generators:
 
+                a = process.get_param()
+                if a is not None:
+                    a[len(a)-1] = batch_size
+                    print(a[len(a)-1])
+                    process.set_param(a)
+                else:
+                    print('a be none')
+        else:
+            print('nigga be none')

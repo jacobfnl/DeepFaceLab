@@ -82,3 +82,6 @@ class SampleGeneratorFaceTemporal(SampleGeneratorBase):
                     batches[i].append ( temporal_samples[i] )
 
             yield [ np.array(batch) for batch in batches]
+
+    def update_batch(self, batch):
+        self.batch_size = batch

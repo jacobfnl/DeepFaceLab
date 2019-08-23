@@ -145,7 +145,7 @@ class ModelBase(object):
                                                                           " Memory error. Tune this value for your"
                                                                           " videocard manually."))
             self.options['ping_pong'] = io.input_bool(
-                "Enable ping-pong? (y/n ?:help skip:%s) : " % self.options.get('ping_pong', False),
+                "Enable ping-pong? (y/n ?:help skip:%s) : " % yn_str[self.options.get('ping_pong', False)],
                 self.options.get('ping_pong', False),
                 help_message="Cycles batch size between 1 and chosen batch size, simulating super convergence")
             self.options['paddle'] = self.options.get('paddle','ping')
@@ -212,7 +212,12 @@ class ModelBase(object):
 
         nnlib.import_all(self.device_config)
         self.keras = nnlib.keras
-        self.K = nnlib.keras.backend
+        try:
+            self.K = nnlib.keras.backend
+        except:
+            print("baby make boom boom. your move, creep")
+            nnlib.import_all(self.device_config)
+            self.keras = nnlib.keras
 
         self.onInitialize()
 
@@ -544,10 +549,12 @@ class ModelBase(object):
     def train_one_iter(self):
 
         if self.iter == 1 and self.options.get('ping_pong', False):
-            self.set_batch_size(1)
+            #self.set_batch_size(1)
+            self.batch_size = 1
             self.paddle = 'ping'
-        elif not self.options.get('ping_pong', False) and self.batch_cap != self.batch_size:
-            self.set_batch_size(self.batch_cap)
+        if not self.options.get('ping_pong', False) and self.batch_cap != self.batch_size:
+            self.batch_size = self.batch_cap
+            #self.set_batch_size(self.batch_cap)
         sample = self.generate_next_sample()
         iter_time = time.time()
         losses = self.onTrainOneIter(sample, self.generator_list)
@@ -578,16 +585,19 @@ class ModelBase(object):
             if self.batch_size == self.batch_cap:
                 self.paddle = 'pong'
             if self.batch_size > self.batch_cap:
-                self.set_batch_size(self.batch_cap)
+                #self.set_batch_size(self.batch_cap)
+                self.batch_size = self.batch_cap
                 self.paddle = 'pong'
             if self.batch_size == 1:
                 self.paddle = 'ping'
             if self.paddle == 'ping':
                 self.save()
-                self.set_batch_size(self.batch_size + 1)
+                #self.set_batch_size(self.batch_size + 1)
+                self.batch_size += 1
             else:
                 self.save()
-                self.set_batch_size(self.batch_size - 1)
+                self.batch_size -= 1
+                #self.set_batch_size(self.batch_size - 1)
 
         self.iter += 1
 
