@@ -1,6 +1,5 @@
 # https://github.com/patrikhuber/eos/blob/master/python/demo.py
 import os
-import sys
 import eos
 import numpy as np
 
@@ -12,13 +11,16 @@ EOS_EDGE_TOPO = os.path.join(EOS_DIR, 'sfm_3448_edge_topology.json')
 EOS_CONTOURS = os.path.join(EOS_DIR, 'sfm_model_contours.json')
 
 
-def get_mesh_landmarks(image, landmarks):
+def get_mesh_landmarks(landmarks, image, bbox):
+    l, t, r, b = bbox
+    # image_height, image_width = b - t, r - l
     image_height, image_width, _ = image.shape
     eos_landmarks = _format_landmarks_for_eos(landmarks)
     mesh, pose = _predict_3d_mesh(image_width, image_height, eos_landmarks)
     v = np.asarray(mesh.vertices)
     points_2d = _project_points(v, pose, image_width, image_height)
-    return points_2d[:2] + [image_height/2, image_width/2]
+    points = points_2d[:, :2] + [t + image_height/2, l + image_width/2]
+    return points
 
 
 def _format_landmarks_for_eos(landmarks):

@@ -20,7 +20,7 @@ class MyTestCase(unittest.TestCase):
 
         rects = s3fd_extractor.extract(input_image=im, is_bgr=True)
         print('rects:', rects)
-        l, t, r, b = rects[0]
+        bbox = rects[0]  # bounding box
 
         landmark_extractor.__enter__()
         # landmarks = landmark_extractor.extract(input_image=im, rects=rects, second_pass_extractor=None,
@@ -32,13 +32,12 @@ class MyTestCase(unittest.TestCase):
         landmark_extractor.__exit__()
         print('landmarks shape:', np.shape(landmarks))
 
-        mesh_points = get_mesh_landmarks(im, landmarks)
+        mesh_points = get_mesh_landmarks(landmarks, bbox)
         print('mesh_points:', mesh_points)
 
         cv2.namedWindow('test output', cv2.WINDOW_NORMAL)
         for i, pt in enumerate(mesh_points):
-            print(i, pt)
-            cv2.circle(im, int(pt[0]), int(pt[1]), 0.25, (0, 255, 0), thickness=-1)
+            cv2.circle(im, (int(pt[0]), int(pt[1])), 1, (0, 255, 0), thickness=-1)
         cv2.imshow('test output', im)
         cv2.waitKey(0)
 
