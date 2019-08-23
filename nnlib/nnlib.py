@@ -1094,24 +1094,15 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
 
     @staticmethod
     def reset_keras():
-        sess = get_session()
-        clear_session()
-        sess.close()
-        sess = get_session()
-
         try:
-            del nnlib.keras  # this is from global space - change this as you need
+            sess = get_session()
+            clear_session()
+            sess.close()
         except:
-            pass
+            print('This is normal-lich')
 
-        print(gc.collect())  # if it's done something you should see a number being outputted
 
-        # use the same config as you used to create the session
-        config = tensorflow.ConfigProto()
-        config.gpu_options.per_process_gpu_memory_fraction = 1
-        print(device)
-        config.gpu_options.visible_device_list = device
-        set_session(tensorflow.Session(config=config))
+
 
 
 class CAInitializerMPSubprocessor(Subprocessor):

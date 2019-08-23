@@ -131,9 +131,7 @@ if __name__ == "__main__":
                        'force_gpu_idx' : arguments.force_gpu_idx,
                        }
         from mainscripts import Trainer
-        while Trainer.main(args, device_args):
-            print('holy nutcrackers batman')
-
+        Trainer.main(args, device_args)
 
     p = subparsers.add_parser( "train", help="Trainer")
     p.add_argument('--training-data-src-dir', required=True, action=fixPathAction, dest="training_data_src_dir",

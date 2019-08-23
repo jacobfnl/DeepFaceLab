@@ -294,7 +294,10 @@ class InteractBase(object):
             if time.time() - t > max_time_sec:
                 break
         p.terminate()
-        sys.stdin = os.fdopen( sys.stdin.fileno() )
+        try:
+            sys.stdin = os.fdopen( sys.stdin.fileno() )
+        except:
+            inp = True
         return inp
 
 
