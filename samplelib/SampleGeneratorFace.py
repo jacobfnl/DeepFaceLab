@@ -5,9 +5,8 @@ import cv2
 import numpy as np
 
 from facelib import LandmarksProcessor
-from samplelib import (SampleGeneratorBase, SampleLoader, SampleProcessor, SampleGeneratorPingPong,
+from samplelib import (SampleGeneratorBase, SampleLoader, SampleProcessor,
                        SampleType)
-from samplelib.SampleGeneratorPingPong import PingPongOptions, SampleGeneratorPingPong
 from utils import iter_utils
 
 
@@ -20,12 +19,12 @@ output_sample_types = [
 '''
 
 
-class SampleGeneratorFace(SampleGeneratorPingPong):
+class SampleGeneratorFace(SampleGeneratorBase):
     def __init__(self, samples_path, debug, batch_size, sort_by_yaw=False, sort_by_yaw_target_samples_path=None,
                  random_ct_samples_path=None, sample_process_options=SampleProcessor.Options(),
                  output_sample_types=[], add_sample_idx=False, generators_count=2, generators_random_seed=None,
-                 ping_pong=PingPongOptions(), **kwargs):
-        super().__init__(samples_path, debug, batch_size=batch_size, ping_pong=ping_pong)
+                 **kwargs):
+        super().__init__(samples_path, debug, batch_size)
         self.sample_process_options = sample_process_options
         self.output_sample_types = output_sample_types
         self.add_sample_idx = add_sample_idx
@@ -65,7 +64,6 @@ class SampleGeneratorFace(SampleGeneratorPingPong):
     def __next__(self):
         self.generator_counter += 1
         generator = self.generators[self.generator_counter % len(self.generators)]
-        super().__next__()
         return next(generator)
 
     def batch_func(self, param):
