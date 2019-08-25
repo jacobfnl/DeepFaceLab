@@ -1,8 +1,13 @@
-import { CurrentArchitectureActions } from '../constants/currentArchitectureConstants';
+import CurrentArchitectureActions from "../constants/currentArchitectureConstants";
 
-    // action creators
+// action creators
 
-    // Sets the current selected architecture
-    export function setCurrentArchitecture(currentArchitecture) {
-        return { type: CurrentArchitectureActions.SET_CURRENT_ARCHITECTURE, data: currentArchitecture };
-    }
+// Sets the current selected architecture
+
+// Dummy data for currentArchitecture
+const currentArchitecture = "liae";
+
+export default {
+	type: CurrentArchitectureActions.SET_CURRENT_ARCHITECTURE,
+	data: currentArchitecture
+};
