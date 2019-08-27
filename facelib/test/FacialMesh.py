@@ -31,7 +31,7 @@ class MyTestCase(unittest.TestCase):
         landmark_extractor.__exit__()
         print('landmarks shape:', np.shape(landmarks))
 
-        mesh_points, isomap = get_mesh_landmarks(landmarks, im)
+        mesh_points, isomap, rendered = get_mesh_landmarks(landmarks, im)
         print('mesh_points:', np.shape(mesh_points))
 
         cv2.namedWindow('test output', cv2.WINDOW_NORMAL)
@@ -49,9 +49,11 @@ class MyTestCase(unittest.TestCase):
         cv2.imshow('test output', im)
         cv2.waitKey(0)
 
-        cv2.imshow('test output', isomap.transpose([1, 0]))
+        cv2.imshow('test output', isomap.transpose([1, 0, 2]))
         cv2.waitKey(0)
 
+        cv2.imshow('test output', rendered)
+        cv2.waitKey(0)
 
         # cv2.imshow('test output', iso_points)
 

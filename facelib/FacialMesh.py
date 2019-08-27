@@ -34,11 +34,10 @@ def get_mesh_landmarks(landmarks, image):
 
     isomap = get_texture(mesh, pose, image)
 
-    # iso_2d = _project_isomap(np.asarray(isomap), pose, image_width, image_height)
-    # iso_points = iso_2d[:, :, :2] # + [image_width/2, image_height/2]
+    rendered = eos.render.render(mesh, pose, image_width, image_height, isomap, False, False, False)
 
-    render(mesh, pose, isomap, image_width, image_height)
-    return points, isomap
+    print('rendered shape:', np.shape(rendered))
+    return points, isomap, rendered
 
 
 def _format_landmarks_for_eos(landmarks):
@@ -98,8 +97,7 @@ def get_pitch_yaw_roll(pose):
 
 # Extract the texture from the image using given mesh and camera parameters:
 def get_texture(mesh, pose, image):
-    isomap = eos.render.extract_texture(mesh, pose, image, isomap_resolution=1024)
-    # print('isomap:', isomap)
+    isomap = eos.render.extract_texture(mesh, pose, image, isomap_resolution=512)
     print('isomap shape', np.shape(isomap))
     return isomap
 
@@ -132,6 +130,7 @@ def _project_points(v, pose, width, height):
     return np.asarray([vpm.dot(projection).dot(modelview).dot(point) for point in points])
 
 
+"""
 def _project_isomap(isomap, pose, width, height):
     # project through pose
     isomap = np.copy(isomap)
@@ -146,9 +145,4 @@ def _project_isomap(isomap, pose, width, height):
             isomap[i, j, :] = vpm.dot(projection).dot(modelview).dot(isomap[i, j, :])
 
     return isomap
-
-def render(mesh, pose, texture, width, height):
-    projection = pose.get_projection()
-    modelview = pose.get_modelview()
-    vpm = _get_viewport_matrix(width, height)
-    eos.render.render(mesh, modelview, projection, vpm, texture)
+"""
