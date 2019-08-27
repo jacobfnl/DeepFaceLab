@@ -2,6 +2,8 @@
 # https://github.com/patrikhuber/eos/blob/master/examples/fit-model.cpp
 # http://patrikhuber.github.io/eos/doc/index.html
 import os
+
+import cv2
 import eos
 import numpy as np
 
@@ -34,10 +36,9 @@ def get_mesh_landmarks(landmarks, image):
 
     isomap = get_texture(mesh, pose, image)
 
-    rendered = eos.render.render(mesh, pose, image_width, image_height, isomap.transpose([1, 0, 2]), False, False, False)
+    mask = _create_mask(points, mesh.tvi, image)
 
-    print('rendered shape:', np.shape(rendered))
-    return points, isomap, rendered
+    return points, isomap, mask, mesh.tvi
 
 
 def _format_landmarks_for_eos(landmarks):
@@ -130,19 +131,84 @@ def _project_points(v, pose, width, height):
     return np.asarray([vpm.dot(projection).dot(modelview).dot(point) for point in points])
 
 
-"""
-def _project_isomap(isomap, pose, width, height):
-    # project through pose
-    isomap = np.copy(isomap)
-    vpm = _get_viewport_matrix(width, height)
-    projection = pose.get_projection()
-    modelview = pose.get_modelview()
+def _create_mask(points, tvi, image):
+    mask = np.zeros((image.shape[:2] + (1,)), dtype=np.float32)
+    triangles = points[tvi]
+    mouth = points[MOUTH_SFM_LANDMARKS]
 
-    # result = np.array([])
-    for i, row in enumerate(isomap):
-        # result_row = np.array([])
-        for j, col in enumerate(row):
-            isomap[i, j, :] = vpm.dot(projection).dot(modelview).dot(isomap[i, j, :])
+    print('triangles shape:', triangles.shape)
+    # triangles = triangles[is_tr_ccw(triangles)]
 
-    return isomap
-"""
+    print('triangles shape:', triangles.shape)
+
+    np.rint(triangles, out=triangles)
+    triangles = triangles.astype(np.int32)
+
+    np.rint(mouth, out=mouth)
+    mouth = mouth.astype(np.int32)
+
+    print('triangles type:', triangles.dtype)
+
+    cv2.fillPoly(mask, triangles, (1,))
+    cv2.fillPoly(mask, [mouth], (1,))
+    print('mask shape:', mask.shape)
+    print('mask type:', mask.dtype)
+
+    return mask
+
+
+def is_tr_ccw(tri_v):
+    return ((tri_v[:, 1, 1] - tri_v[:, 0, 1]) * (tri_v[:, 2, 0] - tri_v[:, 1, 0])) < ((tri_v[:, 2, 1] - tri_v[:, 1, 1]) * (tri_v[:, 1, 0] - tri_v[:, 0, 0]))
+
+
+MOUTH_SFM_LANDMARKS = [
+    398,
+    3446,
+    408,
+    3253,
+    406,
+    3164,
+    404,
+    3115,
+    402,
+    3257,
+    399,
+    3374,
+    442,
+    3376,
+    813,
+    3260,
+    815,
+    3119,
+    817,
+    3167,
+    819,
+    3256,
+    821,
+    3447,
+    812,
+    3427,
+    823,
+    3332,
+    826,
+    3157,
+    828,
+    3212,
+    830,
+    3382,
+    832,
+    3391,
+    423,
+    3388,
+    420,
+    3381,
+    418,
+    3211,
+    416,
+    3155,
+    414,
+    3331,
+    410,
+    3426,
+]
+
