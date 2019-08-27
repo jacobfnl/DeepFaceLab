@@ -52,7 +52,7 @@ class MyTestCase(unittest.TestCase):
         cv2.imshow('test output', isomap.transpose([1, 0, 2]))
         cv2.waitKey(0)
 
-        cv2.imshow('test output', rendered)
+        cv2.imshow('test output', rendered.transpose([1, 0, 2]))
         cv2.waitKey(0)
 
         # cv2.imshow('test output', iso_points)

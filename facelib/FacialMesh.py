@@ -34,7 +34,7 @@ def get_mesh_landmarks(landmarks, image):
 
     isomap = get_texture(mesh, pose, image)
 
-    rendered = eos.render.render(mesh, pose, image_width, image_height, isomap, False, False, False)
+    rendered = eos.render.render(mesh, pose, image_width, image_height, isomap.transpose([1, 0, 2]), False, False, False)
 
     print('rendered shape:', np.shape(rendered))
     return points, isomap, rendered
