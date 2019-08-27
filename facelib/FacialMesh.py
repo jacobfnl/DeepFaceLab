@@ -132,12 +132,12 @@ def _project_points(v, pose, width, height):
 
 
 def _create_mask(points, tvi, image):
-    mask = np.zeros((image.shape[:2] + (1,)), dtype=np.float32)
+    mask = np.zeros((image.shape[:2] + (1,)), dtype=np.uint8)
     triangles = points[tvi]
     mouth = points[MOUTH_SFM_LANDMARKS]
 
     print('triangles shape:', triangles.shape)
-    # triangles = triangles[is_tr_ccw(triangles)]
+    triangles = triangles[is_tr_ccw(triangles)]
 
     print('triangles shape:', triangles.shape)
 
@@ -149,12 +149,22 @@ def _create_mask(points, tvi, image):
 
     print('triangles type:', triangles.dtype)
 
-    cv2.fillPoly(mask, triangles, (1,))
-    cv2.fillPoly(mask, [mouth], (1,))
+    cv2.fillPoly(mask, triangles, (255,))
+    cv2.fillPoly(mask, [mouth], (255,))
     print('mask shape:', mask.shape)
     print('mask type:', mask.dtype)
 
-    return mask
+    # contours, hierarchy = cv2.findContours(np.copy(mask), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
+    # print('contours:', [contour.shape for contour in contours])
+    # print('hierarchy:', hierarchy.shape)
+    # cv2.drawContours(mask, contours, 0, (255,), thickness=-1)
+
+    contours, hierarchy = cv2.findContours(np.copy(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+    print('contours:', [contour.shape for contour in contours])
+    print('hierarchy:', hierarchy.shape)
+    cv2.drawContours(mask, contours, 0, (255,), thickness=-1)
+
+    return mask.astype(np.float32) / 255
 
 
 def is_tr_ccw(tri_v):
