@@ -168,7 +168,7 @@ def _create_mask(points, tvi, image):
 
 
 def is_tr_ccw(tri_v):
-    return ((tri_v[:, 1, 1] - tri_v[:, 0, 1]) * (tri_v[:, 2, 0] - tri_v[:, 1, 0])) < ((tri_v[:, 2, 1] - tri_v[:, 1, 1]) * (tri_v[:, 1, 0] - tri_v[:, 0, 0]))
+    return ((tri_v[:, 1, 1] - tri_v[:, 0, 1]) * (tri_v[:, 2, 0] - tri_v[:, 1, 0])) > ((tri_v[:, 2, 1] - tri_v[:, 1, 1]) * (tri_v[:, 1, 0] - tri_v[:, 0, 0]))
 
 
 MOUTH_SFM_LANDMARKS = [
