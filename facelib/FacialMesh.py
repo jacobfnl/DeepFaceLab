@@ -25,6 +25,19 @@ EOS_EDGE_TOPO = os.path.join(EOS_DIR, 'sfm_3448_edge_topology.json')
 EOS_CONTOURS = os.path.join(EOS_DIR, 'sfm_model_contours.json')
 
 
+def get_mesh_mask(landmarks, image):
+    image_height, image_width, _ = image.shape
+    eos_landmarks = _format_landmarks_for_eos(landmarks)
+    mesh, pose = _predict_3d_mesh(image_width, image_height, eos_landmarks)
+
+    v = np.asarray(mesh.vertices)
+    points_2d = _project_points(v, pose, image_width, image_height)
+    points = points_2d[:, :2] + [image_width/2, image_height/2]
+
+    mask = _create_mask(points, mesh.tvi, image)
+    return mask
+
+
 def get_mesh_landmarks(landmarks, image):
     image_height, image_width, _ = image.shape
     eos_landmarks = _format_landmarks_for_eos(landmarks)

@@ -1,12 +1,14 @@
+import random
 import time
 import unittest
 
 import cv2
 import numpy as np
 
-from facelib.FacialMesh import _predict_3d_mesh, get_mesh_landmarks, get_texture
+from facelib.FacialMesh import _predict_3d_mesh, get_mesh_landmarks, get_texture, get_mesh_mask
 from nnlib import nnlib
 from facelib import LandmarksExtractor, S3FDExtractor
+from samplelib import SampleLoader, SampleType
 
 
 class MyTestCase(unittest.TestCase):
@@ -133,8 +135,8 @@ class MyTestCase(unittest.TestCase):
         cv2.imshow('test output', im)
         cv2.waitKey(0)
 
-        # cv2.imshow('test output', isomap.transpose([1, 0, 2]))
-        # cv2.waitKey(0)
+        cv2.imshow('test output', isomap.transpose([1, 0, 2]))
+        cv2.waitKey(0)
 
         im = np.copy(source_image).astype(np.float32) / 255.0
 
@@ -146,6 +148,51 @@ class MyTestCase(unittest.TestCase):
         cv2.waitKey(0)
 
         cv2.destroyAllWindows()
+
+    def test_compare_hull_mask_with_mesh_mask(self):
+        src_samples = SampleLoader.load(SampleType.FACE, './aligned_carrey', None)
+
+        sample_grid = self.get_sample_grid(src_samples)
+        display_grid = []
+        for sample_row in sample_grid:
+            display_row = []
+            for sample in sample_row:
+                src_img = sample.load_bgr()
+                src_hull_mask = sample.load_image_hull_mask()
+
+                src_landmarks = sample.landmarks
+                src_mesh_mask = get_mesh_mask(src_landmarks, src_img)
+
+                results = np.concatenate((src_img, src_hull_mask * src_img, src_mesh_mask * src_img), axis=1)
+                display_row.append(results)
+            display_grid.append(np.concatenate(display_row, axis=1))
+        output_grid = np.concatenate(display_grid, axis=0)
+
+        cv2.namedWindow('test output', cv2.WINDOW_NORMAL)
+        cv2.imshow('test output', output_grid)
+        cv2.waitKey(0)
+        cv2.destroyAllWindows()
+
+    @staticmethod
+    def get_sample_grid(src_samples):
+        pitch_yaw = np.array([[sample.pitch_yaw_roll[0], sample.pitch_yaw_roll[1]] for sample in src_samples])
+        pitch_yaw = (pitch_yaw - np.mean(pitch_yaw, axis=0)) / np.std(pitch_yaw, axis=0)
+
+        # theta_r = np.stack((np.arctan2(pitch_yaw[:, 0], pitch_yaw[:, 1]), np.hypot(pitch_yaw[:, 0], pitch_yaw[:, 1])), axis=-1)
+
+        grid = [[[1, 1], [1, 0], [1, -1]],
+                [[0, 1], [0, 0], [0, -1]],
+                [[-1, 1], [-1, 0], [-1, -1]]]
+
+        grid_samples = []
+        for row in grid:
+            row_samples = []
+            for item in row:
+                # print(item, pitch_yaw[np.sum(np.square(np.abs(pitch_yaw - item)), 1).argmin()])
+                row_samples.append(src_samples[np.sum(np.square(np.abs(pitch_yaw - item)), 1).argmin()])
+            grid_samples.append(row_samples)
+        return grid_samples
+
 
 
 if __name__ == '__main__':
