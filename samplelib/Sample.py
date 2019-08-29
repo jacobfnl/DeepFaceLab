@@ -1,29 +1,28 @@
 from enum import IntEnum
-from pathlib import Path
 
-import cv2
-import numpy as np
-
-from facelib import LandmarksProcessor
+from facelib import LandmarksProcessor, FacialMesh
 from utils.cv2_utils import *
 from utils.DFLJPG import DFLJPG
 from utils.DFLPNG import DFLPNG
 
 
 class SampleType(IntEnum):
-    IMAGE = 0 #raw image
+    IMAGE = 0                      # raw image
 
     FACE_BEGIN = 1
-    FACE = 1                      #aligned face unsorted
-    FACE_YAW_SORTED = 2           #sorted by yaw
-    FACE_YAW_SORTED_AS_TARGET = 3 #sorted by yaw and included only yaws which exist in TARGET also automatic mirrored
+    FACE = 1                       # aligned face unsorted
+    FACE_YAW_SORTED = 2            # sorted by yaw
+    FACE_YAW_SORTED_AS_TARGET = 3  # sorted by yaw and included only yaws which exist in TARGET also automatic mirrored
     FACE_TEMPORAL_SORTED = 4
     FACE_END = 4
 
     QTY = 5
 
+
 class Sample(object):
-    def __init__(self, sample_type=None, filename=None, face_type=None, shape=None, landmarks=None, ie_polys=None, extend_forehead=False, pitch_yaw_roll=None, source_filename=None, mirror=None, close_target_list=None, fanseg_mask_exist=False):
+    def __init__(self, sample_type=None, filename=None, face_type=None, shape=None, landmarks=None, ie_polys=None,
+                 pitch_yaw_roll=None, source_filename=None, mirror=None, close_target_list=None,
+                 fanseg_mask_exist=False):
         self.sample_type = sample_type if sample_type is not None else SampleType.IMAGE
         self.filename = filename
         self.face_type = face_type
@@ -35,9 +34,10 @@ class Sample(object):
         self.mirror = mirror
         self.close_target_list = close_target_list
         self.fanseg_mask_exist = fanseg_mask_exist
-        self.extend_forehead = extend_forehead
 
-    def copy_and_set(self, sample_type=None, filename=None, face_type=None, shape=None, landmarks=None, ie_polys=None, extend_forehead=None, pitch_yaw_roll=None, source_filename=None, mirror=None, close_target_list=None, fanseg_mask=None, fanseg_mask_exist=None):
+    def copy_and_set(self, sample_type=None, filename=None, face_type=None, shape=None, landmarks=None, ie_polys=None,
+                     pitch_yaw_roll=None, source_filename=None, mirror=None, close_target_list=None, fanseg_mask=None,
+                     fanseg_mask_exist=None):
         return Sample(
             sample_type=sample_type if sample_type is not None else self.sample_type,
             filename=filename if filename is not None else self.filename,
@@ -50,21 +50,21 @@ class Sample(object):
             mirror=mirror if mirror is not None else self.mirror,
             close_target_list=close_target_list if close_target_list is not None else self.close_target_list,
             fanseg_mask_exist=fanseg_mask_exist if fanseg_mask_exist is not None else self.fanseg_mask_exist,
-            extend_forehead=extend_forehead if extend_forehead is not None else self.extend_forehead)
+        )
 
     def load_bgr(self):
-        img = cv2_imread (self.filename).astype(np.float32) / 255.0
+        img = cv2_imread(self.filename).astype(np.float32) / 255.0
         if self.mirror:
-            img = img[:,::-1].copy()
+            img = img[:, ::-1].copy()
         return img
 
     def load_fanseg_mask(self):
         if self.fanseg_mask_exist:
             filepath = Path(self.filename)
             if filepath.suffix == '.png':
-                dflimg = DFLPNG.load ( str(filepath) )
+                dflimg = DFLPNG.load(str(filepath))
             elif filepath.suffix == '.jpg':
-                dflimg = DFLJPG.load ( str(filepath) )
+                dflimg = DFLJPG.load(str(filepath))
             else:
                 dflimg = None
             return dflimg.get_fanseg_mask()
@@ -72,13 +72,21 @@ class Sample(object):
         return None
 
     def load_image_hull_mask(self):
-        return LandmarksProcessor.get_image_hull_mask(self.load_bgr().shape, self.landmarks,
-                                                      extend_forehead=self.extend_forehead)
+        return LandmarksProcessor.get_image_hull_mask(self.load_bgr().shape, self.landmarks)
 
-    def load_mask(self):
-        return self.load_fanseg_mask() or self.load_image_hull_mask()
+    def load_image_mesh_mask(self):
+        return FacialMesh.get_mesh_mask(self.load_bgr().shape, self.landmarks)
+
+    def load_mask(self, extend_forehead=False):
+        mask = self.load_fanseg_mask()
+        if mask is None:
+            if extend_forehead:
+                mask = self.load_image_mesh_mask()
+            else:
+                mask = self.load_image_hull_mask()
+        return mask
 
     def get_random_close_target_sample(self):
         if self.close_target_list is None:
             return None
-        return self.close_target_list[randint (0, len(self.close_target_list)-1)]
+        return self.close_target_list[randint(0, len(self.close_target_list) - 1)]

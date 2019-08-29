@@ -6,7 +6,7 @@ import numpy as np
 
 import imagelib
 import imagelib_legacy
-from facelib import FaceType, FANSegmentator, LandmarksProcessor
+from facelib import FaceType, FANSegmentator, LandmarksProcessor, FacialMesh
 from interact import interact as io
 from joblib import SubprocessFunctionCaller
 from samplelib.SampleProcessor import ColorTransferMode
@@ -195,8 +195,10 @@ class ConverterMasked(Converter):
 
         img_size = img_bgr.shape[1], img_bgr.shape[0]
 
-        img_face_mask_a = LandmarksProcessor.get_image_hull_mask(img_bgr.shape, img_face_landmarks,
-                                                                 extend_forehead=self.extend_forehead)
+        if self.extend_forehead:
+            img_face_mask_a = FacialMesh.get_mesh_mask(img_bgr.shape, img_face_landmarks)
+        else:
+            img_face_mask_a = LandmarksProcessor.get_image_hull_mask(img_bgr.shape, img_face_landmarks)
 
         output_size = self.predictor_input_size
         if self.super_resolution:

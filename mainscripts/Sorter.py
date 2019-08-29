@@ -9,7 +9,7 @@ from utils import Path_utils
 from utils.DFLPNG import DFLPNG
 from utils.DFLJPG import DFLJPG
 from utils.cv2_utils import *
-from facelib import LandmarksProcessor
+from facelib import LandmarksProcessor, FacialMesh
 from joblib import Subprocessor
 import multiprocessing
 from interact import interact as io
@@ -428,8 +428,11 @@ def sort_by_hist_dissim(input_path):
         image = cv2_imread(str(filepath))
 
         if dflimg is not None:
-            face_mask = LandmarksProcessor.get_image_hull_mask(image.shape, dflimg.get_landmarks(),
-                                                               extend_forehead=extend_forehead)
+            if extend_forehead:
+                face_mask = FacialMesh.get_mesh_mask(image.shape, dflimg.get_landmarks())
+            else:
+                face_mask = LandmarksProcessor.get_image_hull_mask(image.shape, dflimg.get_landmarks())
+
             image = (image*face_mask).astype(np.uint8)
 
         img_list.append ([str(filepath), cv2.calcHist([cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)], [0], None, [256], [0, 256]), 0 ])

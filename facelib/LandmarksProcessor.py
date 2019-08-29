@@ -170,7 +170,7 @@ def get_transform_mat(image_landmarks, output_size, face_type, scale=1.0):
     return mat
 
 
-def get_image_hull_mask(image_shape, image_landmarks, ie_polys=None, extend_forehead=False):
+def get_image_hull_mask(image_shape, image_landmarks, ie_polys=None):
     if len(image_landmarks) != 68:
         raise Exception('get_image_hull_mask works only with 68 landmarks')
     int_lmrks = np.array(image_landmarks.copy(), dtype=np.int)
@@ -206,19 +206,7 @@ def get_image_hull_mask(image_shape, image_landmarks, ie_polys=None, extend_fore
     l_eye = (int_lmrks[22:27], int_lmrks[27:28], int_lmrks[31:36], int_lmrks[8:9])
     nose = (int_lmrks[27:31], int_lmrks[31:36])
 
-    if extend_forehead:
-        # forehead top
-        forehead_l = int_lmrks[19] + (top_l - bot_l) // 2
-        forehead_r = int_lmrks[24] + (top_r - bot_r) // 2
-        forehead_ml = int_lmrks[17] + (forehead_l - int_lmrks[17]) // 2
-        forehead_mr = int_lmrks[26] + (forehead_r - int_lmrks[26]) // 2
-        forehead_ml2 = int_lmrks[17] + (forehead_ml - int_lmrks[17]) // 2
-        forehead_mr2 = int_lmrks[26] + (forehead_mr - int_lmrks[26]) // 2
-        forehead = (forehead_ml2, forehead_ml, forehead_l, forehead_r, forehead_mr, forehead_mr2)
-
-        parts = [r_jaw, l_jaw, r_cheek, l_cheek, nose_ridge, forehead, nose]
-    else:
-        parts = [r_jaw, l_jaw, r_cheek, l_cheek, nose_ridge, l_eye, r_eye, nose]
+    parts = [r_jaw, l_jaw, r_cheek, l_cheek, nose_ridge, l_eye, r_eye, nose]
 
     for item in parts:
         merged = np.concatenate(item)
@@ -336,7 +324,7 @@ def draw_landmarks(image, image_landmarks, color=(0, 255, 0), transparent_mask=F
         cv2.circle(image, (x, y), 2, color, lineType=cv2.LINE_AA)
 
     if transparent_mask:
-        mask = get_image_hull_mask(image.shape, image_landmarks, ie_polys, extend_forehead=extend_forehead)
+        mask = get_image_hull_mask(image.shape, image_landmarks, ie_polys)
         image[...] = (image * (1 - mask) + image * mask / 2)[...]
 
 

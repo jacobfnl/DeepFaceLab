@@ -1,9 +1,6 @@
-# https://github.com/patrikhuber/eos/blob/master/python/demo.py
-# https://github.com/patrikhuber/eos/blob/master/examples/fit-model.cpp
-# http://patrikhuber.github.io/eos/doc/index.html
 import os
-
 import cv2
+# noinspection PyUnresolvedReferences
 import eos
 import numpy as np
 
@@ -12,6 +9,8 @@ This app demonstrates estimation of the camera and fitting of the shape
 model of a 3D Morphable Model from an ibug LFPW image with its landmarks.
 In addition to fit-model-simple, this example uses blendshapes, contour-
 fitting, and can iterate the fitting.
+
+See python demo in repo: https://github.com/patrikhuber/eos/blob/master/python/demo.py
 
 68 ibug landmarks are loaded from the .pts file and converted
 to vertex indices using the LandmarkMapper.
@@ -25,36 +24,47 @@ EOS_EDGE_TOPO = os.path.join(EOS_DIR, 'sfm_3448_edge_topology.json')
 EOS_CONTOURS = os.path.join(EOS_DIR, 'sfm_model_contours.json')
 
 
-def get_mesh_mask(landmarks, image):
-    image_height, image_width, _ = image.shape
-    eos_landmarks = _format_landmarks_for_eos(landmarks)
-    mesh, pose = _predict_3d_mesh(image_width, image_height, eos_landmarks)
+def get_mesh_mask(image_shape, image_landmarks, ie_polys=None):
+    """
+    Gets a full-face mask from aligning a mesh to the facial landmarks
+    :param image_shape:
+    :param image_landmarks:
+    :param ie_polys:
+    :return:
+    """
+    mesh, pose = _predict_3d_mesh(image_landmarks, image_shape)
 
-    v = np.asarray(mesh.vertices)
-    points_2d = _project_points(v, pose, image_width, image_height)
-    points = points_2d[:, :2] + [image_width/2, image_height/2]
+    projected = _project_points(mesh, pose, image_shape)
+    points = _center_and_reduce_to_2d(projected, image_shape)
 
-    mask = _create_mask(points, mesh.tvi, image)
-    return mask
+    return _create_mask(points, mesh.tvi, image_shape, ie_polys)
 
 
 def get_mesh_landmarks(landmarks, image):
-    image_height, image_width, _ = image.shape
-    eos_landmarks = _format_landmarks_for_eos(landmarks)
-    mesh, pose = _predict_3d_mesh(image_width, image_height, eos_landmarks)
+    """
+    Purely for testing
+    :param landmarks:
+    :param image:
+    :return:
+    """
+    mesh, pose = _predict_3d_mesh(landmarks, image.shape)
 
-    v = np.asarray(mesh.vertices)
-    points_2d = _project_points(v, pose, image_width, image_height)
-    points = points_2d[:, :2] + [image_width/2, image_height/2]
+    projected = _project_points(mesh, pose, image.shape)
+    points = _center_and_reduce_to_2d(projected, image.shape)
 
-    isomap = get_texture(mesh, pose, image)
+    isomap = _get_texture(mesh, pose, image)
 
-    mask = _create_mask(points, mesh.tvi, image)
+    mask = _create_mask(points, mesh.tvi, image.shape)
 
-    return points, isomap, mask, mesh.tvi
+    return points, isomap, mask
 
 
 def _format_landmarks_for_eos(landmarks):
+    """
+    Formats landmarks for eos
+    :param landmarks:
+    :return:
+    """
     eos_landmarks = []
     ibug_index = 1  # count from 1 to 68 for all ibug landmarks
     for coords in landmarks:
@@ -63,7 +73,14 @@ def _format_landmarks_for_eos(landmarks):
     return eos_landmarks
 
 
-def _predict_3d_mesh(image_width, image_height, landmarks):
+def _predict_3d_mesh(landmarks, image_shape):
+    """
+    Predicts the 3D mesh using landmarks
+    :param landmarks:
+    :param image_shape:
+    :return:
+    """
+    image_height, image_width, _ = image_shape
     model = eos.morphablemodel.load_model(EOS_MODEL)
 
     # The expression blendshapes:
@@ -91,9 +108,12 @@ def _predict_3d_mesh(image_width, image_height, landmarks):
     contour_landmarks = eos.fitting.ContourLandmarks.load(EOS_MAPPER)
     model_contour = eos.fitting.ModelContour.load(EOS_CONTOURS)
 
+    # Formats the landmarks for eos
+    eos_landmarks = _format_landmarks_for_eos(landmarks)
+
     # Fit the model, get back a mesh and the pose:
     (mesh, pose, shape_coeffs, blendshape_coeffs) = eos.fitting.fit_shape_and_pose(morphablemodel_with_expressions,
-                                                                                   landmarks, landmark_mapper,
+                                                                                   eos_landmarks, landmark_mapper,
                                                                                    image_width, image_height,
                                                                                    edge_topology, contour_landmarks,
                                                                                    model_contour)
@@ -101,28 +121,24 @@ def _predict_3d_mesh(image_width, image_height, landmarks):
     return mesh, pose
 
 
-def get_pitch_yaw_roll(pose):
-    # // The 3D head pose can be recovered as follows:
-    # float yaw_angle = glm::degrees(glm::yaw(rendering_params.get_rotation()));
-    # // and similarly for pitch and roll.
+def _get_pitch_yaw_roll(pose):
     pitch, yaw, roll = pose.get_rotation_euler_angles()
-    print('pitch, yaw, roll:', pitch, yaw, roll)
+    return pitch, yaw, roll
 
 
 # Extract the texture from the image using given mesh and camera parameters:
-def get_texture(mesh, pose, image):
-    isomap = eos.render.extract_texture(mesh, pose, image, isomap_resolution=512)
-    print('isomap shape', np.shape(isomap))
-    return isomap
+def _get_texture(mesh, pose, image, resolution=512):
+    return eos.render.extract_texture(mesh, pose, image, isomap_resolution=resolution)
 
 
 # based on https://github.com/patrikhuber/eos/issues/140#issuecomment-314775288
-def _get_opencv_viewport(width, height):
+def _get_opencv_viewport(image_shape):
+    height, width, _ = image_shape
     return np.array([0, height, width, -height])
 
 
-def _get_viewport_matrix(width, height):
-    viewport = _get_opencv_viewport(width, height)
+def _get_viewport_matrix(image_shape):
+    viewport = _get_opencv_viewport(image_shape)
     viewport_matrix = np.zeros((4, 4))
     viewport_matrix[0, 0] = 0.5 * viewport[2]
     viewport_matrix[3, 0] = 0.5 * viewport[2] + viewport[0]
@@ -133,10 +149,17 @@ def _get_viewport_matrix(width, height):
     return viewport_matrix
 
 
-def _project_points(v, pose, width, height):
+def _project_points(mesh, pose, image_shape):
+    """
+    Projects mesh points back into 2D
+    :param mesh:
+    :param pose:
+    :param image_shape:
+    :return:
+    """
     # project through pose
-    points = np.copy(v)
-    vpm = _get_viewport_matrix(width, height)
+    points = np.asarray(mesh.vertices)
+    vpm = _get_viewport_matrix(image_shape)
     projection = pose.get_projection()
     modelview = pose.get_modelview()
 
@@ -144,15 +167,31 @@ def _project_points(v, pose, width, height):
     return np.asarray([vpm.dot(projection).dot(modelview).dot(point) for point in points])
 
 
-def _create_mask(points, tvi, image):
-    mask = np.zeros((image.shape[:2] + (1,)), dtype=np.uint8)
+def _center_and_reduce_to_2d(points, image_shape):
+    """
+    Centers the points on image, and reduces quaternion to 2D
+    :param points:
+    :param image_shape:
+    :return:
+    """
+    height, width, _ = image_shape
+    return points[:, :2] + [width / 2, height / 2]
+
+
+def _create_mask(points, tvi, image_shape, ie_polys=None):
+    """
+    Creates a mask using the mesh vertices and their triangular face indices
+    :param points: The mesh vertices, projected in 2D, shape (N, 2)
+    :param tvi: the triangular vertex indices, shape (N, 3, 1)
+    :param image_shape: height, width, channels of image
+    :param ie_polys:
+    :return: mask of points covered by mesh
+    """
+    mask = np.zeros((image_shape[:2] + (1,)), dtype=np.uint8)
     triangles = points[tvi]
     mouth = points[MOUTH_SFM_LANDMARKS]
 
-    print('triangles shape:', triangles.shape)
-    triangles = triangles[is_tr_ccw(triangles)]
-
-    print('triangles shape:', triangles.shape)
+    triangles = triangles[_is_triangle_ccw(triangles)]  # filter out the backfaces
 
     np.rint(triangles, out=triangles)
     triangles = triangles.astype(np.int32)
@@ -160,30 +199,35 @@ def _create_mask(points, tvi, image):
     np.rint(mouth, out=mouth)
     mouth = mouth.astype(np.int32)
 
-    print('triangles type:', triangles.dtype)
-
     cv2.fillPoly(mask, triangles, (255,))
     cv2.fillPoly(mask, [mouth], (255,))
-    print('mask shape:', mask.shape)
-    print('mask type:', mask.dtype)
-
-    # contours, hierarchy = cv2.findContours(np.copy(mask), cv2.RETR_TREE, cv2.CHAIN_APPROX_NONE)
-    # print('contours:', [contour.shape for contour in contours])
-    # print('hierarchy:', hierarchy.shape)
-    # cv2.drawContours(mask, contours, 0, (255,), thickness=-1)
 
     contours, hierarchy = cv2.findContours(np.copy(mask), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
-    print('contours:', [contour.shape for contour in contours])
-    print('hierarchy:', hierarchy.shape)
     cv2.drawContours(mask, contours, 0, (255,), thickness=-1)
 
-    return mask.astype(np.float32) / 255
+    mask = mask.astype(np.float32) / 255
+
+    if ie_polys is not None:
+        ie_polys.overlay_mask(mask)
+
+    return mask
 
 
-def is_tr_ccw(tri_v):
-    return ((tri_v[:, 1, 1] - tri_v[:, 0, 1]) * (tri_v[:, 2, 0] - tri_v[:, 1, 0])) > ((tri_v[:, 2, 1] - tri_v[:, 1, 1]) * (tri_v[:, 1, 0] - tri_v[:, 0, 0]))
+def _is_triangle_ccw(triangle_vertices):
+    """
+    Returns the boolean masks for an array of triangular vertices, testing whether a face is clockwise (facing away)
+    or counter-clockwise (facing towards camera). Compares the slope of the first two segments
+    :param triangle_vertices: numpy array of shape (N, 3, 2)
+    :return: numpy boolean mask of shape (N, )
+    """
+    vert_0_x, vert_0_y = triangle_vertices[:, 0, 0], triangle_vertices[:, 0, 1]
+    vert_1_x, vert_1_y = triangle_vertices[:, 1, 0], triangle_vertices[:, 1, 1]
+    vert_2_x, vert_2_y = triangle_vertices[:, 2, 0], triangle_vertices[:, 2, 1]
+
+    return ((vert_1_y - vert_0_y) * (vert_2_x - vert_1_x)) > ((vert_2_y - vert_1_y) * (vert_1_x - vert_0_x))
 
 
+""" The mesh landmarks surrounding the mouth (unfilled in mesh) """
 MOUTH_SFM_LANDMARKS = [
     398,
     3446,
@@ -234,4 +278,3 @@ MOUTH_SFM_LANDMARKS = [
     410,
     3426,
 ]
-

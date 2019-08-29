@@ -98,7 +98,7 @@ class SampleProcessor(object):
 
 
     @staticmethod
-    def process(sample, sample_process_options, output_sample_types, debug, ct_sample=None):
+    def process(sample, sample_process_options: Options, output_sample_types, debug, ct_sample=None):
         SPTF = SampleProcessor.Types
 
         sample_bgr = sample.load_bgr()
@@ -209,11 +209,7 @@ class SampleProcessor(object):
                                 dim = mb_range[np.random.randint(len(mb_range))]
                                 img = imagelib.LinearMotionBlur(img, dim, np.random.randint(180))
 
-                        mask = cur_sample.load_fanseg_mask()  # using fanseg_mask if exist
-
-                        if mask is None:
-                            mask = LandmarksProcessor.get_image_hull_mask(img.shape, cur_sample.landmarks,
-                                                                          extend_forehead=sample_process_options.extend_forehead)
+                        mask = cur_sample.load_mask(extend_forehead=sample_process_options.extend_forehead)
 
                         if cur_sample.ie_polys is not None:
                             cur_sample.ie_polys.overlay_mask(mask)
@@ -280,7 +276,8 @@ class SampleProcessor(object):
                                                                        preserve_paper=use_paper)
                         else:
                             if ct_sample_mask is None:
-                                ct_sample_mask = ct_sample.load_mask()
+                                ct_sample_mask = ct_sample.load_mask(extend_forehead=sample_process_options.extend_forehead)
+
                             img_bgr = imagelib.reinhard_color_transfer(img_bgr, ct_sample_bgr, clip=use_clip,
                                                                        preserve_paper=use_paper, source_mask=img_mask,
                                                                        target_mask=ct_sample_mask)

@@ -9,7 +9,7 @@ import numpy as np
 import numpy.linalg as npl
 
 import imagelib
-from facelib import LandmarksProcessor
+from facelib import LandmarksProcessor, FacialMesh
 from imagelib import IEPolys
 from interact import interact as io
 from utils import Path_utils
@@ -406,8 +406,10 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None):
 
                 if fanseg_mask is not None:
                     mask = fanseg_mask
+                elif extend_forehead:
+                    mask = FacialMesh.get_mesh_mask(img.shape, lmrks)
                 else:
-                    mask = LandmarksProcessor.get_image_hull_mask(img.shape, lmrks, extend_forehead=extend_forehead)
+                    mask = LandmarksProcessor.get_image_hull_mask(img.shape, lmrks)
         else:
             img = np.zeros((target_wh, target_wh, 3))
             mask = np.ones((target_wh, target_wh, 3))
