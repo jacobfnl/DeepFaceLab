@@ -1,11 +1,11 @@
-﻿﻿![](doc/DFL_welcome.jpg)
+﻿﻿![](doc/DFL_welcome.png)
 
-![](doc/logo_cuda.jpg)![](doc/logo_opencl.jpg)![](doc/logo_keras.jpg)![](doc/logo_tensorflow.jpg)![](doc/logo_plaidml.jpg)
+![](doc/logo_cuda.jpg)![](doc/logo_opencl.jpg)![](doc/logo_keras.jpg)![](doc/logo_tensorflow.jpg)![](doc/logo_plaidml.jpg)<img src="doc/pytorch-logo-flat.png" width="20%">.
 
 #deepfakes #faceswap #face-swap #deep-learning #deeplearning #deep-neural-networks #deepface #deep-face-swap #fakeapp #fake-app #neural-networks #neural-nets
 
 ## **DeepFaceLab** is a tool that utilizes machine learning to replace faces in videos.
-
+ 
 GOAL: next DeepFacelab update.
 
 - ### [Gallery](doc/gallery/doc_gallery.md)
