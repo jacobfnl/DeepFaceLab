@@ -88,7 +88,7 @@ class Conv2D(object):
 
     def __call__(self, x):
         if self.reflect_pad:
-            return ReflectionPadding2D(self.pad)(x)
+            x = ReflectionPadding2D(self.pad)(x)
         return self.func(x)
 
 
