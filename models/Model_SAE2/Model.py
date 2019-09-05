@@ -236,7 +236,7 @@ class SAEModel2(ModelBase):
                 self.decoderm = mask_decoder(num_channels=1,
                                              resolution=resolution,
                                              ch_dims=d_ch_dims,
-                                             ae_dims=ae_dims,
+                                             ae_dims=ae_dims * 4,
                                              name='decoder_srcm')
 
                 models_list += [self.decoderm]
