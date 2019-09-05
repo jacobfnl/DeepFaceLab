@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import multiprocessing
 from utils import os_utils
 from mainscripts import Trainer
@@ -8,7 +10,7 @@ CONFIG_ARGS = {
     'pretraining_data_dir'   : '',
     'model_path'             : '../DeepFaceLab-workspace/model',
     'model_name'             : 'SAE',
-    'no_preview'             : True,
+    'no_preview'             : False,
     'debug'                  : False,
     'execute_program'        : [],
 }
@@ -20,9 +22,9 @@ CONFIG_DEVICE_ARGS = {
 
 CONFIG_MODEL_BASE_OPTIONS = {
     'autobackup'             : False,
-    'write_preview_history'  : False,
-    'target_iter'            : 1000,
-    'batch_size'             : 32,
+    'write_preview_history'  : True,
+    'target_iter'            : 0,
+    'batch_size'             : 8,
     'batch_cap'              : 4,
     'ping_pong'              : False,
     'paddle'                 : 'ping',
@@ -35,19 +37,19 @@ CONFIG_MODEL_BASE_OPTIONS = {
 
 CONFIG_SAE_MODEL_OPTIONS = {
     'resolution'             : 16,
-    'face_type'              : 'h',
-    'learn_mask'             : False,
+    'face_type'              : 'f',
+    'learn_mask'             : True,
     'optimizer_mode'         : 1,
-    'archi'                  : 'liae',
+    'archi'                  : 'df',
     'ae_dims'                : 64,
     'e_ch_dims'              : 4,
     'd_ch_dims'              : 2,
-    'multiscale_decoder'     : True,
+    'multiscale_decoder'     : False,
     'ca_weights'             : True,
     'pixel_loss'             : False,
     'face_style_power'       : 0.0,
     'bg_style_power'         : 0.0,
-    'default_apply_random_ct': 0,
+    'default_apply_random_ct': 5,
     'clipgrad'               : False,
     'pretrain'               : False,
 }
