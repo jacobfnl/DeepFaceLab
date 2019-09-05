@@ -1,8 +1,6 @@
 import numpy as np
-from keras.datasets import mnist, cifar10
 
-from models.Model_SAE2.autoencoder import Autoencoder
-from models.Model_SAE2.models import DF
+from models.Model_SAE2.networks import df_encoder, decoder, mask_decoder, df_encoder, liae_encoder, liae_interpolator
 from nnlib import nnlib
 from models import ModelBase
 from facelib import FaceType
@@ -203,26 +201,44 @@ class SAEModel2(ModelBase):
         models_list = []
         weights_to_load = []
         if 'liae' in self.options['archi']:
-            self.encoder = modelify(SAEModel2.LIAEEncFlow(resolution, ch_dims=e_ch_dims, **common_flow_kwargs))(
-                Input(bgr_shape))
+            self.encoder = liae_encoder(num_channels=3,
+                                        resolution=resolution,
+                                        ch_dims=e_ch_dims,
+                                        name='encoder')
 
             enc_output_Inputs = [Input(K.int_shape(x)[1:]) for x in self.encoder.outputs]
 
-            self.inter_B = modelify(SAEModel2.LIAEInterFlow(resolution, ae_dims=ae_dims, **common_flow_kwargs))(
-                enc_output_Inputs)
-            self.inter_AB = modelify(SAEModel2.LIAEInterFlow(resolution, ae_dims=ae_dims, **common_flow_kwargs))(
-                enc_output_Inputs)
+            self.inter_B = liae_interpolator(num_channels=3,
+                                             resolution=resolution,
+                                             ch_dims=e_ch_dims,
+                                             ae_dims=ae_dims,
+                                             name='inter_B')
+
+            self.inter_AB = liae_interpolator(num_channels=3,
+                                              resolution=resolution,
+                                              ch_dims=e_ch_dims,
+                                              ae_dims=ae_dims,
+                                              name='inter_AB')
 
             inter_output_Inputs = [Input(np.array(K.int_shape(x)[1:]) * (1, 1, 2)) for x in self.inter_B.outputs]
 
-            self.decoder = modelify(
-                SAEModel2.LIAEDecFlow(bgr_shape[2], ch_dims=d_ch_dims, multiscale_count=self.ms_count,
-                                      add_residual_blocks=d_residual_blocks, **common_flow_kwargs))(inter_output_Inputs)
+            self.decoder = decoder(num_channels=3,
+                                   resolution=resolution,
+                                   ch_dims=d_ch_dims,
+                                   ae_dims=ae_dims * 4,
+                                   add_residual_blocks=d_residual_blocks,
+                                   multiscale_count=ms_count,
+                                   name='decoder')
+
             models_list += [self.encoder, self.inter_B, self.inter_AB, self.decoder]
 
             if self.options['learn_mask']:
-                self.decoderm = modelify(SAEModel2.LIAEDecFlow(mask_shape[2], ch_dims=d_ch_dims, **common_flow_kwargs))(
-                    inter_output_Inputs)
+                self.decoderm = mask_decoder(num_channels=1,
+                                             resolution=resolution,
+                                             ch_dims=d_ch_dims,
+                                             ae_dims=ae_dims,
+                                             name='decoder_srcm')
+
                 models_list += [self.decoderm]
 
             if not self.is_first_run():
@@ -255,20 +271,48 @@ class SAEModel2(ModelBase):
                 pred_src_dstm = self.decoderm(warped_src_dst_inter_code)
 
         elif 'df' in self.options['archi']:
+            self.encoder = df_encoder(num_channels=3,
+                                   resolution=resolution,
+                                   ch_dims=e_ch_dims,
+                                   ae_dims=ae_dims,
+                                   name='encoder')
 
-            # (x_train, y_train), (x_test, y_test) = cifar10.load_data()
-            # Autoencoder().create_model(bgr_shape, mask_shape, resolution, ae_dims, e_ch_dims, d_ch_dims, self.ms_count, d_residual_blocks, x_train, x_test, **common_flow_kwargs)
-
-            self.DF = DF(bgr_shape, mask_shape, resolution, ae_dims, e_ch_dims, d_ch_dims, self.ms_count, d_residual_blocks, **common_flow_kwargs)
-            self.encoder = self.DF.encoder()
             print(self.encoder.summary())
-            self.decoder_src = self.DF.decoder(**common_flow_kwargs)
-            self.decoder_dst = self.DF.decoder(**common_flow_kwargs)
+            self.decoder_src = decoder(num_channels=3,
+                                       resolution=resolution,
+                                       ch_dims=d_ch_dims,
+                                       ae_dims=ae_dims,
+                                       add_residual_blocks=d_residual_blocks,
+                                       multiscale_count=ms_count,
+                                       name='decoder_src')
+            print(self.decoder_src.summary())
+
+            self.decoder_dst = decoder(num_channels=3,
+                                       resolution=resolution,
+                                       ch_dims=d_ch_dims,
+                                       ae_dims=ae_dims,
+                                       add_residual_blocks=d_residual_blocks,
+                                       multiscale_count=ms_count,
+                                       name='decoder_dst')
+            print(self.decoder_dst.summary())
+
             models_list += [self.encoder, self.decoder_src, self.decoder_dst]
 
             if self.options['learn_mask']:
-                self.decoder_srcm = self.DF.decoder_mask(**common_flow_kwargs)
-                self.decoder_dstm = self.DF.decoder_mask(**common_flow_kwargs)
+                self.decoder_srcm = mask_decoder(num_channels=1,
+                                                 resolution=resolution,
+                                                 ch_dims=d_ch_dims,
+                                                 ae_dims=ae_dims,
+                                                 name='decoder_srcm')
+                print(self.decoder_srcm.summary())
+
+                self.decoder_dstm = mask_decoder(num_channels=1,
+                                                 resolution=resolution,
+                                                 ch_dims=d_ch_dims,
+                                                 ae_dims=ae_dims,
+                                                 name='decoder_dstm')
+                print(self.decoder_dstm.summary())
+
                 models_list += [self.decoder_srcm, self.decoder_dstm]
 
             if not self.is_first_run():
