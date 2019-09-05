@@ -15,6 +15,7 @@ from interact import interact as io
 from nnlib import nnlib
 from samplelib import SampleGeneratorBase
 from samplelib.SampleGeneratorPingPong import PingPongOptions, Paddle
+from train import CONFIG_MODEL_BASE_OPTIONS
 from utils import Path_utils, std_utils
 from utils.cv2_utils import *
 
@@ -86,105 +87,7 @@ class ModelBase(object):
                 self.loss_history = model_data.get('loss_history', [])
                 self.sample_for_preview = model_data.get('sample_for_preview', None)
 
-        ask_override = self.is_training_mode and self.iter != 0 and io.input_in_time("Press enter in 2 seconds to"
-                                                                                     " override model settings.",
-                                                                                     5 if io.is_colab() else 2)
-
-        yn_str = {True:'y',False:'n'}
-
-        if self.iter == 0:
-            io.log_info ("\nModel first run. Enter model options as default for each run.")
-
-        if ask_enable_autobackup and (self.iter == 0 or ask_override):
-            default_autobackup = False if self.iter == 0 else self.options.get('autobackup',False)
-            self.options['autobackup'] = io.input_bool("Enable autobackup? (y/n ?:help skip:%s) : " %
-                                                       (yn_str[default_autobackup]), default_autobackup,
-                                                       help_message="Autobackup model files with preview every hour for"
-                                                                    " last 15 hours. Latest backup located in model/<>"
-                                                                    "_autobackups/01")
-        else:
-            self.options['autobackup'] = self.options.get('autobackup', False)
-
-        if ask_write_preview_history and (self.iter == 0 or ask_override):
-            default_write_preview_history = False if self.iter == 0 else self.options.get('write_preview_history',
-                                                                                          False)
-            self.options['write_preview_history'] = io.input_bool("Write preview history? (y/n ?:help skip:%s) : " %
-                                                                  (yn_str[default_write_preview_history]),
-                                                                  default_write_preview_history,
-                                                                  help_message="Preview history will be writed to"
-                                                                               " <ModelName>_history folder.")
-        else:
-            self.options['write_preview_history'] = self.options.get('write_preview_history', False)
-
-        if (self.iter == 0 or ask_override) and self.options['write_preview_history'] and io.is_support_windows():
-            choose_preview_history = io.input_bool("Choose image for the preview history?"
-                                                   " (y/n skip:%s) : " % (yn_str[False]), False)
-
-        elif (self.iter == 0 or ask_override) and self.options['write_preview_history'] and io.is_colab():
-            choose_preview_history = io.input_bool("Randomly choose new image for preview history? (y/n ?:help skip:%s)"
-                                                   ": " % (yn_str[False]), False,
-                                                   help_message="Preview image history will stay stuck with old faces"
-                                                                " if you reuse the same model on different celebs."
-                                                                " Choose no unless you are changing src/dst to a"
-                                                                " new person")
-        else:
-            choose_preview_history = False
-
-        if ask_target_iter:
-            if (self.iter == 0 or ask_override):
-                self.options['target_iter'] = max(0, io.input_int("Target iteration (skip:unlimited/default) : ", 0))
-            else:
-                self.options['target_iter'] = max(model_data.get('target_iter',0), self.options.get('target_epoch',0))
-                if 'target_epoch' in self.options:
-                    self.options.pop('target_epoch')
-
-        if ask_batch_size and (self.iter == 0 or ask_override):
-            default_batch_size = 0 if self.iter == 0 else self.options.get('batch_size',0)
-            self.options['batch_cap'] = max(0, io.input_int("Batch_size (?:help skip:%d) : " % self.options.get('batch_cap', 1),self.options.get('batch_cap', 1),
-                                                             help_message="Larger batch size is better for NN's"
-                                                                          " generalization, but it can cause Out of"
-                                                                          " Memory error. Tune this value for your"
-                                                                          " videocard manually."))
-            self.options['ping_pong'] = io.input_bool(
-                "Enable ping-pong? (y/n ?:help skip:%s) : " % yn_str[self.options.get('ping_pong', False)],
-                self.options.get('ping_pong', False),
-                help_message="Cycles batch size between 1 and chosen batch size, simulating super convergence")
-            self.options['paddle'] = self.options.get('paddle','ping')
-            if self.options.get('ping_pong',False):
-                self.options['ping_pong_iter'] = max(0, io.input_int("Ping-pong iteration (skip:1000/default) : ", 1000))
-            else:
-                self.options['batch_size'] = self.options.get('batch_cap', 1)
-
-        else:
-            self.options['batch_cap'] = self.options.get('batch_cap', 1)
-            self.options['ping_pong'] = self.options.get('ping_pong', False)
-            self.options['ping_pong_iter'] = self.options.get('ping_pong_iter',1000)
-
-        if ask_sort_by_yaw:
-            if (self.iter == 0 or ask_override):
-                default_sort_by_yaw = self.options.get('sort_by_yaw', False)
-                self.options['sort_by_yaw'] = io.input_bool("Feed faces to network sorted by yaw? (y/n ?:help skip:%s):"
-                                                            " " % (yn_str[default_sort_by_yaw]), default_sort_by_yaw,
-                                                            help_message="NN will not learn src face directions that"
-                                                                         " don't match dst face directions. Do not use "
-                                                                         "if the dst face has hair that covers the jaw")
-            else:
-                self.options['sort_by_yaw'] = self.options.get('sort_by_yaw', False)
-
-
-        if self.iter == 0 or ask_override:
-                self.options['random_flip'] = io.input_bool("Flip faces randomly? (y/n ?:help skip:y) : ", True, help_message="Predicted face will look more naturally without this option, but src faceset should cover all face directions as dst faceset.")
-
-
-        if ask_src_scale_mod:
-            if self.iter == 0:
-                self.options['src_scale_mod'] = np.clip(io.input_int("Src face scale modifier %"
-                                                                     " ( -30...30, ?:help skip:0) : ", 0,
-                                                                     help_message="If src face shape is wider than"
-                                                                                  " dst, try to decrease this value to"
-                                                                                  " get a better result."), -30, 30)
-            else:
-                self.options['src_scale_mod'] = self.options.get('src_scale_mod', 0)
+        self.options.update(CONFIG_MODEL_BASE_OPTIONS)
 
         self.autobackup = self.options.get('autobackup', False)
         if not self.autobackup and 'autobackup' in self.options:
@@ -211,8 +114,8 @@ class ModelBase(object):
         if self.src_scale_mod == 0 and 'src_scale_mod' in self.options:
             self.options.pop('src_scale_mod')
 
-        self.onInitializeOptions(self.iter == 0, ask_override)
-
+        self.onInitializeOptions(self.iter == 0, True)
+        choose_preview_history = self.options.get('choose_preview_history', False)
         self.ping_pong_options = PingPongOptions(enabled=self.options['ping_pong'],
                                                  iterations=self.ping_pong_iter,
                                                  model_iter=self.iter,

@@ -12,6 +12,7 @@ from samplelib.SampleProcessor import ColorTransferMode
 
 
 # SAE - Styled AutoEncoder
+from train import CONFIG_SAE_MODEL_OPTIONS
 
 
 class SAEModel(ModelBase):
@@ -28,133 +29,7 @@ class SAEModel(ModelBase):
 
     # override
     def onInitializeOptions(self, is_first_run, ask_override):
-        yn_str = {True: 'y', False: 'n'}
-
-        default_resolution = 128
-        default_archi = 'df'
-        default_face_type = 'f'
-
-        if is_first_run:
-            resolution = io.input_int("Resolution ( 16-1024 ?:help skip:128) : ", default_resolution,
-                                      help_message="More resolution requires more VRAM and time to train. Value will be adjusted to multiple of 16.")
-            resolution = np.clip(resolution, 16, 1024)
-            while np.modf(resolution / 16)[0] != 0.0:
-                resolution -= 1
-            self.options['resolution'] = resolution
-
-            self.options['face_type'] = io.input_str("Half or Full face? (h/f, ?:help skip:f) : ", default_face_type,
-                                                     ['h', 'f'],
-                                                     help_message="Half face has better resolution, but covers less area of cheeks.").lower()
-            self.options['learn_mask'] = io.input_bool("Learn mask? (y/n, ?:help skip:y) : ", True,
-                                                       help_message="Learning mask can help model to recognize face directions. Learn without mask can reduce model size, in this case converter forced to use 'not predicted mask' that is not smooth as predicted. Model with style values can be learned without mask and produce same quality result.")
-        else:
-            self.options['resolution'] = self.options.get('resolution', default_resolution)
-            self.options['face_type'] = self.options.get('face_type', default_face_type)
-            self.options['learn_mask'] = self.options.get('learn_mask', True)
-
-        if (is_first_run or ask_override) and 'tensorflow' in self.device_config.backend:
-            def_optimizer_mode = self.options.get('optimizer_mode', 1)
-            self.options['optimizer_mode'] = io.input_int(
-                "Optimizer mode? ( 1,2,3 ?:help skip:%d) : " % (def_optimizer_mode), def_optimizer_mode,
-                help_message="1 - no changes. 2 - allows you to train x2 bigger network consuming RAM. 3 - allows you to train x3 bigger network consuming huge amount of RAM and slower, depends on CPU power.")
-        else:
-            self.options['optimizer_mode'] = self.options.get('optimizer_mode', 1)
-
-        if is_first_run:
-            self.options['archi'] = io.input_str("AE architecture (df, liae ?:help skip:%s) : " % (default_archi),
-                                                 default_archi, ['df', 'liae'],
-                                                 help_message="'df' keeps faces more natural. 'liae' can fix overly different face shapes.").lower()  # -s version is slower, but has decreased change to collapse.
-        else:
-            self.options['archi'] = self.options.get('archi', default_archi)
-
-        default_ae_dims = 256 if 'liae' in self.options['archi'] else 512
-        default_e_ch_dims = 42
-        default_d_ch_dims = default_e_ch_dims // 2
-        def_ca_weights = False
-
-        if is_first_run:
-            self.options['ae_dims'] = np.clip(
-                io.input_int("AutoEncoder dims (1-2048 ?:help skip:%d) : " % (default_ae_dims), default_ae_dims,
-                             help_message="All face information will packed to AE dims. If amount of AE dims are not enough, then for example closed eyes will not be recognized. More dims are better, but require more VRAM. You can fine-tune model size to fit your GPU."),
-                1, 2048)
-            self.options['e_ch_dims'] = np.clip(
-                io.input_int("Encoder dims per channel (1-128 ?:help skip:%d) : " % (default_e_ch_dims),
-                             default_e_ch_dims,
-                             help_message="More encoder dims help to recognize more facial features, but require more VRAM. You can fine-tune model size to fit your GPU."),
-                1, 128)
-            default_d_ch_dims = self.options['e_ch_dims'] // 2
-            self.options['d_ch_dims'] = np.clip(
-                io.input_int("Decoder dims per channel (1-128 ?:help skip:%d) : " % (default_d_ch_dims),
-                             default_d_ch_dims,
-                             help_message="More decoder dims help to get better details, but require more VRAM. You can fine-tune model size to fit your GPU."),
-                1, 128)
-            self.options['multiscale_decoder'] = io.input_bool("Use multiscale decoder? (y/n, ?:help skip:n) : ", False,
-                                                               help_message="Multiscale decoder helps to get better details.")
-            self.options['ca_weights'] = io.input_bool(
-                "Use CA weights? (y/n, ?:help skip: %s ) : " % (yn_str[def_ca_weights]), def_ca_weights,
-                help_message="Initialize network with 'Convolution Aware' weights. This may help to achieve a higher accuracy model, but consumes a time at first run.")
-        else:
-            self.options['ae_dims'] = self.options.get('ae_dims', default_ae_dims)
-            self.options['e_ch_dims'] = self.options.get('e_ch_dims', default_e_ch_dims)
-            self.options['d_ch_dims'] = self.options.get('d_ch_dims', default_d_ch_dims)
-            self.options['multiscale_decoder'] = self.options.get('multiscale_decoder', False)
-            self.options['ca_weights'] = self.options.get('ca_weights', def_ca_weights)
-
-        default_face_style_power = 0.0
-        default_bg_style_power = 0.0
-        if is_first_run or ask_override:
-            def_pixel_loss = self.options.get('pixel_loss', False)
-            self.options['pixel_loss'] = io.input_bool(
-                "Use pixel loss? (y/n, ?:help skip: %s ) : " % (yn_str[def_pixel_loss]), def_pixel_loss,
-                help_message="Pixel loss may help to enhance fine details and stabilize face color. Use it only if quality does not improve over time. Enabling this option too early increases the chance of model collapse.")
-
-            default_face_style_power = default_face_style_power if is_first_run else self.options.get(
-                'face_style_power', default_face_style_power)
-            self.options['face_style_power'] = np.clip(
-                io.input_number("Face style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % (default_face_style_power),
-                                default_face_style_power,
-                                help_message="Learn to transfer face style details such as light and color conditions. Warning: Enable it only after 10k iters, when predicted face is clear enough to start learn style. Start from 0.1 value and check history changes. Enabling this option increases the chance of model collapse."),
-                0.0, 100.0)
-
-            default_bg_style_power = default_bg_style_power if is_first_run else self.options.get('bg_style_power',
-                                                                                                  default_bg_style_power)
-            self.options['bg_style_power'] = np.clip(
-                io.input_number("Background style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % (default_bg_style_power),
-                                default_bg_style_power,
-                                help_message="Learn to transfer image around face. This can make face more like dst. Enabling this option increases the chance of model collapse."),
-                0.0, 100.0)
-
-            default_apply_random_ct = ColorTransferMode.NONE if is_first_run else self.options.get('apply_random_ct', ColorTransferMode.NONE)
-            self.options['apply_random_ct'] = np.clip(io.input_int(
-                "Apply random color transfer to src faceset? (0) None, (1) LCT, (2) RCT, (3) RCT-c, (4) RCT-p, "
-                "(5) RCT-pc, (6) mRTC, (7) mRTC-c, (8) mRTC-p, (9) mRTC-pc ?:help skip:%s) : " % default_apply_random_ct,
-                default_apply_random_ct,
-                help_message="Increase variativity of src samples by apply LCT color transfer from random dst "
-                             "samples. It is like 'face_style' learning, but more precise color transfer and without "
-                             "risk of model collapse, also it does not require additional GPU resources, "
-                             "but the training time may be longer, due to the src faceset is becoming more diverse."),
-                ColorTransferMode.NONE, ColorTransferMode.MASKED_RCT_PAPER_CLIP)
-
-            if nnlib.device.backend != 'plaidML':  # todo https://github.com/plaidml/plaidml/issues/301
-                default_clipgrad = False if is_first_run else self.options.get('clipgrad', False)
-                self.options['clipgrad'] = io.input_bool(
-                    "Enable gradient clipping? (y/n, ?:help skip:%s) : " % (yn_str[default_clipgrad]), default_clipgrad,
-                    help_message="Gradient clipping reduces chance of model collapse, sacrificing speed of training.")
-            else:
-                self.options['clipgrad'] = False
-
-        else:
-            self.options['pixel_loss'] = self.options.get('pixel_loss', False)
-            self.options['face_style_power'] = self.options.get('face_style_power', default_face_style_power)
-            self.options['bg_style_power'] = self.options.get('bg_style_power', default_bg_style_power)
-            self.options['apply_random_ct'] = self.options.get('apply_random_ct', ColorTransferMode.NONE)
-            self.options['clipgrad'] = self.options.get('clipgrad', False)
-
-        if is_first_run:
-            self.options['pretrain'] = io.input_bool("Pretrain the model? (y/n, ?:help skip:n) : ", False,
-                                                     help_message="Pretrain the model with large amount of various faces. This technique may help to train the fake with overly different face shapes and light conditions of src/dst data. Face will be look more like a morphed. To reduce the morph effect, some model files will be initialized but not be updated after pretrain: LIAE: inter_AB.h5 DF: encoder.h5. The longer you pretrain the model the more morphed face will look. After that, save and run the training again.")
-        else:
-            self.options['pretrain'] = False
+        self.options.update(CONFIG_SAE_MODEL_OPTIONS)
 
     # override
     def onInitialize(self):

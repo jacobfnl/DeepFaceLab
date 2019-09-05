@@ -1,4 +1,3 @@
-import argparse
 import multiprocessing
 from utils import os_utils
 from mainscripts import Trainer
@@ -17,6 +16,40 @@ CONFIG_ARGS = {
 CONFIG_DEVICE_ARGS = {
     'cpu_only'               : True,
     'force_gpu_idx'          : -1,
+}
+
+CONFIG_MODEL_BASE_OPTIONS = {
+    'autobackup'             : False,
+    'write_preview_history'  : False,
+    'target_iter'            : 1000,
+    'batch_size'             : 32,
+    'batch_cap'              : 4,
+    'ping_pong'              : False,
+    'paddle'                 : 'ping',
+    'ping_pong_iter'         : 1000,
+    'sort_by_yaw'            : False,
+    'random_flip'            : True,
+    'src_scale_mod'          : 0,
+    'choose_preview_history' : False,
+}
+
+CONFIG_SAE_MODEL_OPTIONS = {
+    'resolution'             : 16,
+    'face_type'              : 'h',
+    'learn_mask'             : False,
+    'optimizer_mode'         : 1,
+    'archi'                  : 'liae',
+    'ae_dims'                : 64,
+    'e_ch_dims'              : 4,
+    'd_ch_dims'              : 2,
+    'multiscale_decoder'     : True,
+    'ca_weights'             : True,
+    'pixel_loss'             : False,
+    'face_style_power'       : 0.0,
+    'bg_style_power'         : 0.0,
+    'default_apply_random_ct': 0,
+    'clipgrad'               : False,
+    'pretrain'               : False,
 }
 
 
