@@ -1,6 +1,6 @@
 import numpy as np
 
-from models.Model_SAE2.networks import df_encoder, decoder, mask_decoder, df_encoder, liae_encoder, liae_interpolator
+from models.Model_SAE2.networks import df_encoder, liae_encoder, liae_interpolator, decoder, mask_decoder
 from nnlib import nnlib
 from models import ModelBase
 from facelib import FaceType
