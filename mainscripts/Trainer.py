@@ -244,13 +244,21 @@ def main(args, device_args):
                             max_w = int( max_w / (max_h / max_size) )
                             max_h = max_size
 
+                        min_size = 512
+                        if max_h < min_size:
+                            max_w = int( max_w / (max_h / min_size) )
+                            max_h = min_size
+
                         #make all previews size equal
                         for preview in previews[:]:
                             (preview_name, preview_rgb) = preview
                             (h, w, c) = preview_rgb.shape
-                            if h != max_h or w != max_w:
+                            if h > max_h or w > max_w:
                                 previews.remove(preview)
                                 previews.append ( (preview_name, cv2.resize(preview_rgb, (max_w, max_h))) )
+                            elif h < max_h or w < max_w:
+                                previews.remove(preview)
+                                previews.append ( (preview_name, cv2.resize(preview_rgb, (max_w, max_h), interpolation=cv2.INTER_NEAREST)) )
                         selected_preview = selected_preview % len(previews)
                         update_preview = True
                 elif op == 'close':
