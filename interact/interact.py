@@ -7,14 +7,7 @@ import types
 import cv2
 from tqdm import tqdm
 
-try:
-    import IPython #if success we are in colab
-    from IPython.display import display, clear_output
-    import PIL
-    import matplotlib.pyplot as plt
-    is_colab = True
-except:
-    is_colab = False
+is_colab = 'COLAB_GPU' in os.environ
 
 class InteractBase(object):
     EVENT_LBUTTONDOWN = 1
