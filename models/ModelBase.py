@@ -290,6 +290,9 @@ class ModelBase(object):
                     self.sample_for_preview = self.generate_next_sample()
                 self.last_sample = self.sample_for_preview
 
+        io.log_info(self.get_model_summary())
+
+    def get_model_summary(self):
         ###Generate text summary of model hyperparameters
         #Find the longest key name and value string. Used as column widths.
         width_name = max([len(k) for k in self.options.keys()] + [17]) + 1 # Single space buffer to left edge. Minimum of 17, the length of the longest static string used "Current iteration"
@@ -336,9 +339,7 @@ class ModelBase(object):
             model_summary_text += ["/!\\ Also you can disable Windows Aero Desktop to increase available VRAM."]
             model_summary_text += ["/!\\"]
 
-        model_summary_text = "\n".join (model_summary_text)
-        self.model_summary_text = model_summary_text
-        io.log_info(model_summary_text)
+        return "\n".join (model_summary_text)
 
     #overridable
     def onInitializeOptions(self, is_first_run, ask_override):
@@ -421,7 +422,7 @@ class ModelBase(object):
         self.options['batch_size'] = self.batch_size
         self.options['paddle'] = self.ping_pong_options.paddle
         summary_path = self.get_strpath_storage_for_file('summary.txt')
-        Path( summary_path ).write_text(self.model_summary_text)
+        Path( summary_path ).write_text(self.get_model_summary())
         self.onSave()
 
         model_data = {
