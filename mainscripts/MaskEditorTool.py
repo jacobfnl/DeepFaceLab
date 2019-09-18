@@ -257,7 +257,7 @@ class MaskEditor:
                 preview_images += [ np.concatenate (prev_images, axis=1) ]
 
             img = np.full ( (prh,prw, sc), (0,0,1), dtype=np.float )
-            img[border:-border,border:-border] = cv2.resize( self.img, 256 )
+            img[border:-border, border:-border] = cv2.resize(self.img, (256, 256))
 
             preview_images += [ img ]
 
@@ -333,7 +333,7 @@ def mask_editor_main(input_dir, confirmed_dir=None, skipped_dir=None, no_default
 
     if not skipped_path.exists():
         skipped_path.mkdir(parents=True)
-        
+
     if not no_default_mask:
         eyebrows_expand_mod = np.clip ( io.input_int ("Default eyebrows expand modifier? (0..400, skip:100) : ", 100), 0, 400 ) / 100.0
     else:
