@@ -88,6 +88,8 @@ modelify = nnlib.modelify
 gaussian_blur = nnlib.gaussian_blur
 style_loss = nnlib.style_loss
 dssim = nnlib.dssim
+dssim_multiscale = nnlib.dssim_multiscale
+
 
 PixelShuffler = nnlib.PixelShuffler
 SubpixelUpscaler = nnlib.SubpixelUpscaler
