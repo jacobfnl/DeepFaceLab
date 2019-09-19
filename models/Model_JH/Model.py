@@ -189,7 +189,7 @@ class JHModel(ModelBase):
     #override
     def onInitialize(self):
         exec(nnlib.import_all(), locals(), globals())
-        SAEModel.initialize_nn_functions()
+        JHModel.initialize_nn_functions()
         self.set_vram_batch_requirements({1.5:4})
 
         global resolution
@@ -231,25 +231,25 @@ class JHModel(ModelBase):
         models_list = []
         weights_to_load = []
         if 'liae' in self.options['archi']:
-            self.encoder = modelify(SAEModel.LIAEEncFlow(resolution, ch_dims=e_ch_dims, layers=layers, **common_flow_kwargs))(
+            self.encoder = modelify(JHModel.LIAEEncFlow(resolution, ch_dims=e_ch_dims, layers=layers, **common_flow_kwargs))(
                 Input(bgr_shape))
 
             enc_output_Inputs = [ Input(K.int_shape(x)[1:]) for x in self.encoder.outputs ]
 
-            self.inter_B = modelify(SAEModel.LIAEInterFlow(resolution, ae_dims=ae_dims, layers=layers, **common_flow_kwargs))(
+            self.inter_B = modelify(JHModel.LIAEInterFlow(resolution, ae_dims=ae_dims, layers=layers, **common_flow_kwargs))(
                 enc_output_Inputs)
-            self.inter_AB = modelify(SAEModel.LIAEInterFlow(resolution, ae_dims=ae_dims, layers=layers, **common_flow_kwargs))(
+            self.inter_AB = modelify(JHModel.LIAEInterFlow(resolution, ae_dims=ae_dims, layers=layers, **common_flow_kwargs))(
                 enc_output_Inputs)
 
             inter_output_Inputs = [ Input( np.array(K.int_shape(x)[1:])*(1,1,2) ) for x in self.inter_B.outputs ]
 
             self.decoder = modelify(
-                SAEModel.LIAEDecFlow(bgr_shape[2], ch_dims=d_ch_dims, add_residual_blocks=d_residual_blocks,
+                JHModel.LIAEDecFlow(bgr_shape[2], ch_dims=d_ch_dims, add_residual_blocks=d_residual_blocks,
                                      layers=layers, **common_flow_kwargs))(inter_output_Inputs)
             models_list += [self.encoder, self.inter_B, self.inter_AB, self.decoder]
 
             if self.options['learn_mask']:
-                self.decoderm = modelify(SAEModel.LIAEDecFlow(mask_shape[2], ch_dims=d_ch_dims, layers=layers, **common_flow_kwargs))(
+                self.decoderm = modelify(JHModel.LIAEDecFlow(mask_shape[2], ch_dims=d_ch_dims, layers=layers, **common_flow_kwargs))(
                     inter_output_Inputs)
                 models_list += [self.decoderm]
 
@@ -284,24 +284,24 @@ class JHModel(ModelBase):
 
         elif 'df' in self.options['archi']:
             self.encoder = modelify(
-                SAEModel.DFEncFlow(resolution, ae_dims=ae_dims, ch_dims=e_ch_dims, layers=layers, **common_flow_kwargs))(
+                JHModel.DFEncFlow(resolution, ae_dims=ae_dims, ch_dims=e_ch_dims, layers=layers, **common_flow_kwargs))(
                 Input(bgr_shape))
 
             dec_Inputs = [ Input(K.int_shape(x)[1:]) for x in self.encoder.outputs ]
 
             self.decoder_src = modelify(
-                SAEModel.DFDecFlow(bgr_shape[2], ch_dims=d_ch_dims, add_residual_blocks=d_residual_blocks,
+                JHModel.DFDecFlow(bgr_shape[2], ch_dims=d_ch_dims, add_residual_blocks=d_residual_blocks,
                                    layers=layers, **common_flow_kwargs))(dec_Inputs)
             self.decoder_dst = modelify(
-                SAEModel.DFDecFlow(bgr_shape[2], ch_dims=d_ch_dims, add_residual_blocks=d_residual_blocks,
+                JHModel.DFDecFlow(bgr_shape[2], ch_dims=d_ch_dims, add_residual_blocks=d_residual_blocks,
                                    layers=layers, **common_flow_kwargs))(dec_Inputs)
             models_list += [self.encoder, self.decoder_src, self.decoder_dst]
 
             if self.options['learn_mask']:
                 self.decoder_srcm = modelify(
-                    SAEModel.DFDecFlow(mask_shape[2], ch_dims=d_ch_dims, layers=layers, **common_flow_kwargs))(dec_Inputs)
+                    JHModel.DFDecFlow(mask_shape[2], ch_dims=d_ch_dims, layers=layers, **common_flow_kwargs))(dec_Inputs)
                 self.decoder_dstm = modelify(
-                    SAEModel.DFDecFlow(mask_shape[2], ch_dims=d_ch_dims, layers=layers, **common_flow_kwargs))(dec_Inputs)
+                    JHModel.DFDecFlow(mask_shape[2], ch_dims=d_ch_dims, layers=layers, **common_flow_kwargs))(dec_Inputs)
                 models_list += [self.decoder_srcm, self.decoder_dstm]
 
             if not self.is_first_run():
@@ -686,7 +686,7 @@ class JHModel(ModelBase):
                 x = Norm(self.norm)(x)
                 return x
 
-        SAEModel.ResidualBlock = ResidualBlock
+        JHModel.ResidualBlock = ResidualBlock
 
         def downscale (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
@@ -694,13 +694,13 @@ class JHModel(ModelBase):
 
             return func
 
-        SAEModel.downscale = downscale
+        JHModel.downscale = downscale
 
         #def downscale (dim, padding='zero', norm='', act='', **kwargs):
         #    def func(x):
         #        return BlurPool()( Norm(norm)( Act(act) (Conv2D(dim, kernel_size=5, strides=1, padding=padding)(x)) ) )
         #    return func
-        #SAEModel.downscale = downscale
+        #JHModel.downscale = downscale
 
         def upscale (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
@@ -709,7 +709,7 @@ class JHModel(ModelBase):
 
             return func
 
-        SAEModel.upscale = upscale
+        JHModel.upscale = upscale
 
         def to_bgr (output_nc, padding='zero', **kwargs):
             def func(x):
@@ -717,13 +717,13 @@ class JHModel(ModelBase):
 
             return func
 
-        SAEModel.to_bgr = to_bgr
+        JHModel.to_bgr = to_bgr
 
     @staticmethod
     def LIAEEncFlow(resolution, ch_dims, layers=4, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
-        upscale = partial(SAEModel.upscale, **kwargs)
-        downscale = partial(SAEModel.downscale, **kwargs)
+        upscale = partial(JHModel.upscale, **kwargs)
+        downscale = partial(JHModel.downscale, **kwargs)
 
         def func(input):
             dims = K.int_shape(input)[-1]*ch_dims
@@ -739,7 +739,7 @@ class JHModel(ModelBase):
     @staticmethod
     def LIAEInterFlow(resolution, ae_dims=256, layers=4, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
-        upscale = partial(SAEModel.upscale, **kwargs)
+        upscale = partial(JHModel.upscale, **kwargs)
         lowest_dense_res = resolution // (2**layers)
 
         def func(input):
@@ -755,10 +755,10 @@ class JHModel(ModelBase):
     @staticmethod
     def LIAEDecFlow(output_nc, ch_dims, add_residual_blocks=False, layers=4, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
-        upscale = partial(SAEModel.upscale, **kwargs)
-        to_bgr = partial(SAEModel.to_bgr, **kwargs)
+        upscale = partial(JHModel.upscale, **kwargs)
+        to_bgr = partial(JHModel.to_bgr, **kwargs)
         dims = output_nc * ch_dims
-        ResidualBlock = partial(SAEModel.ResidualBlock, **kwargs)
+        ResidualBlock = partial(JHModel.ResidualBlock, **kwargs)
 
         def func(input):
             x = input[0]
@@ -781,8 +781,8 @@ class JHModel(ModelBase):
     @staticmethod
     def DFEncFlow(resolution, ae_dims, ch_dims, layers=4, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
-        upscale = partial(SAEModel.upscale, **kwargs)
-        downscale = partial(SAEModel.downscale, **kwargs)#, kernel_regularizer=keras.regularizers.l2(0.0),
+        upscale = partial(JHModel.upscale, **kwargs)
+        downscale = partial(JHModel.downscale, **kwargs)#, kernel_regularizer=keras.regularizers.l2(0.0),
         lowest_dense_res = resolution // (2**layers)
 
         def func(input):
@@ -803,10 +803,10 @@ class JHModel(ModelBase):
     @staticmethod
     def DFDecFlow(output_nc, ch_dims, add_residual_blocks=False, layers=4, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
-        upscale = partial(SAEModel.upscale, **kwargs)
-        to_bgr = partial(SAEModel.to_bgr, **kwargs)
+        upscale = partial(JHModel.upscale, **kwargs)
+        to_bgr = partial(JHModel.to_bgr, **kwargs)
         dims = output_nc * ch_dims
-        ResidualBlock = partial(SAEModel.ResidualBlock, **kwargs)
+        ResidualBlock = partial(JHModel.ResidualBlock, **kwargs)
 
         def func(input):
             x = input[0]
@@ -826,4 +826,4 @@ class JHModel(ModelBase):
         return func
 
 
-Model = SAEModel
+Model = JHModel
