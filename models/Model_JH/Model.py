@@ -86,8 +86,9 @@ class JHModel(ModelBase):
             self.options['archi'] = self.options.get('archi', default_archi)
 
         default_ae_dims = 256 if 'liae' in self.options['archi'] else 512
-        default_e_ch_dims = 16
-        default_d_ch_dims = 16
+        default_enc_dims = 64
+        default_dec_dims = 64
+        default_mask_dec_dims = 8
         default_layers = 4
         def_ca_weights = False
 
@@ -96,26 +97,34 @@ class JHModel(ModelBase):
                 io.input_int("AutoEncoder dims (1-2048 ?:help skip:%d) : " % (default_ae_dims), default_ae_dims,
                              help_message="All face information will packed to AE dims. If amount of AE dims are not enough, then for example closed eyes will not be recognized. More dims are better, but require more VRAM. You can fine-tune model size to fit your GPU."),
                 1, 2048)
-            self.options['e_ch_dims'] = np.clip(
-                io.input_int("Encoder dims per channel (1-128 ?:help skip:%d) : " % (default_e_ch_dims),
-                             default_e_ch_dims,
+            self.options['enc_dims'] = np.clip(
+                io.input_int("Encoder dims (1-256 ?:help skip:%d) : " % (default_enc_dims),
+                             default_enc_dims,
                              help_message="More encoder dims help to recognize more facial features, but require more VRAM. You can fine-tune model size to fit your GPU."),
-                1, 128)
-            default_d_ch_dims = self.options['e_ch_dims'] // 2
-            self.options['d_ch_dims'] = np.clip(
-                io.input_int("Decoder dims per channel (1-128 ?:help skip:%d) : " % (default_d_ch_dims),
-                             default_d_ch_dims,
+                1, 256)
+            default_dec_dims = self.options['enc_dims']
+            self.options['dec_dims'] = np.clip(
+                io.input_int("Decoder dims (1-256 ?:help skip:%d) : " % (default_dec_dims),
+                             default_dec_dims,
                              help_message="More decoder dims help to get better details, but require more VRAM. You can fine-tune model size to fit your GPU."),
-                1, 128)
+                1, 256)
             self.options['ca_weights'] = io.input_bool(
                 "Use CA weights? (y/n, ?:help skip: %s ) : " % (yn_str[def_ca_weights]), def_ca_weights,
                 help_message="Initialize network with 'Convolution Aware' weights. This may help to achieve a higher accuracy model, but consumes a time at first run.")
         else:
             self.options['ae_dims'] = self.options.get('ae_dims', default_ae_dims)
-            self.options['e_ch_dims'] = self.options.get('e_ch_dims', default_e_ch_dims)
-            self.options['d_ch_dims'] = self.options.get('d_ch_dims', default_d_ch_dims)
+            self.options['enc_dims'] = self.options.get('enc_dims', default_enc_dims)
+            self.options['dec_dims'] = self.options.get('dec_dims', default_dec_dims)
             self.options['layers'] = self.options.get('layers', default_layers)
             self.options['ca_weights'] = self.options.get('ca_weights', def_ca_weights)
+
+        if self.options.get('learn_mask', False) and 'mask_dec_dims' not in self.options:
+            default_mask_dec_dims = self.options['dec_dims'] // 4
+            self.options['mask_dec_dims'] = np.clip(
+                io.input_int("Mask Decoder dims (1-256 ?:help skip:%d) : " % (default_mask_dec_dims),
+                             default_mask_dec_dims,
+                             help_message="More decoder dims help to get better details, but require more VRAM. You can fine-tune model size to fit your GPU."),
+                1, 256)
 
         default_face_style_power = 0.0
         default_bg_style_power = 0.0
@@ -195,8 +204,9 @@ class JHModel(ModelBase):
         global resolution
         resolution = self.options['resolution']
         ae_dims = self.options['ae_dims']
-        e_ch_dims = self.options['e_ch_dims']
-        d_ch_dims = self.options['d_ch_dims']
+        enc_dims = self.options['enc_dims']
+        dec_dims = self.options['dec_dims']
+        mask_dec_dims = self.options.get('mask_dec_dims', None)
         layers = self.options['layers']
         self.pretrain = self.options['pretrain'] = self.options.get('pretrain', False)
         if not self.pretrain:
@@ -231,7 +241,7 @@ class JHModel(ModelBase):
         models_list = []
         weights_to_load = []
         if 'liae' in self.options['archi']:
-            self.encoder = modelify(JHModel.LIAEEncFlow(resolution, dims=e_ch_dims, layers=layers, **common_flow_kwargs))(
+            self.encoder = modelify(JHModel.LIAEEncFlow(resolution, dims=enc_dims, layers=layers, **common_flow_kwargs))(
                 Input(bgr_shape))
 
             enc_output_Inputs = [ Input(K.int_shape(x)[1:]) for x in self.encoder.outputs ]
@@ -244,12 +254,12 @@ class JHModel(ModelBase):
             inter_output_Inputs = [ Input( np.array(K.int_shape(x)[1:])*(1,1,2) ) for x in self.inter_B.outputs ]
 
             self.decoder = modelify(
-                JHModel.LIAEDecFlow(bgr_shape[2], dims=d_ch_dims, add_residual_blocks=d_residual_blocks,
+                JHModel.LIAEDecFlow(bgr_shape[2], dims=dec_dims, add_residual_blocks=d_residual_blocks,
                                      layers=layers, **common_flow_kwargs))(inter_output_Inputs)
             models_list += [self.encoder, self.inter_B, self.inter_AB, self.decoder]
 
             if self.options['learn_mask']:
-                self.decoderm = modelify(JHModel.LIAEDecFlow(mask_shape[2], dims=d_ch_dims//3, layers=layers, **common_flow_kwargs))(
+                self.decoderm = modelify(JHModel.LIAEDecFlow(mask_shape[2], dims=mask_dec_dims, layers=layers, **common_flow_kwargs))(
                     inter_output_Inputs)
                 models_list += [self.decoderm]
 
@@ -284,24 +294,24 @@ class JHModel(ModelBase):
 
         elif 'df' in self.options['archi']:
             self.encoder = modelify(
-                JHModel.DFEncFlow(resolution, ae_dims=ae_dims, dims=e_ch_dims, layers=layers, **common_flow_kwargs))(
+                JHModel.DFEncFlow(resolution, ae_dims=ae_dims, dims=enc_dims, layers=layers, **common_flow_kwargs))(
                 Input(bgr_shape))
 
             dec_Inputs = [ Input(K.int_shape(x)[1:]) for x in self.encoder.outputs ]
 
             self.decoder_src = modelify(
-                JHModel.DFDecFlow(bgr_shape[2], dims=d_ch_dims, add_residual_blocks=d_residual_blocks,
+                JHModel.DFDecFlow(bgr_shape[2], dims=dec_dims, add_residual_blocks=d_residual_blocks,
                                    layers=layers, **common_flow_kwargs))(dec_Inputs)
             self.decoder_dst = modelify(
-                JHModel.DFDecFlow(bgr_shape[2], dims=d_ch_dims, add_residual_blocks=d_residual_blocks,
+                JHModel.DFDecFlow(bgr_shape[2], dims=dec_dims, add_residual_blocks=d_residual_blocks,
                                    layers=layers, **common_flow_kwargs))(dec_Inputs)
             models_list += [self.encoder, self.decoder_src, self.decoder_dst]
 
             if self.options['learn_mask']:
                 self.decoder_srcm = modelify(
-                    JHModel.DFDecFlow(mask_shape[2], dims=d_ch_dims//3, layers=layers, **common_flow_kwargs))(dec_Inputs)
+                    JHModel.DFDecFlow(mask_shape[2], dims=mask_dec_dims, layers=layers, **common_flow_kwargs))(dec_Inputs)
                 self.decoder_dstm = modelify(
-                    JHModel.DFDecFlow(mask_shape[2], dims=d_ch_dims//3, layers=layers, **common_flow_kwargs))(dec_Inputs)
+                    JHModel.DFDecFlow(mask_shape[2], dims=mask_dec_dims, layers=layers, **common_flow_kwargs))(dec_Inputs)
                 models_list += [self.decoder_srcm, self.decoder_dstm]
 
             if not self.is_first_run():
