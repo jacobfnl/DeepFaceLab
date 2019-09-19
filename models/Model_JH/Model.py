@@ -725,7 +725,7 @@ class JHModel(ModelBase):
 
             return func
 
-        JHModel.to_bgr = to_bgr
+        JHModel.from_bgr = from_bgr
 
 
     @staticmethod
