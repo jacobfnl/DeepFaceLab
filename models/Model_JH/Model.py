@@ -86,7 +86,7 @@ class JHModel(ModelBase):
             self.options['archi'] = self.options.get('archi', default_archi)
 
         default_ae_dims = 256 if 'liae' in self.options['archi'] else 512
-        default_e_ch_dims = 42
+        default_e_ch_dims = 64
         default_d_ch_dims = default_e_ch_dims // 2
         default_layers = 4
         def_ca_weights = False
@@ -711,26 +711,35 @@ class JHModel(ModelBase):
 
         JHModel.upscale = upscale
 
-        def to_bgr (output_nc, padding='zero', **kwargs):
+        def to_bgr(output_nc, padding='zero', **kwargs):
             def func(x):
-                return Conv2D(output_nc, kernel_size=5, padding=padding, activation='sigmoid')(x)
+                return Conv2D(output_nc, kernel_size=1, padding=padding, activation='linear')(x)
 
             return func
 
         JHModel.to_bgr = to_bgr
+
+        def from_bgr(dims, padding='zero', act='', **kwargs):
+            def func(x):
+                return Act(act)(Conv2D(dims, kernel_size=1, padding=padding, activation='linear')(x))
+
+            return func
+
+        JHModel.to_bgr = to_bgr
+
 
     @staticmethod
     def LIAEEncFlow(resolution, ch_dims, layers=4, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
         upscale = partial(JHModel.upscale, **kwargs)
         downscale = partial(JHModel.downscale, **kwargs)
+        from_bgr = partial(JHModel.from_bgr, **kwargs)
 
         def func(input):
-            dims = K.int_shape(input)[-1]*ch_dims
-
             x = input
+            x = from_bgr(ch_dims)(x)
             for i in range(layers):
-                x = downscale(dims * 2**i)(x)
+                x = downscale(ch_dims * 2**i)(x)
             x = Flatten()(x)
             return x
 
@@ -783,14 +792,14 @@ class JHModel(ModelBase):
         exec (nnlib.import_all(), locals(), globals())
         upscale = partial(JHModel.upscale, **kwargs)
         downscale = partial(JHModel.downscale, **kwargs)#, kernel_regularizer=keras.regularizers.l2(0.0),
+        from_bgr = partial(JHModel.from_bgr, **kwargs)
         lowest_dense_res = resolution // (2**layers)
 
         def func(input):
             x = input
-
-            dims = K.int_shape(input)[-1]*ch_dims
+            x = from_bgr(ch_dims)(x)
             for i in range(layers):
-                x = downscale(dims * 2**i)(x)
+                x = downscale(ch_dims * 2**i)(x)
 
             x = Dense(ae_dims)(Flatten()(x))
             x = Dense(lowest_dense_res * lowest_dense_res * ae_dims)(x)
