@@ -692,7 +692,7 @@ class JHModel(ModelBase):
             def func(x):
                 x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
                 x = Act(act)(Conv2D(dim * 2, kernel_size=3, strides=1, padding=padding)(x))
-                x = AveragePooling2D(x)
+                x = AveragePooling2D()(x)
                 return x
 
             return func
@@ -707,7 +707,7 @@ class JHModel(ModelBase):
 
         def upscale (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
-                x = UpSampling2D(x)
+                x = UpSampling2D()(x)
                 x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
                 x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
                 return x
