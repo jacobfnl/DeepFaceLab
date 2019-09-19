@@ -339,6 +339,23 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
 
         nnlib.dssim = dssim
 
+        class dssim_multiscale(object):
+            _MSSSIM_WEIGHTS = (0.0448, 0.2856, 0.3001, 0.2363, 0.1333)
+
+            def __init__(self, kernel_size=11, k1=0.01, k2=0.03, max_value=1.0, power_factors=_MSSSIM_WEIGHTS):
+                self.dssim = dssim(kernel_size, k1, k2, max_value)
+                self.power_factors = power_factors
+
+            def __call__(self, y_true, y_pred):
+                loss = 0.0
+                im_size = K.shape(y_pred)[-2]
+                for i, weight in enumerate(self.power_factors):
+                    size = im_size / (i ** 2)
+                    loss += weight * self.dssim(K.resize_images(y_true, size), K.resize_images(y_pred, size))
+                return loss
+
+        nnlib.dssim_multiscale = dssim_multiscale
+
         if 'tensorflow' in backend:
             class PixelShuffler(keras.layers.Layer):
                 def __init__(self, size=(2, 2),  data_format='channels_last', **kwargs):
