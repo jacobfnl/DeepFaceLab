@@ -413,7 +413,7 @@ class JHModel(ModelBase):
                     src_dst_mask_loss_train_weights = self.encoder.trainable_weights + self.decoder_srcm.trainable_weights + self.decoder_dstm.trainable_weights
 
             if self.options['multiscale_loss']:
-                src_loss_batch = sum([10 * dssim_multiscale(kernel_size=int(resolution / 11.6), max_value=1.0)(
+                src_loss_batch = sum([10 * dssim_multiscale(max_value=1.0)(
                     target_src_masked_ar_opt[i], pred_src_src_masked_ar_opt[i]) for i in
                                       range(len(target_src_masked_ar_opt))])
             elif not self.options['pixel_loss']:
@@ -436,7 +436,7 @@ class JHModel(ModelBase):
             bg_style_power = self.options['bg_style_power'] / 100.0
             if bg_style_power != 0:
                 if self.options['multiscale_loss']:
-                    bg_loss = K.mean((10 * bg_style_power) * dssim_multiscale(kernel_size=int(resolution / 11.6), max_value=1.0)(
+                    bg_loss = K.mean((10 * bg_style_power) * dssim_multiscale(max_value=1.0)(
                         psd_target_dst_anti_masked_ar[-1], target_dst_anti_masked_ar[-1]))
                 elif not self.options['pixel_loss']:
                     bg_loss = K.mean((10 * bg_style_power) * dssim(kernel_size=int(resolution / 11.6), max_value=1.0)(
@@ -447,7 +447,7 @@ class JHModel(ModelBase):
                 src_loss += bg_loss
 
             if self.options['multiscale_loss']:
-                dst_loss_batch = sum([10 * dssim_multiscale(kernel_size=int(resolution / 11.6), max_value=1.0)(
+                dst_loss_batch = sum([10 * dssim_multiscale(max_value=1.0)(
                     target_dst_masked_ar_opt[i], pred_dst_dst_masked_ar_opt[i]) for i in
                                       range(len(target_dst_masked_ar_opt))])
             elif not self.options['pixel_loss']:
