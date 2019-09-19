@@ -86,8 +86,8 @@ class JHModel(ModelBase):
             self.options['archi'] = self.options.get('archi', default_archi)
 
         default_ae_dims = 256 if 'liae' in self.options['archi'] else 512
-        default_e_ch_dims = 64
-        default_d_ch_dims = default_e_ch_dims // 2
+        default_e_ch_dims = 16
+        default_d_ch_dims = 16
         default_layers = 4
         def_ca_weights = False
 
@@ -690,7 +690,10 @@ class JHModel(ModelBase):
 
         def downscale (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
-                return Norm(norm)( Act(act) (Conv2D(dim, kernel_size=5, strides=2, padding=padding)(x)) )
+                x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
+                x = Act(act)(Conv2D(dim * 2, kernel_size=3, strides=1, padding=padding)(x))
+                x = AveragePooling2D(x)
+                return x
 
             return func
 
@@ -704,8 +707,10 @@ class JHModel(ModelBase):
 
         def upscale (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
-                return SubpixelUpscaler()(
-                    Norm(norm)(Act(act)(Conv2D(dim * 4, kernel_size=3, strides=1, padding=padding)(x))))
+                x = UpSampling2D(x)
+                x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
+                x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
+                return x
 
             return func
 

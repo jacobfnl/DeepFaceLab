@@ -56,6 +56,7 @@ Conv2DTranspose = nnlib.Conv2DTranspose
 EqualConv2D = nnlib.EqualConv2D
 SeparableConv2D = KL.SeparableConv2D
 MaxPooling2D = KL.MaxPooling2D
+AveragePooling2D = KL.AveragePooling2D
 UpSampling2D = KL.UpSampling2D
 BatchNormalization = KL.BatchNormalization
 PixelNormalization = nnlib.PixelNormalization
@@ -693,7 +694,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
         nnlib.Adam = Adam
 
         def CAInitializerMP( conv_weights_list ):
-            #Convolution Aware Initialization https://arxiv.org/abs/1702.06295            
+            #Convolution Aware Initialization https://arxiv.org/abs/1702.06295
             data = [ (i, K.int_shape(conv_weights)) for i, conv_weights in enumerate(conv_weights_list) ]
             data = sorted(data, key=lambda data: np.prod(data[1]) )
             result = CAInitializerMPSubprocessor (data, K.floatx(), K.image_data_format() ).run()
@@ -823,8 +824,8 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 return self.func(x)
 
         nnlib.Conv2DTranspose = Conv2DTranspose
-        
-        class EqualConv2D(KL.Conv2D):            
+
+        class EqualConv2D(KL.Conv2D):
             def __init__(self, filters,
                         kernel_size,
                         strides=(1, 1),
@@ -853,16 +854,16 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                     bias_constraint=None,
                     **kwargs)
                 self.gain = gain
-                
+
             def build(self, input_shape):
                 super().build(input_shape)
-                
+
                 self.wscale = self.gain / np.sqrt( np.prod( K.int_shape(self.kernel)[:-1]) )
                 self.wscale_t = K.constant (self.wscale, dtype=K.floatx() )
-       
+
             def call(self, inputs):
                 k = self.kernel * self.wscale_t
-                
+
                 outputs = K.conv2d(
                         inputs,
                         k,
@@ -881,12 +882,12 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                     return self.activation(outputs)
                 return outputs
         nnlib.EqualConv2D = EqualConv2D
-        
+
         class PixelNormalization(KL.Layer):
             # initialize the layer
             def __init__(self, **kwargs):
                 super(PixelNormalization, self).__init__(**kwargs)
-        
+
             # perform the operation
             def call(self, inputs):
                 # calculate square pixel values
@@ -900,12 +901,12 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 # normalize values by the l2 norm
                 normalized = inputs / l2
                 return normalized
-        
+
             # define the output shape of the layer
             def compute_output_shape(self, input_shape):
-                return input_shape                
+                return input_shape
         nnlib.PixelNormalization = PixelNormalization
-        
+
     @staticmethod
     def import_keras_contrib(device_config):
         if nnlib.keras_contrib is not None:
