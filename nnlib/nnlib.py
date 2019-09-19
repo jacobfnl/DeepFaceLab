@@ -350,10 +350,11 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
 
             def __call__(self, y_true, y_pred):
                 loss = 0.0
-                im_size = K.shape(y_pred)[-2]
+                # im_size = K.shape(y_pred)[-2]
                 for i, weight in enumerate(self.power_factors):
-                    size = im_size / (i ** 2)
-                    loss += weight * self.dssim(K.resize_images(y_true, size), K.resize_images(y_pred, size))
+                    size = 2**i
+                    loss += weight * self.dssim(K.pool2d(y_true, (size, size), strides=(size, size), pool_mode='avg'),
+                                                K.pool2d(y_true, (size, size), strides=(size, size), pool_mode='avg'))
                 return loss
 
         nnlib.dssim_multiscale = dssim_multiscale
