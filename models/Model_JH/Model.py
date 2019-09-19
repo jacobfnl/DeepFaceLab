@@ -119,7 +119,7 @@ class JHModel(ModelBase):
             self.options['ca_weights'] = self.options.get('ca_weights', def_ca_weights)
 
         if self.options.get('learn_mask', False) and 'mask_dec_dims' not in self.options:
-            default_mask_dec_dims = self.options['dec_dims'] // 8
+            default_mask_dec_dims = self.options['dec_dims'] // 4
             self.options['mask_dec_dims'] = np.clip(
                 io.input_int("Mask Decoder dims (1-256 ?:help skip:%d) : " % (default_mask_dec_dims),
                              default_mask_dec_dims,
