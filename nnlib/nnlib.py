@@ -354,7 +354,6 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
 
             def __call__(self, y_true, y_pred):
                 if nnlib.tf is not None:
-                    io.log_info('Using tf.image.ssim_multiscale')
                     return nnlib.tf.image.ssim_multiscale(y_true, y_pred, self.max_value,
                                                           power_factors=self.power_factors,
                                                           filter_size=self.kernel_size,
