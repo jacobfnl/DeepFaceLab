@@ -134,6 +134,11 @@ class JHModel(ModelBase):
                 "Use multiscale loss? (y/n, ?:help skip: %s ) : " % (yn_str[default_multiscale_loss]), default_multiscale_loss,
                 help_message="")
 
+            def_abs_loss = self.options.get('abs_loss', False)
+            self.options['abs_loss'] = io.input_bool(
+                "Use absolute loss (L1 norm)? (y/n, ?:help skip: %s ) : " % (yn_str[def_abs_loss]), def_abs_loss,
+                help_message="")
+
             def_pixel_loss = self.options.get('pixel_loss', False)
             self.options['pixel_loss'] = io.input_bool(
                 "Use pixel loss? (y/n, ?:help skip: %s ) : " % (yn_str[def_pixel_loss]), def_pixel_loss,
@@ -193,6 +198,7 @@ class JHModel(ModelBase):
 
         else:
             self.options['multiscale_loss'] = self.options.get('multiscale_loss', True)
+            self.options['abs_loss'] = self.options.get('abs_loss', False)
             self.options['pixel_loss'] = self.options.get('pixel_loss', False)
             self.options['face_style_power'] = self.options.get('face_style_power', default_face_style_power)
             self.options['bg_style_power'] = self.options.get('bg_style_power', default_bg_style_power)
@@ -416,6 +422,10 @@ class JHModel(ModelBase):
                 src_loss_batch = sum([10 * dssim_multiscale(max_value=1.0)(
                     target_src_masked_ar_opt[i], pred_src_src_masked_ar_opt[i]) for i in
                                       range(len(target_src_masked_ar_opt))])
+            elif self.options['abs_loss']:
+                src_loss_batch = sum(
+                    [K.mean(50 * K.abs(target_src_masked_ar_opt[i] - pred_src_src_masked_ar_opt[i]), axis=[1, 2, 3])
+                     for i in range(len(target_src_masked_ar_opt))])
             elif not self.options['pixel_loss']:
                 src_loss_batch = sum([10 * dssim(kernel_size=int(resolution / 11.6), max_value=1.0)(
                     target_src_masked_ar_opt[i], pred_src_src_masked_ar_opt[i]) for i in
@@ -438,6 +448,9 @@ class JHModel(ModelBase):
                 if self.options['multiscale_loss']:
                     bg_loss = K.mean((10 * bg_style_power) * dssim_multiscale(max_value=1.0)(
                         psd_target_dst_anti_masked_ar[-1], target_dst_anti_masked_ar[-1]))
+                elif self.options['abs_loss']:
+                    bg_loss = K.mean((50 * bg_style_power) * K.abs(
+                        psd_target_dst_anti_masked_ar[-1] - target_dst_anti_masked_ar[-1]))
                 elif not self.options['pixel_loss']:
                     bg_loss = K.mean((10 * bg_style_power) * dssim(kernel_size=int(resolution / 11.6), max_value=1.0)(
                         psd_target_dst_anti_masked_ar[-1], target_dst_anti_masked_ar[-1]))
@@ -450,6 +463,10 @@ class JHModel(ModelBase):
                 dst_loss_batch = sum([10 * dssim_multiscale(max_value=1.0)(
                     target_dst_masked_ar_opt[i], pred_dst_dst_masked_ar_opt[i]) for i in
                                       range(len(target_dst_masked_ar_opt))])
+            elif self.options['abs_loss']:
+                dst_loss_batch = sum(
+                    [K.mean(50 * K.abs(target_dst_masked_ar_opt[i] - pred_dst_dst_masked_ar_opt[i]), axis=[1, 2, 3])
+                     for i in range(len(target_dst_masked_ar_opt))])
             elif not self.options['pixel_loss']:
                 dst_loss_batch = sum([10 * dssim(kernel_size=int(resolution / 11.6), max_value=1.0)(
                     target_dst_masked_ar_opt[i], pred_dst_dst_masked_ar_opt[i]) for i in
