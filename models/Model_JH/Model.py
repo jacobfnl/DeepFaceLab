@@ -754,8 +754,8 @@ class JHModel(ModelBase):
             def func(x):
                 # x = UpSampling2D()(x)
                 # x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
-                x = Act(act)(Conv2DTranspose(dim, kernel_size=3, strides=2, padding=padding)(x))
-                x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2DTranspose(dim, kernel_size=3, strides=2, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
                 return x
 
             return func
@@ -764,7 +764,7 @@ class JHModel(ModelBase):
 
         def to_bgr(output_nc, padding='zero', **kwargs):
             def func(x):
-                return Conv2D(output_nc, kernel_size=1, padding=padding, activation='linear')(x)
+                return Conv2D(output_nc, kernel_size=1, padding=padding)(x)
 
             return func
 
@@ -772,7 +772,7 @@ class JHModel(ModelBase):
 
         def from_bgr(dims, padding='zero', act='', **kwargs):
             def func(x):
-                return Act(act)(Conv2D(dims, kernel_size=1, padding=padding, activation='linear')(x))
+                return Act(act, lrelu_alpha=0.2)(Conv2D(dims, kernel_size=1, padding=padding)(x))
 
             return func
 
