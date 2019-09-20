@@ -345,10 +345,19 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
             _MSSSIM_WEIGHTS = (0.0448, 0.2856, 0.3001, 0.2363, 0.1333)
 
             def __init__(self, kernel_size=11, k1=0.01, k2=0.03, max_value=1.0, power_factors=_MSSSIM_WEIGHTS):
+                self.kernel_size = kernel_size
+                self.k1 = k1
+                self.k2 = k2
+                self.max_value = max_value
                 self.dssim = dssim(kernel_size, k1, k2, max_value)
                 self.power_factors = power_factors
 
             def __call__(self, y_true, y_pred):
+                if nnlib.tf is not None:
+                    return nnlib.tf.image.ssim_multiscale(y_true, y_pred, self.max_value,
+                                                          power_factors=self.power_factors,
+                                                          filter_size=self.kernel_size,
+                                                          k1=self.k1, k2=self.k2)
                 loss = 0.0
                 # im_size = K.shape(y_pred)[-2]
                 for i, weight in enumerate(self.power_factors):
