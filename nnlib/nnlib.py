@@ -354,10 +354,11 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
 
             def __call__(self, y_true, y_pred):
                 if nnlib.tf is not None:
-                    return nnlib.tf.image.ssim_multiscale(y_true, y_pred, self.max_value,
+                    mssim_val = K.mean(nnlib.tf.image.ssim_multiscale(y_true, y_pred, self.max_value,
                                                           power_factors=self.power_factors,
                                                           filter_size=self.kernel_size,
-                                                          k1=self.k1, k2=self.k2)
+                                                          k1=self.k1, k2=self.k2))
+                    return(1.0 - mssim_val) / 2.0
                 loss = 0.0
                 # im_size = K.shape(y_pred)[-2]
                 for i, weight in enumerate(self.power_factors):
