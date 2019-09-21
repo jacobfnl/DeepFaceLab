@@ -758,7 +758,7 @@ class JHModel(ModelBase):
 
             return func
 
-        JHModel.downscale = downscale_v2
+        JHModel.downscale_v2 = downscale_v2
 
         def upscale (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
@@ -783,7 +783,7 @@ class JHModel(ModelBase):
 
             return func
 
-        JHModel.upscale = upscale_v2
+        JHModel.upscale_v2 = upscale_v2
 
         def to_bgr(output_nc, padding='zero', **kwargs):
             def func(x):
