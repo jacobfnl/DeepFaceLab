@@ -347,6 +347,8 @@ class JHModel(ModelBase):
                 pred_dst_dstm = self.decoder_dstm(warped_dst_code)
                 pred_src_dstm = self.decoder_srcm(warped_dst_code)
 
+        for model in models_list:
+            print(model.summary())
         if self.is_first_run():
             if self.options.get('ca_weights',False):
                 conv_weights_list = []
