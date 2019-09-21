@@ -737,6 +737,18 @@ class JHModel(ModelBase):
 
         def downscale (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
+                x = Act(act, lrelu_alpha=0.2)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2D(dim * 2, kernel_size=3, strides=2, padding=padding)(x))
+                # x = Act(act)(Conv2D(dim * 2, kernel_size=3, strides=1, padding=padding)(x))
+                # x = AveragePooling2D()(x)
+                return x
+
+            return func
+
+        JHModel.downscale = downscale
+
+        def downscale_v2 (dim, padding='zero', norm='', act='', **kwargs):
+            def func(x):
                 x = Act(act, lrelu_alpha=0.2)(Conv2D(dim, kernel_size=5, strides=1, padding=padding)(x))
                 x = Act(act, lrelu_alpha=0.2)(Conv2D(dim * 2, kernel_size=1, strides=1, padding=padding)(x))
                 x = Act(act, lrelu_alpha=0.2)(Conv2D(dim * 2, kernel_size=9, strides=2, padding=padding)(x))
@@ -746,15 +758,21 @@ class JHModel(ModelBase):
 
             return func
 
-        JHModel.downscale = downscale
-
-        #def downscale (dim, padding='zero', norm='', act='', **kwargs):
-        #    def func(x):
-        #        return BlurPool()( Norm(norm)( Act(act) (Conv2D(dim, kernel_size=5, strides=1, padding=padding)(x)) ) )
-        #    return func
-        #JHModel.downscale = downscale
+        JHModel.downscale = downscale_v2
 
         def upscale (dim, padding='zero', norm='', act='', **kwargs):
+            def func(x):
+                # x = UpSampling2D()(x)
+                # x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2DTranspose(dim * 2, kernel_size=3, strides=2, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
+                return x
+
+            return func
+
+        JHModel.upscale = upscale
+
+        def upscale_v2 (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
                 # x = UpSampling2D()(x)
                 # x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
@@ -765,7 +783,7 @@ class JHModel(ModelBase):
 
             return func
 
-        JHModel.upscale = upscale
+        JHModel.upscale = upscale_v2
 
         def to_bgr(output_nc, padding='zero', **kwargs):
             def func(x):
@@ -789,13 +807,17 @@ class JHModel(ModelBase):
         exec (nnlib.import_all(), locals(), globals())
         upscale = partial(JHModel.upscale, **kwargs)
         downscale = partial(JHModel.downscale, **kwargs)
+        downscale_v2 = partial(JHModel.downscale_v2, **kwargs)
         from_bgr = partial(JHModel.from_bgr, **kwargs)
 
         def func(input):
             x = input
             x = from_bgr(dims)(x)
             for i in range(layers):
-                x = downscale(dims * 2**i)(x)
+                if i == layers - 1:
+                    x = downscale_v2(dims * 2**i)(x)
+                else:
+                    x = downscale(dims * 2**i)(x)
             x = Flatten()(x)
             return x
 
@@ -821,6 +843,7 @@ class JHModel(ModelBase):
     def LIAEDecFlow(output_nc, dims, add_residual_blocks=False, layers=4, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
         upscale = partial(JHModel.upscale, **kwargs)
+        upscale_v2 = partial(JHModel.upscale_v2, **kwargs)
         to_bgr = partial(JHModel.to_bgr, **kwargs)
         ResidualBlock = partial(JHModel.ResidualBlock, **kwargs)
 
@@ -830,7 +853,10 @@ class JHModel(ModelBase):
             outputs = []
 
             for i in range(layers-1, 0, -1):
-                x = upscale(dims * 2**i)(x)
+                if i == 1:
+                    x = upscale_v2(dims * 2**i)(x)
+                else:
+                    x = upscale(dims * 2**i)(x)
 
                 if add_residual_blocks:
                     x = ResidualBlock(dims * 2**i)(x)
@@ -846,7 +872,8 @@ class JHModel(ModelBase):
     def DFEncFlow(resolution, ae_dims, dims, layers=4, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
         upscale = partial(JHModel.upscale, **kwargs)
-        downscale = partial(JHModel.downscale, **kwargs)#, kernel_regularizer=keras.regularizers.l2(0.0),
+        downscale = partial(JHModel.downscale, **kwargs)
+        downscale_v2 = partial(JHModel.downscale_v2, **kwargs)
         from_bgr = partial(JHModel.from_bgr, **kwargs)
         lowest_dense_res = resolution // (2**layers)
 
@@ -854,7 +881,10 @@ class JHModel(ModelBase):
             x = input
             x = from_bgr(dims)(x)
             for i in range(layers):
-                x = downscale(dims * 2**i)(x)
+                if i == layers - 1:
+                    x = downscale_v2(dims * 2**i)(x)
+                else:
+                    x = downscale(dims * 2**i)(x)
 
             x = Dense(ae_dims)(Flatten()(x))
             x = Dense(lowest_dense_res * lowest_dense_res * ae_dims)(x)
@@ -868,6 +898,7 @@ class JHModel(ModelBase):
     def DFDecFlow(output_nc, dims, add_residual_blocks=False, layers=4, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
         upscale = partial(JHModel.upscale, **kwargs)
+        upscale_v2 = partial(JHModel.upscale_v2, **kwargs)
         to_bgr = partial(JHModel.to_bgr, **kwargs)
         ResidualBlock = partial(JHModel.ResidualBlock, **kwargs)
 
@@ -876,7 +907,10 @@ class JHModel(ModelBase):
 
             outputs = []
             for i in range(layers-1, 0, -1):
-                x = upscale(dims * 2**i)(x)
+                if i == 1:
+                    x = upscale_v2(dims * 2**i)(x)
+                else:
+                    x = upscale(dims * 2**i)(x)
 
                 if add_residual_blocks:
                     x = ResidualBlock(dims * 2**i)(x)
