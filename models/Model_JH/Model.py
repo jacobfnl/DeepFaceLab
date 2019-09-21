@@ -30,6 +30,7 @@ class JHModel(ModelBase):
         yn_str = {True:'y',False:'n'}
 
         default_layers = 4
+        default_super_res_layers = 2
         default_resolution = 128
         default_archi = 'df'
         default_face_type = 'f'
@@ -41,7 +42,13 @@ class JHModel(ModelBase):
                              default_layers,
                              help_message="Controls the depth of network, increasing this will result in more "
                                           "convolutional layers, but a smaller fully connected (dense) layer"),
-                0, 7)
+                0, 8)
+
+            self.options['super_res_layers'] = np.clip(
+                io.input_int(f"Number of upscaling/downscaling layers? (0-{self.options['layers']} ?:help skip:{default_super_res_layers}) : ",
+                             default_super_res_layers,
+                             help_message=""),
+                0, self.options['layers'])
 
             default_resolution = 2 ** (self.options['layers'] + 3)
             resolution = io.input_int(f"Resolution ( 16-1024 ?:help skip:{default_resolution}) : ", default_resolution,
@@ -56,6 +63,7 @@ class JHModel(ModelBase):
                                                      help_message="Half face has better resolution, but covers less area of cheeks.").lower()
         else:
             self.options['layers'] = self.options.get('layers', default_layers)
+            self.options['super_res_layers'] = self.options.get('super_res_layers', default_super_res_layers)
             self.options['resolution'] = self.options.get('resolution', default_resolution)
             self.options['face_type'] = self.options.get('face_type', default_face_type)
 
@@ -220,6 +228,7 @@ class JHModel(ModelBase):
         dec_dims = self.options['dec_dims']
         mask_dec_dims = self.options.get('mask_dec_dims', None)
         layers = self.options['layers']
+        super_res_layers = self.options['super_res_layers']
         self.pretrain = self.options['pretrain'] = self.options.get('pretrain', False)
         if not self.pretrain:
             self.options.pop('pretrain')
@@ -803,7 +812,7 @@ class JHModel(ModelBase):
 
 
     @staticmethod
-    def LIAEEncFlow(resolution, dims, layers=4, **kwargs):
+    def LIAEEncFlow(resolution, dims, layers=4, sr_layers=2, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
         upscale = partial(JHModel.upscale, **kwargs)
         downscale = partial(JHModel.downscale, **kwargs)
@@ -814,7 +823,7 @@ class JHModel(ModelBase):
             x = input
             x = from_bgr(dims)(x)
             for i in range(layers):
-                if i == layers - 1:
+                if i < sr_layers:
                     x = downscale_v2(dims * 2**i)(x)
                 else:
                     x = downscale(dims * 2**i)(x)
@@ -840,7 +849,7 @@ class JHModel(ModelBase):
         return func
 
     @staticmethod
-    def LIAEDecFlow(output_nc, dims, add_residual_blocks=False, layers=4, **kwargs):
+    def LIAEDecFlow(output_nc, dims, add_residual_blocks=False, layers=4, sr_layers=2, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
         upscale = partial(JHModel.upscale, **kwargs)
         upscale_v2 = partial(JHModel.upscale_v2, **kwargs)
@@ -853,7 +862,7 @@ class JHModel(ModelBase):
             outputs = []
 
             for i in range(layers-1, 0, -1):
-                if i == 1:
+                if i <= sr_layers:
                     x = upscale_v2(dims * 2**i)(x)
                 else:
                     x = upscale(dims * 2**i)(x)
@@ -869,7 +878,7 @@ class JHModel(ModelBase):
         return func
 
     @staticmethod
-    def DFEncFlow(resolution, ae_dims, dims, layers=4, **kwargs):
+    def DFEncFlow(resolution, ae_dims, dims, layers=4, sr_layers=2, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
         upscale = partial(JHModel.upscale, **kwargs)
         downscale = partial(JHModel.downscale, **kwargs)
@@ -881,7 +890,7 @@ class JHModel(ModelBase):
             x = input
             x = from_bgr(dims)(x)
             for i in range(layers):
-                if i == layers - 1:
+                if i < sr_layers:
                     x = downscale_v2(dims * 2**i)(x)
                 else:
                     x = downscale(dims * 2**i)(x)
@@ -895,7 +904,7 @@ class JHModel(ModelBase):
         return func
 
     @staticmethod
-    def DFDecFlow(output_nc, dims, add_residual_blocks=False, layers=4, **kwargs):
+    def DFDecFlow(output_nc, dims, add_residual_blocks=False, layers=4, sr_layers=2, **kwargs):
         exec (nnlib.import_all(), locals(), globals())
         upscale = partial(JHModel.upscale, **kwargs)
         upscale_v2 = partial(JHModel.upscale_v2, **kwargs)
@@ -907,7 +916,7 @@ class JHModel(ModelBase):
 
             outputs = []
             for i in range(layers-1, 0, -1):
-                if i == 1:
+                if i <= sr_layers:
                     x = upscale_v2(dims * 2**i)(x)
                 else:
                     x = upscale(dims * 2**i)(x)
