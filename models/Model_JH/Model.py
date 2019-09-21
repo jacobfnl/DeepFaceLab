@@ -734,8 +734,9 @@ class JHModel(ModelBase):
 
         def downscale (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
-                x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
-                x = Act(act)(Conv2D(dim * 2, kernel_size=3, strides=2, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2D(dim, kernel_size=5, strides=1, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2D(dim * 2, kernel_size=1, strides=1, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2D(dim * 2, kernel_size=9, strides=2, padding=padding)(x))
                 # x = Act(act)(Conv2D(dim * 2, kernel_size=3, strides=1, padding=padding)(x))
                 # x = AveragePooling2D()(x)
                 return x
@@ -754,8 +755,9 @@ class JHModel(ModelBase):
             def func(x):
                 # x = UpSampling2D()(x)
                 # x = Act(act)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
-                x = Act(act, lrelu_alpha=0.2)(Conv2DTranspose(dim, kernel_size=3, strides=2, padding=padding)(x))
-                x = Act(act, lrelu_alpha=0.2)(Conv2D(dim, kernel_size=3, strides=1, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2DTranspose(dim * 2, kernel_size=9, strides=2, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2D(dim, kernel_size=1, strides=1, padding=padding)(x))
+                x = Act(act, lrelu_alpha=0.2)(Conv2D(dim, kernel_size=5, strides=1, padding=padding)(x))
                 return x
 
             return func
