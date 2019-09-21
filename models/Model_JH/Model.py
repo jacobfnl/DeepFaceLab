@@ -45,7 +45,7 @@ class JHModel(ModelBase):
                 0, 8)
 
             self.options['super_res_layers'] = np.clip(
-                io.input_int(f"Number of upscaling/downscaling layers? (0-{self.options['layers']} ?:help skip:{default_super_res_layers}) : ",
+                io.input_int(f"Number of super resolution upscaling/downscaling layers? (0-{self.options['layers']} ?:help skip:{default_super_res_layers}) : ",
                              default_super_res_layers,
                              help_message=""),
                 0, self.options['layers'])
