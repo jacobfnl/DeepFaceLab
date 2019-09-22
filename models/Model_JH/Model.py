@@ -746,11 +746,9 @@ class JHModel(ModelBase):
                 self.act = act
 
             def __call__(self, inp):
-                x = inp
-                x = Act(self.act, lrelu_alpha=0.2)(Conv2D(self.filters, kernel_size=9, strides=1, padding=self.padding)(x))
-                x = Act(self.act, lrelu_alpha=0.2)(Conv2D(self.filters, kernel_size=1, strides=1, padding=self.padding)(x))
-                x = Conv2D(self.filters, kernel_size=5, strides=1, padding=self.padding)(x)
-                x = Add()([x, inp])
+                x = Add()([x,
+                           Conv2D(self.filters, kernel_size=5, strides=1, padding=self.padding)(x),
+                           Conv2D(self.filters, kernel_size=9, strides=1, padding=self.padding)(x)])
                 x = Act(self.act, lrelu_alpha=0.2)(x)
                 return x
 
