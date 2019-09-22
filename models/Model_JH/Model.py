@@ -233,7 +233,7 @@ class JHModel(ModelBase):
         if not self.pretrain:
             self.options.pop('pretrain')
 
-        d_residual_blocks = False
+        d_residual_blocks = True
         bgr_shape = (resolution, resolution, 3)
         mask_shape = (resolution, resolution, 1)
 
@@ -724,25 +724,37 @@ class JHModel(ModelBase):
                 return LeakyReLU(alpha=lrelu_alpha)
 
         class ResidualBlock(object):
-            def __init__(self, filters, kernel_size=3, padding='zero', norm='', act='', **kwargs):
+            def __init__(self, filters, padding='zero', act='', **kwargs):
                 self.filters = filters
-                self.kernel_size = kernel_size
                 self.padding = padding
-                self.norm = norm
                 self.act = act
 
             def __call__(self, inp):
                 x = inp
-                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
-                x = Act(self.act, lrelu_alpha=0.2)(x)
-                x = Norm(self.norm)(x)
-                x = Conv2D(self.filters, kernel_size=self.kernel_size, padding=self.padding)(x)
+                x = Act(self.act, lrelu_alpha=0.2)(Conv2D(self.filters, kernel_size=3, padding=self.padding)(x))
+                x = Conv2D(self.filters, kernel_size=3, padding=self.padding)(x)
                 x = Add()([x, inp])
                 x = Act(self.act, lrelu_alpha=0.2)(x)
-                x = Norm(self.norm)(x)
                 return x
 
         JHModel.ResidualBlock = ResidualBlock
+
+        class SuperResResidualBlock(object):
+            def __init__(self, filters, padding='zero', act='', **kwargs):
+                self.filters = filters
+                self.padding = padding
+                self.act = act
+
+            def __call__(self, inp):
+                x = inp
+                x = Act(self.act, lrelu_alpha=0.2)(Conv2D(self.filters, kernel_size=9, strides=1, padding=self.padding)(x))
+                x = Act(self.act, lrelu_alpha=0.2)(Conv2D(self.filters, kernel_size=1, strides=1, padding=self.padding)(x))
+                x = Conv2D(self.filters, kernel_size=5, strides=1, padding=self.padding)(x)
+                x = Add()([x, inp])
+                x = Act(self.act, lrelu_alpha=0.2)(x)
+                return x
+
+        JHModel.SuperResResidualBlock = SuperResResidualBlock
 
         def downscale (dim, padding='zero', norm='', act='', **kwargs):
             def func(x):
@@ -855,6 +867,7 @@ class JHModel(ModelBase):
         upscale_v2 = partial(JHModel.upscale_v2, **kwargs)
         to_bgr = partial(JHModel.to_bgr, **kwargs)
         ResidualBlock = partial(JHModel.ResidualBlock, **kwargs)
+        SuperResResidualBlock = partial(JHModel.SuperResResidualBlock, **kwargs)
 
         def func(input):
             x = input[0]
@@ -864,12 +877,14 @@ class JHModel(ModelBase):
             for i in range(layers-1, 0, -1):
                 if i <= sr_layers:
                     x = upscale_v2(dims * 2**i)(x)
+                    if add_residual_blocks:
+                        x = SuperResResidualBlock(dims * 2**i)(x)
+                        x = SuperResResidualBlock(dims * 2**i)(x)
                 else:
                     x = upscale(dims * 2**i)(x)
-
-                if add_residual_blocks:
-                    x = ResidualBlock(dims * 2**i)(x)
-                    x = ResidualBlock(dims * 2**i)(x)
+                    if add_residual_blocks:
+                        x = ResidualBlock(dims * 2**i)(x)
+                        x = ResidualBlock(dims * 2**i)(x)
 
             outputs += [to_bgr(output_nc)(x)]
 
@@ -910,6 +925,8 @@ class JHModel(ModelBase):
         upscale_v2 = partial(JHModel.upscale_v2, **kwargs)
         to_bgr = partial(JHModel.to_bgr, **kwargs)
         ResidualBlock = partial(JHModel.ResidualBlock, **kwargs)
+        SuperResResidualBlock = partial(JHModel.SuperResResidualBlock, **kwargs)
+
 
         def func(input):
             x = input[0]
@@ -918,12 +935,14 @@ class JHModel(ModelBase):
             for i in range(layers-1, 0, -1):
                 if i <= sr_layers:
                     x = upscale_v2(dims * 2**i)(x)
+                    if add_residual_blocks:
+                        x = SuperResResidualBlock(dims * 2**i)(x)
+                        x = SuperResResidualBlock(dims * 2**i)(x)
                 else:
                     x = upscale(dims * 2**i)(x)
-
-                if add_residual_blocks:
-                    x = ResidualBlock(dims * 2**i)(x)
-                    x = ResidualBlock(dims * 2**i)(x)
+                    if add_residual_blocks:
+                        x = ResidualBlock(dims * 2**i)(x)
+                        x = ResidualBlock(dims * 2**i)(x)
 
             outputs += [to_bgr(output_nc)(x)]
 
