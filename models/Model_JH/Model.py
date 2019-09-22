@@ -745,7 +745,7 @@ class JHModel(ModelBase):
                 self.padding = padding
                 self.act = act
 
-            def __call__(self, inp):
+            def __call__(self, x):
                 x = Add()([x,
                            Conv2D(self.filters, kernel_size=5, strides=1, padding=self.padding)(x),
                            Conv2D(self.filters, kernel_size=9, strides=1, padding=self.padding)(x)])
