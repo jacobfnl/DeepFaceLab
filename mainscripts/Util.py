@@ -61,7 +61,7 @@ def remove_fanseg_folder(input_path):
         filepath = Path(filepath)
         remove_fanseg_file(filepath)
 
-def convert_png_to_jpg_file (filepath):
+def convert_png_to_jpg_file (filepath, output_path=None):
     filepath = Path(filepath)
 
     if filepath.suffix != '.png':
@@ -75,7 +75,15 @@ def convert_png_to_jpg_file (filepath):
     dfl_dict = dflpng.getDFLDictData()
 
     img = cv2_imread (str(filepath))
-    new_filepath = str(filepath.parent / (filepath.stem + '.jpg'))
+    orig_output_path = output_path
+    if output_path is None:
+        output_path = filepath.parent
+    else:
+        if not isinstance(output_path, Path):
+            output_path = Path(output_path)
+        if not output_path.is_dir():
+            output_path.mkdir(parents=True)
+    new_filepath = str(output_path / (filepath.stem + '.jpg'))
     cv2_imwrite ( new_filepath, img, [int(cv2.IMWRITE_JPEG_QUALITY), 85])
 
     DFLJPG.embed_data( new_filepath,
@@ -85,20 +93,26 @@ def convert_png_to_jpg_file (filepath):
                        source_filename=dfl_dict.get('source_filename', None),
                        source_rect=dfl_dict.get('source_rect', None),
                        source_landmarks=dfl_dict.get('source_landmarks', None) )
+    if orig_output_path is None:
+        filepath.unlink()
 
-    filepath.unlink()
-
-def convert_png_to_jpg_folder (input_path):
+def convert_png_to_jpg_folder (input_path, output_path=None):
     input_path = Path(input_path)
 
     io.log_info ("Converting PNG to JPG...\r\n")
 
     for filepath in io.progress_bar_generator( Path_utils.get_image_paths(input_path), "Converting"):
         filepath = Path(filepath)
-        convert_png_to_jpg_file(filepath)
+        convert_png_to_jpg_file(filepath, output_path=output_path)
 
-def add_landmarks_debug_images(input_path):
+def add_landmarks_debug_images(input_path, output_path=None):
     io.log_info ("Adding landmarks debug images...")
+
+    if output_path is not None:
+        if not isinstance(output_path, Path):
+            output_path = Path(output_path)
+        if not output_path.is_dir():
+            output_path.mkdir(parents=True)
 
     for filepath in io.progress_bar_generator( Path_utils.get_image_paths(input_path), "Processing"):
         filepath = Path(filepath)
@@ -120,7 +134,10 @@ def add_landmarks_debug_images(input_path):
             face_landmarks = dflimg.get_landmarks()
             LandmarksProcessor.draw_landmarks(img, face_landmarks, transparent_mask=True, ie_polys=dflimg.get_ie_polys() )
 
-            output_file = '{}{}'.format( str(Path(str(input_path)) / filepath.stem),  '_debug.jpg')
+            if output_path is None:
+                output_file = '{}{}'.format( str(Path(str(input_path)) / filepath.stem),  '_debug.jpg')
+            else:
+                output_file = '{}{}'.format(output_path / filepath.stem, '.jpg')
             cv2_imwrite(output_file, img, [int(cv2.IMWRITE_JPEG_QUALITY), 50] )
 
 def recover_original_aligned_filename(input_path):

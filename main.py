@@ -96,10 +96,12 @@ if __name__ == "__main__":
         from mainscripts import Util
 
         if arguments.convert_png_to_jpg:
-            Util.convert_png_to_jpg_folder (input_path=arguments.input_dir)
+            Util.convert_png_to_jpg_folder (input_path=arguments.input_dir,
+                                            output_path=arguments.output_dir)
 
         if arguments.add_landmarks_debug_images:
-            Util.add_landmarks_debug_images (input_path=arguments.input_dir)
+            Util.add_landmarks_debug_images (input_path=arguments.input_dir,
+                                             output_path=arguments.output_dir)
 
         if arguments.recover_original_aligned_filename:
             Util.recover_original_aligned_filename (input_path=arguments.input_dir)
@@ -112,7 +114,8 @@ if __name__ == "__main__":
 
     p = subparsers.add_parser( "util", help="Utilities.")
     p.add_argument('--input-dir', required=True, action=fixPathAction, dest="input_dir", help="Input directory. A directory containing the files you wish to process.")
-    p.add_argument('--convert-png-to-jpg', action="store_true", dest="convert_png_to_jpg", default=False, help="Convert DeepFaceLAB PNG files to JPEG.")
+    p.add_argument('--output-dir', action=fixPathAction, dest="output_dir", help="Output directory, for actions which create new files - ie, --convert-png-to-jpg and --add-landmarks-debug-images. If used with --convert-png-to-jpg, then original png files are not deleted.")
+    p.add_argument('--convert-png-to-jpg', action="store_true", dest="convert_png_to_jpg", default=False, help="Convert DeepFaceLAB PNG files to JPEG.  If --output-dir is specified, original png images are kept, otherwise, they are removed.")
     p.add_argument('--add-landmarks-debug-images', action="store_true", dest="add_landmarks_debug_images", default=False, help="Add landmarks debug image for aligned faces.")
     p.add_argument('--recover-original-aligned-filename', action="store_true", dest="recover_original_aligned_filename", default=False, help="Recover original aligned filename.")
     #p.add_argument('--remove-fanseg', action="store_true", dest="remove_fanseg", default=False, help="Remove fanseg mask from aligned faces.")
