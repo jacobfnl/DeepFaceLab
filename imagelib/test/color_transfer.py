@@ -1,3 +1,5 @@
+import inspect
+import os
 import unittest
 
 import cv2
@@ -9,11 +11,16 @@ from imagelib.color_transfer import _scale_array, lab_image_stats, linear_color_
 from interact.interact import InteractDesktop
 from samplelib import SampleLoader, SampleType
 
+THIS_FILE = os.path.normpath(os.path.abspath(inspect.getsourcefile(lambda: None)))
+THIS_DIR = os.path.dirname(THIS_FILE)
+TEST_DST = os.path.join(THIS_DIR, "test_dst")
+TEST_SRC = os.path.join(THIS_DIR, "test_src")
 
-class ColorTranfer(unittest.TestCase):
+
+class ColorTransfer(unittest.TestCase):
     def test_algorithms(self):
-        src_samples = SampleLoader.load(SampleType.FACE, './test_src', None)
-        dst_samples = SampleLoader.load(SampleType.FACE, './test_dst', None)
+        src_samples = SampleLoader.load(SampleType.FACE, TEST_SRC, None)
+        dst_samples = SampleLoader.load(SampleType.FACE, TEST_DST, None)
 
         for src_sample in src_samples:
             src_img = src_sample.load_bgr()
@@ -74,8 +81,8 @@ class ColorTranfer(unittest.TestCase):
         cv2.destroyAllWindows()
 
     def test_lct_algorithms(self):
-        src_samples = SampleLoader.load(SampleType.FACE, './test_src', None)
-        dst_samples = SampleLoader.load(SampleType.FACE, './test_dst', None)
+        src_samples = SampleLoader.load(SampleType.FACE, TEST_SRC, None)
+        dst_samples = SampleLoader.load(SampleType.FACE, TEST_DST, None)
 
         for src_sample in src_samples:
             src_img = src_sample.load_bgr()

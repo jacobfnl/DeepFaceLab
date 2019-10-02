@@ -1,3 +1,5 @@
+import inspect
+import os
 import unittest
 
 import cv2
@@ -7,10 +9,13 @@ from mainscripts.Extractor import ExtractSubprocessor
 from nnlib import nnlib
 from facelib import LandmarksExtractor, S3FDExtractor
 
+THIS_FILE = os.path.normpath(os.path.abspath(inspect.getsourcefile(lambda: None)))
+THIS_DIR = os.path.dirname(THIS_FILE)
+CARREY_JPG = os.path.join(THIS_DIR, 'test_image', 'carrey.jpg')
 
 class LandmarkExtractorTest(unittest.TestCase):
     def test_extract(self):
-        im = cv2.imread('../../imagelib/test/test_src/carrey/carrey.jpg')
+        im = cv2.imread(CARREY_JPG)
         h, w, _ = im.shape
 
         device_config = nnlib.DeviceConfig(cpu_only=True)
