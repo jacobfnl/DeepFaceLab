@@ -40,15 +40,15 @@ class SAEModel(ModelBase):
             while np.modf(resolution / 16)[0] != 0.0:
                 resolution -= 1
             self.options['resolution'] = resolution
-
-            self.options['face_type'] = io.input_str("Half or Full face? (h/f, ?:help skip:f) : ", default_face_type,
-                                                     ['h', 'f'],
-                                                     help_message="Half face has better resolution, but covers less area of cheeks.").lower()
         else:
             self.options['resolution'] = self.options.get('resolution', default_resolution)
-            self.options['face_type'] = self.options.get('face_type', default_face_type)
 
         if is_first_run or ask_override:
+            default_face_type = self.options.get('face_type', default_face_type)
+            self.options['face_type'] = io.input_str("Half or Full face? (h/f, ?:help skip:f) : ", default_face_type,
+                                                 ['h', 'f'],
+                                                 help_message="Half face has better resolution, but covers less area of cheeks.").lower()
+
             default_learn_mask = self.options.get('learn_mask', True)
             self.options['learn_mask'] = io.input_bool(
                 f'Learn mask? (y/n, ?:help skip:{yn_str[default_learn_mask]}) : ',
