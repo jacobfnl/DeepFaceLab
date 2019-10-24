@@ -845,7 +845,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                     # update accumulator
                     e = K.tf.device("/cpu:0") if self.tf_cpu_mode == 2 else None
                     if e: e.__enter__()
-                    gt = (g + ga)/self.accum_iters
+                    gt = (g + ga)/self.accum_iters_float
                     new_a = self.rho * a + (1. - self.rho) * K.square(gt)
                     new_p = p - lr * g / (K.sqrt(new_a) + self.epsilon)
                     if e: e.__exit__(None, None, None)
