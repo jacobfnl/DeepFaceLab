@@ -88,7 +88,7 @@ Model = keras.models.Model
 
 AdamAccumulate = nnlib.AdamAccumulate
 Adam = nnlib.Adam
-AccumulateRMSProp = nnlib.AccumulateRMSProp
+RMSpropAccumulate = nnlib.RMSpropAccumulate
 RMSprop = nnlib.RMSprop
 
 modelify = nnlib.modelify
@@ -777,7 +777,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
 
         nnlib.SelfAttention = SelfAttention
 
-        class AccumulateRMSprop(keras.optimizers.Optimizer):
+        class RMSpropAccumulate(keras.optimizers.Optimizer):
             """RMSProp optimizer.
             It is recommended to leave the parameters of this optimizer
             at their default values
@@ -804,7 +804,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 self.tf_cpu_mode = tf_cpu_mode
 
                 learning_rate = kwargs.pop('lr', learning_rate)
-                super(AccumulateRMSprop, self).__init__(**kwargs)
+                super(RMSpropAccumulate, self).__init__(**kwargs)
                 with K.name_scope(self.__class__.__name__):
                     self.learning_rate = K.variable(learning_rate, name='learning_rate')
                     self.rho = K.variable(rho, name='rho')
@@ -866,17 +866,17 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 # iteration to 0.
                 if len(params) == len(weights) + 1:
                     weights = [np.array(0)] + weights
-                super(AccumulateRMSprop, self).set_weights(weights)
+                super(RMSpropAccumulate, self).set_weights(weights)
 
             def get_config(self):
                 config = {'learning_rate': float(K.get_value(self.learning_rate)),
                           'rho': float(K.get_value(self.rho)),
                           'decay': float(K.get_value(self.decay)),
                           'epsilon': self.epsilon}
-                base_config = super(AccumulateRMSprop, self).get_config()
+                base_config = super(RMSpropAccumulate, self).get_config()
                 return dict(list(base_config.items()) + list(config.items()))
 
-        nnlib.AccumulateRMSprop = AccumulateRMSprop
+        nnlib.RMSpropAccumulate = RMSpropAccumulate
 
         class RMSprop(keras.optimizers.Optimizer):
             """RMSProp optimizer.
