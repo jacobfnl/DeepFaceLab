@@ -967,13 +967,13 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
 
         nnlib.Adam = Adam
 
-        class AdamAccumulate(Adam):
+        class AdamAccumulate(keras.optimizers.Optimizer):
             """https://stackoverflow.com/questions/55268762/how-to-accumulate-gradients-for-large-batch-sizes-in-keras"""
             def __init__(self, lr=0.001, beta_1=0.9, beta_2=0.999,
                          epsilon=None, decay=0., amsgrad=False, tf_cpu_mode=0, accum_iters=1, **kwargs):
                 if accum_iters < 1:
                     raise ValueError('accum_iters must be >= 1')
-                super(Adam, self).__init__(**kwargs)
+                super(keras.optimizers.Adam, self).__init__(**kwargs)
                 with K.name_scope(self.__class__.__name__):
                     self.iterations = K.variable(0, dtype='int64', name='iterations')
                     self.lr = K.variable(lr, name='lr')
@@ -1063,7 +1063,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                           'decay': float(K.get_value(self.decay)),
                           'epsilon': self.epsilon,
                           'amsgrad': self.amsgrad}
-                base_config = super(Adam, self).get_config()
+                base_config = super(keras.optimizers.Adam, self).get_config()
                 return dict(list(base_config.items()) + list(config.items()))
 
         nnlib.AdamAccumulate = AdamAccumulate
