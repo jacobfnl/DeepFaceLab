@@ -86,6 +86,7 @@ ZeroPadding2D = KL.ZeroPadding2D
 RandomNormal = keras.initializers.RandomNormal
 Model = keras.models.Model
 
+AdamAccumulate = nnlib.AdamAccumulate
 Adam = nnlib.Adam
 RMSprop = nnlib.RMSprop
 
