@@ -476,8 +476,7 @@ class SAEHDModel(ModelBase):
             self.src_dst_mask_opt = AccumulateRMSProp(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
             self.D_opt            = AccumulateRMSProp(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
 
-
-        if self.options['ms_ssim_loss']:
+            if self.options['ms_ssim_loss']:
                 # TODO - Done
                 src_loss = K.mean(10 * MsSSIM(resolution)(target_src_masked_opt, pred_src_src_masked_opt))
             else:
