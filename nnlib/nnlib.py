@@ -834,8 +834,8 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 self.updates = [K.update_add(self.iterations, 1)]
 
                 t = completed_updates + 1
-                accum_switch = K.floor(
-                    (self.accum_iters - K.mod(self.iterations + 1., self.accum_iters)) / self.accum_iters)
+                accum_switch = K.equal((self.iterations + 1) % self.accum_iters, 0)
+                accum_switch = K.cast(accum_switch, K.floatx())
 
                 lr = self.learning_rate
                 if self.initial_decay > 0:
