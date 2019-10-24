@@ -472,7 +472,7 @@ class SAEHDModel(ModelBase):
         psd_target_dst_anti_masked = self.model.pred_src_dst*(1.0 - target_dstm)
 
         if self.is_training_mode:
-            self.src_dst_opt      = AdamAccumulate(lr=5e-5, beta_1=0.5, beta_2=0.999, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode'] - 1, accum_iters=0)
+            self.src_dst_opt      = AdamAccumulate(lr=5e-5, beta_1=0.5, beta_2=0.999, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode'] - 1, accum_iters=4)
             self.src_dst_mask_opt = AdamAccumulate(lr=5e-5, beta_1=0.5, beta_2=0.999, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode'] - 1, accum_iters=4)
             self.D_opt            = AdamAccumulate(lr=5e-5, beta_1=0.5, beta_2=0.999, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode'] - 1, accum_iters=4)
 
