@@ -88,6 +88,7 @@ Model = keras.models.Model
 
 AdamAccumulate = nnlib.AdamAccumulate
 Adam = nnlib.Adam
+AccumulateRMSProp = nnlib.AccumulateRMSProp
 RMSprop = nnlib.RMSprop
 
 modelify = nnlib.modelify
@@ -773,7 +774,109 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
 
                 out = Add()([o, inp])
                 return out
+
         nnlib.SelfAttention = SelfAttention
+
+        class AccumulateRMSprop(keras.optimizers.Optimizer):
+            """RMSProp optimizer.
+            It is recommended to leave the parameters of this optimizer
+            at their default values
+            (except the learning rate, which can be freely tuned).
+            # Arguments
+                learning_rate: float >= 0. Learning rate.
+                rho: float >= 0.
+            # References
+                - [rmsprop: Divide the gradient by a running average of its recent magnitude
+                ](http://www.cs.toronto.edu/~tijmen/csc321/slides/lecture_slides_lec6.pdf)
+
+                tf_cpu_mode: only for tensorflow backend
+                              0 - default, no changes.
+                              1 - allows to train x2 bigger network on same VRAM consuming RAM
+                              2 - allows to train x3 bigger network on same VRAM consuming RAM*2 and CPU power.
+            """
+
+            def __init__(self, learning_rate=0.001, rho=0.9, tf_cpu_mode=0, accum_iters=1, **kwargs):
+                if accum_iters < 1:
+                    raise ValueError('accum_iters must be >= 1')
+
+                self.initial_decay = kwargs.pop('decay', 0.0)
+                self.epsilon = kwargs.pop('epsilon', K.epsilon())
+                self.tf_cpu_mode = tf_cpu_mode
+
+                learning_rate = kwargs.pop('lr', learning_rate)
+                super(AccumulateRMSprop, self).__init__(**kwargs)
+                with K.name_scope(self.__class__.__name__):
+                    self.learning_rate = K.variable(learning_rate, name='learning_rate')
+                    self.rho = K.variable(rho, name='rho')
+                    self.decay = K.variable(self.initial_decay, name='decay')
+                    self.iterations = K.variable(0, dtype='int64', name='iterations')
+                self.accum_iters = K.variable(accum_iters, K.dtype(self.iterations))
+                self.accum_iters_float = K.cast(self.accum_iters, K.floatx())
+
+            def get_updates(self, loss, params):
+                grads = self.get_gradients(loss, params)
+                self.updates = [K.update_add(self.iterations, 1)]
+                completed_updates = K.cast(K.tf.floordiv(self.iterations, self.accum_iters), K.floatx())
+
+                e = K.tf.device("/cpu:0") if self.tf_cpu_mode > 0 else None
+                if e: e.__enter__()
+                accumulators = [K.zeros(K.int_shape(p),
+                                        dtype=K.dtype(p),
+                                        name='accumulator_' + str(i))
+                                for (i, p) in enumerate(params)]
+                gs = [K.zeros(K.int_shape(p),
+                              dtype=K.dtype(p),
+                              name='gs' + str(i))
+                      for (i, p) in enumerate(params)]
+                if e: e.__exit__(None, None, None)
+
+                self.weights = [self.iterations] + accumulators
+                self.updates = [K.update_add(self.iterations, 1)]
+
+                t = completed_updates + 1
+                accum_switch = K.floor(
+                    (self.accum_iters - K.mod(self.iterations + 1., self.accum_iters)) / self.accum_iters)
+
+                lr = self.learning_rate
+                if self.initial_decay > 0:
+                    lr = lr * (1. / (1. + self.decay * K.cast(t, K.dtype(self.decay))))
+
+                for p, g, a, ga in zip(params, grads, accumulators, gs):
+                    # update accumulator
+                    e = K.tf.device("/cpu:0") if self.tf_cpu_mode == 2 else None
+                    if e: e.__enter__()
+                    gt = (g + ga)/self.accum_iters
+                    new_a = self.rho * a + (1. - self.rho) * K.square(gt)
+                    new_p = p - lr * g / (K.sqrt(new_a) + self.epsilon)
+                    if e: e.__exit__(None, None, None)
+
+                    self.updates.append(K.update(a, (1 - accum_switch) * a + accum_switch * new_a))
+
+                    # Apply constraints.
+                    if getattr(p, 'constraint', None) is not None:
+                        new_p = p.constraint(new_p)
+
+                    self.updates.append(K.update(p, (1 - accum_switch) * p + accum_switch * new_p))
+                return self.updates
+
+            def set_weights(self, weights):
+                params = self.weights
+                # Override set_weights for backward compatibility of Keras 2.2.4 optimizer
+                # since it does not include iteration at head of the weight list. Set
+                # iteration to 0.
+                if len(params) == len(weights) + 1:
+                    weights = [np.array(0)] + weights
+                super(AccumulateRMSprop, self).set_weights(weights)
+
+            def get_config(self):
+                config = {'learning_rate': float(K.get_value(self.learning_rate)),
+                          'rho': float(K.get_value(self.rho)),
+                          'decay': float(K.get_value(self.decay)),
+                          'epsilon': self.epsilon}
+                base_config = super(AccumulateRMSprop, self).get_config()
+                return dict(list(base_config.items()) + list(config.items()))
+
+        nnlib.AccumulateRMSprop = AccumulateRMSprop
 
         class RMSprop(keras.optimizers.Optimizer):
             """RMSProp optimizer.
