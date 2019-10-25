@@ -393,7 +393,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                                                                             self.max_value,
                                                                             power_factors=self.power_factors)
                         gray_loss = (1.0 - grey_mssim_val) / 2.0
-                        loss = (1-self.grayscale_power) * loss + self.grayscale_power * gray_loss
+                        loss = (1.0-self.grayscale_power) * loss + self.grayscale_power * gray_loss
                     return loss
                 else:
                     raise Exception("Not supported in PlaidML")
