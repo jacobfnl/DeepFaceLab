@@ -61,6 +61,7 @@ class SAEHDModel(ModelBase):
             self.options['ae_dims'] = self.options.get('ae_dims', default_ae_dims)
             self.options['ed_ch_dims'] = self.options.get('ed_ch_dims', default_ed_ch_dims)
 
+        default_grayscale_power = self.options.get('grayscale_power', 0.0)
         default_true_face_training = self.options.get('true_face_training', False)
         default_face_style_power = self.options.get('face_style_power', 0.0)
         default_bg_style_power = self.options.get('bg_style_power', 0.0)
@@ -71,6 +72,10 @@ class SAEHDModel(ModelBase):
                 "Use multiscale loss? (y/n, ?:help skip: %s ) : " % (yn_str[default_multiscale_loss]),
                 default_multiscale_loss,
                 help_message="")
+
+            self.options['grayscale_power'] = np.clip(io.input_number(
+                "Grayscale power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % (default_grayscale_power),
+                default_grayscale_power, help_message=""), 0.0, 100.0)
 
             def_absolute_loss = self.options.get('abs_loss', False)
             # self.options['absolute_loss'] = io.input_bool(
@@ -115,6 +120,7 @@ class SAEHDModel(ModelBase):
 
         else:
             self.options['ms_ssim_loss'] = self.options.get('ms_ssim_loss', True)
+            self.options['grayscale_power'] = self.options.get('grayscale_power', default_grayscale_power)
             self.options['absolute_loss'] = self.options.get('absolute_loss', False)
             self.options['random_warp'] = self.options.get('random_warp', True)
             self.options['true_face_training'] = self.options.get('true_face_training', default_true_face_training)
@@ -493,6 +499,10 @@ class SAEHDModel(ModelBase):
             else:
                 src_loss =  K.mean ( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( target_src_masked_opt, pred_src_src_masked_opt) )
                 src_loss += K.mean ( 10*K.square( target_src_masked_opt - pred_src_src_masked_opt ) )
+
+            grayscale_power = self.options['grayscale_power']  / 100.0
+            if grayscale_power != 0:
+                src_loss = src_loss * (1-grayscale_power) + grayscale_power * K.mean(10 * MsSSIM(resolution)(K.image.rgb_to_grayscale(target_src_masked_opt), K.image.rgb_to_grayscale(pred_src_src_masked_opt)))
 
             face_style_power = self.options['face_style_power'] / 100.0
             if face_style_power != 0:
