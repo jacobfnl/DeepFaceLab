@@ -847,7 +847,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                     if e: e.__enter__()
                     gt = (g + ga)/self.accum_iters_float
                     new_a = self.rho * a + (1. - self.rho) * K.square(gt)
-                    new_p = p - lr * g / (K.sqrt(new_a) + self.epsilon)
+                    new_p = p - lr * gt / (K.sqrt(new_a) + self.epsilon)
                     if e: e.__exit__(None, None, None)
 
                     self.updates.append(K.update(a, (1 - accum_switch) * a + accum_switch * new_a))
