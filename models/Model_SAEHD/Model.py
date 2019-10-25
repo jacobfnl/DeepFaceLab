@@ -88,6 +88,17 @@ class SAEHDModel(ModelBase):
             self.options['bg_style_power'] = np.clip ( io.input_number("Background style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % (default_bg_style_power), default_bg_style_power,
                                                                                help_message="Learn to transfer image around face. This can make face more like dst. Enabling this option increases the chance of model collapse."), 0.0, 100.0 )
 
+            default_ct_mode = self.options.get('ct_mode', 0)
+            self.options['apply_random_ct'] = np.clip(io.input_int(
+                "Apply random color transfer to src faceset? (0) None, (1) LCT, (2) RCT, (3) RCT-c, (4) RCT-p, "
+                "(5) RCT-pc, (6) mRTC, (7) mRTC-c, (8) mRTC-p, (9) mRTC-pc ?:help skip:%s) : " % default_ct_mode,
+                default_ct_mode,
+                help_message="Increase variativity of src samples by apply LCT color transfer from random dst "
+                             "samples. It is like 'face_style' learning, but more precise color transfer and without "
+                             "risk of model collapse, also it does not require additional GPU resources, "
+                             "but the training time may be longer, due to the src faceset is becoming more diverse."),
+                0, 9)
+
             default_ct_mode = self.options.get('ct_mode', 'none')
             self.options['ct_mode'] = io.input_str (f"Color transfer mode apply to src faceset. ( none/rct/lct/mkl/idt, ?:help skip:{default_ct_mode}) : ", default_ct_mode, ['none','rct','lct','mkl','idt'], help_message="Change color distribution of src samples close to dst samples. Try all modes to find the best.")
 
@@ -109,7 +120,7 @@ class SAEHDModel(ModelBase):
             self.options['true_face_training'] = self.options.get('true_face_training', default_true_face_training)
             self.options['face_style_power'] = self.options.get('face_style_power', default_face_style_power)
             self.options['bg_style_power'] = self.options.get('bg_style_power', default_bg_style_power)
-            self.options['ct_mode'] = self.options.get('ct_mode', 'none')
+            self.options['ct_mode'] = self.options.get('ct_mode', 0)
             self.options['random_color_change'] = self.options.get('random_color_change', False)
             self.options['clipgrad'] = self.options.get('clipgrad', False)
 
