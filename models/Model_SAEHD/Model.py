@@ -89,6 +89,8 @@ class SAEHDModel(ModelBase):
                                                                                help_message="Learn to transfer image around face. This can make face more like dst. Enabling this option increases the chance of model collapse."), 0.0, 100.0 )
 
             default_ct_mode = self.options.get('ct_mode', 0)
+            if default_ct_mode not in range(0, 10):
+                default_ct_mode = 0
             self.options['apply_random_ct'] = np.clip(io.input_int(
                 "Apply random color transfer to src faceset? (0) None, (1) LCT, (2) RCT, (3) RCT-c, (4) RCT-p, "
                 "(5) RCT-pc, (6) mRTC, (7) mRTC-c, (8) mRTC-p, (9) mRTC-pc ?:help skip:%s) : " % default_ct_mode,
