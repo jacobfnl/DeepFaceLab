@@ -381,15 +381,15 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
 
                     if self.grayscale_power != 0:
                         if nnlib.tf.__version__ >= "1.14":
-                            grey_mssim_val = nnlib.tf.image.ssim_multiscale(nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_true, -1)),
-                                                                            nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_pred, -1)),
+                            grey_mssim_val = nnlib.tf.image.ssim_multiscale(nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_true, [-1])),
+                                                                            nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_pred, [-1])),
                                                                             self.max_value,
                                                                             power_factors=self.power_factors,
                                                                             filter_size=self.kernel_size,
                                                                             k1=self.k1, k2=self.k2)
                         else:
-                            grey_mssim_val = nnlib.tf.image.ssim_multiscale(nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_true, -1)),
-                                                                            nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_pred, -1)),
+                            grey_mssim_val = nnlib.tf.image.ssim_multiscale(nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_true, [-1])),
+                                                                            nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_pred, [-1]),
                                                                             self.max_value,
                                                                             power_factors=self.power_factors)
                         gray_loss = (1.0 - grey_mssim_val) / 2.0
