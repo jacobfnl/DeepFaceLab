@@ -142,6 +142,9 @@ def trainer_thread(s2c, c2s, e, args, device_args, socketio=None):
                             for loss_value in np.mean(np.array(loss_history[-100:]), axis=0):
                                 loss_string += "[%.4f]" % loss_value
 
+                            for loss_value in np.mean(np.array(loss_history[-200:-100]), axis=0) - np.mean(np.array(loss_history[-100:]), axis=0):
+                                loss_string += "[%.4f]" % loss_value
+
                             if io.is_colab():
                                 io.log_info('\r' + loss_string, end='')
                             else:
