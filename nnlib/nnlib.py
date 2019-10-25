@@ -350,13 +350,14 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
         class MsSSIM(object):
             _MSSSIM_WEIGHTS = (0.0448, 0.2856, 0.3001, 0.2363, 0.1333)
 
-            def __init__(self, resolution, kernel_size=11, k1=0.01, k2=0.03, max_value=1.0, power_factors=_MSSSIM_WEIGHTS):
+            def __init__(self, resolution, grayscale_power=0, kernel_size=11, k1=0.01, k2=0.03, max_value=1.0, power_factors=_MSSSIM_WEIGHTS):
                 self.resolution = resolution
                 self.kernel_size = kernel_size
                 self.k1 = k1
                 self.k2 = k2
                 self.max_value = max_value
                 self.dssim = dssim(kernel_size, k1, k2, max_value)
+                self.grayscale_power = grayscale_power
                 # self.power_factors = power_factors
 
                 # restrict mssim factors to those greater/equal to kernel size
@@ -377,6 +378,22 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                         mssim_val = nnlib.tf.image.ssim_multiscale(y_true, y_pred, self.max_value,
                                                                    power_factors=self.power_factors)
                     loss = (1.0 - mssim_val) / 2.0
+
+                    if self.grayscale_power != 0:
+                        if nnlib.tf.__version__ >= "1.14":
+                            grey_mssim_val = nnlib.tf.image.ssim_multiscale(nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_true, -1)),
+                                                                            nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_pred, -1)),
+                                                                            self.max_value,
+                                                                            power_factors=self.power_factors,
+                                                                            filter_size=self.kernel_size,
+                                                                            k1=self.k1, k2=self.k2)
+                        else:
+                            grey_mssim_val = nnlib.tf.image.ssim_multiscale(nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_true, -1)),
+                                                                            nnlib.tf.image.rgb_to_grayscale(nnlib.tf.reverse(y_pred, -1)),
+                                                                            self.max_value,
+                                                                            power_factors=self.power_factors)
+                        gray_loss = (1.0 - grey_mssim_val) / 2.0
+                        loss = (1-self.grayscale_power) * loss + self.grayscale_power * gray_loss
                     return loss
                 else:
                     raise Exception("Not supported in PlaidML")
