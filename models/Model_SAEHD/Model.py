@@ -4,6 +4,7 @@ import numpy as np
 
 import mathlib
 from facelib import FaceType
+from imagelib.color_transfer import ColorTransferMode
 from interact import interact as io
 from models import ModelBase
 from nnlib import nnlib
@@ -88,8 +89,18 @@ class SAEHDModel(ModelBase):
             self.options['bg_style_power'] = np.clip ( io.input_number("Background style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % (default_bg_style_power), default_bg_style_power,
                                                                                help_message="Learn to transfer image around face. This can make face more like dst. Enabling this option increases the chance of model collapse."), 0.0, 100.0 )
 
-            default_ct_mode = self.options.get('ct_mode', 'none')
-            self.options['ct_mode'] = io.input_str (f"Color transfer mode apply to src faceset. ( none/rct/lct/mkl/idt, ?:help skip:{default_ct_mode}) : ", default_ct_mode, ['none','rct','lct','mkl','idt'], help_message="Change color distribution of src samples close to dst samples. Try all modes to find the best.")
+            default_ct_mode = self.options.get('ct_mode', ColorTransferMode.NONE)
+            if default_ct_mode not in [int(v) for v in ColorTransferMode]:
+                default_ct_mode = ColorTransferMode.NONE
+            self.options['ct_mode'] = np.clip(io.input_int(
+                "Apply random color transfer to src faceset? (0) None, (1) LCT, (2) RCT, (3) RCT-c, (4) RCT-p, "
+                "(5) RCT-pc, (6) mRTC, (7) mRTC-c, (8) mRTC-p, (9) mRTC-pc ?:help skip:%s) : " % default_ct_mode,
+                default_ct_mode,
+                help_message="Increase variativity of src samples by apply LCT color transfer from random dst "
+                             "samples. It is like 'face_style' learning, but more precise color transfer and without "
+                             "risk of model collapse, also it does not require additional GPU resources, "
+                             "but the training time may be longer, due to the src faceset is becoming more diverse."),
+                ColorTransferMode.NONE, ColorTransferMode.MASKED_RCT_PAPER_CLIP)
 
             default_random_color_change = False if is_first_run else self.options.get('random_color_change', False)
             self.options['random_color_change'] = io.input_bool(
@@ -109,7 +120,7 @@ class SAEHDModel(ModelBase):
             self.options['true_face_training'] = self.options.get('true_face_training', default_true_face_training)
             self.options['face_style_power'] = self.options.get('face_style_power', default_face_style_power)
             self.options['bg_style_power'] = self.options.get('bg_style_power', default_bg_style_power)
-            self.options['ct_mode'] = self.options.get('ct_mode', 'none')
+            self.options['ct_mode'] = self.options.get('ct_mode', 0)
             self.options['random_color_change'] = self.options.get('random_color_change', False)
             self.options['clipgrad'] = self.options.get('clipgrad', False)
 
@@ -579,7 +590,7 @@ class SAEHDModel(ModelBase):
 
             self.set_training_data_generators ([
                     SampleGeneratorFace(training_data_src_path, sort_by_yaw_target_samples_path=training_data_dst_path if sort_by_yaw else None,
-                                                                random_ct_samples_path=training_data_dst_path if self.options['ct_mode'] != 'none' else None,
+                                                                random_ct_samples_path=training_data_dst_path if self.options['ct_mode'] != 0 else None,
                                                                 debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, scale_range=np.array([-0.05, 0.05])+self.src_scale_mod / 100.0 ),
                         output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_bgr), 'resolution':resolution, 'ct_mode': self.options['ct_mode'] },

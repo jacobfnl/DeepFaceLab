@@ -504,10 +504,10 @@ class SAEModel(ModelBase):
                                                                                                          0.05]) + self.src_scale_mod / 100.0),
                                     output_sample_types=[{'types': (
                                         t.IMG_WARPED_TRANSFORMED, face_type, t_mode_bgr),
-                                        'resolution': resolution, 'apply_ct': apply_random_ct}] + \
+                                        'resolution': resolution, 'ct_mode': apply_random_ct}] + \
                                                         [{'types': (t.IMG_TRANSFORMED, face_type, t_mode_bgr),
                                                           'resolution': resolution // (2 ** i),
-                                                          'apply_ct': apply_random_ct} for i in range(ms_count)] + \
+                                                          'ct_mode': apply_random_ct} for i in range(ms_count)] + \
                                                         [{'types': (t.IMG_TRANSFORMED, face_type, t.MODE_M),
                                                           'resolution': resolution // (2 ** i)} for i in
                                                          range(ms_count)],
