@@ -101,9 +101,6 @@ class SAEHDModel(ModelBase):
                              "but the training time may be longer, due to the src faceset is becoming more diverse."),
                 0, 9)
 
-            default_ct_mode = self.options.get('ct_mode', 'none')
-            self.options['ct_mode'] = io.input_str (f"Color transfer mode apply to src faceset. ( none/rct/lct/mkl/idt, ?:help skip:{default_ct_mode}) : ", default_ct_mode, ['none','rct','lct','mkl','idt'], help_message="Change color distribution of src samples close to dst samples. Try all modes to find the best.")
-
             default_random_color_change = False if is_first_run else self.options.get('random_color_change', False)
             self.options['random_color_change'] = io.input_bool(
                 "Enable random color change? (y/n, ?:help skip:%s) : " % (yn_str[default_random_color_change]), default_random_color_change,
