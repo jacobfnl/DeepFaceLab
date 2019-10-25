@@ -4,6 +4,7 @@ import numpy as np
 
 import mathlib
 from facelib import FaceType
+from imagelib.color_transfer import ColorTransferMode
 from interact import interact as io
 from models import ModelBase
 from nnlib import nnlib
@@ -88,9 +89,9 @@ class SAEHDModel(ModelBase):
             self.options['bg_style_power'] = np.clip ( io.input_number("Background style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % (default_bg_style_power), default_bg_style_power,
                                                                                help_message="Learn to transfer image around face. This can make face more like dst. Enabling this option increases the chance of model collapse."), 0.0, 100.0 )
 
-            default_ct_mode = self.options.get('ct_mode', 0)
-            if default_ct_mode not in range(0, 10):
-                default_ct_mode = 0
+            default_ct_mode = self.options.get('ct_mode', ColorTransferMode.NONE)
+            if default_ct_mode not in [int(v) for v in ColorTransferMode]:
+                default_ct_mode = ColorTransferMode.NONE
             self.options['ct_mode'] = np.clip(io.input_int(
                 "Apply random color transfer to src faceset? (0) None, (1) LCT, (2) RCT, (3) RCT-c, (4) RCT-p, "
                 "(5) RCT-pc, (6) mRTC, (7) mRTC-c, (8) mRTC-p, (9) mRTC-pc ?:help skip:%s) : " % default_ct_mode,
@@ -99,7 +100,7 @@ class SAEHDModel(ModelBase):
                              "samples. It is like 'face_style' learning, but more precise color transfer and without "
                              "risk of model collapse, also it does not require additional GPU resources, "
                              "but the training time may be longer, due to the src faceset is becoming more diverse."),
-                0, 9)
+                ColorTransferMode.NONE, ColorTransferMode.MASKED_RCT_PAPER_CLIP)
 
             default_random_color_change = False if is_first_run else self.options.get('random_color_change', False)
             self.options['random_color_change'] = io.input_bool(
