@@ -284,8 +284,7 @@ class SampleProcessor(object):
                     elif ct_mode == ColorTransferMode.IDT:
                         img_bgr = imagelib.color_transfer_idt (img_bgr, ct_sample_bgr)
 
-
-            if random_hsv_shift:
+                if random_hsv_shift:
                     rnd_state = np.random.RandomState (sample_rnd_seed)
                     hsv = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2HSV)
                     h, s, v = cv2.split(hsv)
