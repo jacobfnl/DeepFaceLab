@@ -130,7 +130,7 @@ class SampleProcessor(object):
             gaussian_blur = opts.get('gaussian_blur', None)
 
             random_hsv_shift = opts.get('random_hsv_shift', None)
-            ct_mode = opts.get('ct_mode', 'None')
+            ct_mode = opts.get('ct_mode', 0)
             normalize_tanh = opts.get('normalize_tanh', False)
 
             img_type = SPTF.NONE

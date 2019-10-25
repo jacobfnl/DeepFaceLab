@@ -91,7 +91,7 @@ class SAEHDModel(ModelBase):
             default_ct_mode = self.options.get('ct_mode', 0)
             if default_ct_mode not in range(0, 10):
                 default_ct_mode = 0
-            self.options['apply_random_ct'] = np.clip(io.input_int(
+            self.options['ct_mode'] = np.clip(io.input_int(
                 "Apply random color transfer to src faceset? (0) None, (1) LCT, (2) RCT, (3) RCT-c, (4) RCT-p, "
                 "(5) RCT-pc, (6) mRTC, (7) mRTC-c, (8) mRTC-p, (9) mRTC-pc ?:help skip:%s) : " % default_ct_mode,
                 default_ct_mode,
@@ -589,7 +589,7 @@ class SAEHDModel(ModelBase):
 
             self.set_training_data_generators ([
                     SampleGeneratorFace(training_data_src_path, sort_by_yaw_target_samples_path=training_data_dst_path if sort_by_yaw else None,
-                                                                random_ct_samples_path=training_data_dst_path if self.options['ct_mode'] != 'none' else None,
+                                                                random_ct_samples_path=training_data_dst_path if self.options['ct_mode'] != 0 else None,
                                                                 debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, scale_range=np.array([-0.05, 0.05])+self.src_scale_mod / 100.0 ),
                         output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_bgr), 'resolution':resolution, 'ct_mode': self.options['ct_mode'] },
