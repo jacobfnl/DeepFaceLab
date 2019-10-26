@@ -57,6 +57,10 @@ def trainer_thread(s2c, c2s, e, args, device_args, socketio=None):
             loss_string = ""
             save_iter = model.get_iter()
 
+            # Exponential moving average for loss
+            moving_average = None
+            alpha = 0.02
+
             def model_save():
                 if not debug and not is_reached_goal:
                     io.log_info("Saving....", end='\r')
@@ -141,7 +145,6 @@ def trainer_thread(s2c, c2s, e, args, device_args, socketio=None):
 
                             if moving_average is None:
                                 moving_average = loss_history[-1]
-                                alpha = 0.02
                             else:
                                 for idx, v in enumerate(loss_history[-1]):
                                     moving_average[idx] = alpha * v + (1-alpha) * moving_average[idx]
