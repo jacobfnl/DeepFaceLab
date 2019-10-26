@@ -139,11 +139,21 @@ def trainer_thread(s2c, c2s, e, args, device_args, socketio=None):
                             for loss_value in loss_history[-1]:
                                 loss_string += "[%.4f]" % loss_value
 
-                            for loss_value in np.mean(np.array(loss_history[-100:]), axis=0):
+                            if moving_average is None:
+                                moving_average = loss_history[-1]
+                                alpha = 0.02
+                            else:
+                                for idx, v in enumerate(loss_history[-1]):
+                                    moving_average[idx] = alpha * v + (1-alpha) * moving_average[idx]
+
+                            for loss_value in moving_average:
                                 loss_string += "[%.4f]" % loss_value
 
-                            for loss_value in np.mean(np.array(loss_history[-200:-100]), axis=0) - np.mean(np.array(loss_history[-100:]), axis=0):
-                                loss_string += "[%.4f]" % loss_value
+                            # for loss_value in np.mean(np.array(loss_history[-100:]), axis=0):
+                            #     loss_string += "[%.4f]" % loss_value
+                            #
+                            # for loss_value in np.mean(np.array(loss_history[-200:-100]), axis=0) - np.mean(np.array(loss_history[-100:]), axis=0):
+                            #     loss_string += "[%.4f]" % loss_value
 
                             if io.is_colab():
                                 io.log_info('\r' + loss_string, end='')
