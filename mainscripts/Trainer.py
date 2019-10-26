@@ -59,7 +59,7 @@ def trainer_thread(s2c, c2s, e, args, device_args, socketio=None):
 
             # Exponential moving average for loss
             moving_average = None
-            alpha = 0.02
+            alpha = 0.001
 
             def model_save():
                 if not debug and not is_reached_goal:
@@ -150,7 +150,7 @@ def trainer_thread(s2c, c2s, e, args, device_args, socketio=None):
                                     moving_average[idx] = alpha * v + (1-alpha) * moving_average[idx]
 
                             for loss_value in moving_average:
-                                loss_string += "[%.4f]" % loss_value
+                                loss_string += "[%.3f]" % loss_value
 
                             # for loss_value in np.mean(np.array(loss_history[-100:]), axis=0):
                             #     loss_string += "[%.4f]" % loss_value
