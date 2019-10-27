@@ -7,7 +7,7 @@ from flask_socketio import SocketIO, emit
 def create_flask_app(s2c, c2s, s2flask, args):
     app = Flask(__name__, template_folder="templates", static_folder="static")
     model_path = Path(args.get('model_path', ''))
-    filename = 'preview.jpg'
+    filename = 'preview.png'
     preview_file = str(model_path / filename)
 
     def gen():
