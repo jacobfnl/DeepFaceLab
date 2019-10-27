@@ -377,7 +377,7 @@ def main(args, device_args):
                                                                zoom)
                 # io.show_image(wnd_name, preview_pane_image)
                 model_path = Path(args.get('model_path', ''))
-                filename = 'preview.jpg'
+                filename = 'preview.png'
                 preview_file = str(model_path / filename)
                 cv2.imwrite(preview_file, preview_pane_image)
                 s2flask.put({'op': 'show'})
