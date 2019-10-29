@@ -682,7 +682,7 @@ class SAEHDModel(ModelBase):
 
             st_test = []
             for i in range(len(test_S)):
-                ar_over = S[i], SS[i]*SSM[i] + S[i]*(1-SSM[i]), D[i], DD[i]*DDM[i] + D[i]*(1-DDM[i]), SDM[i]*SSM[i] + (D[i]*(1-DDM[i]) + SDM[i]*DDM[i])*(1-SSM[i])
+                ar_over = S[i], SS[i]*SSM[i] + S[i]*(1-SSM[i]), D[i], DD[i]*DDM[i] + D[i]*(1-DDM[i]), SD[i]*SDM[i] + (SD[i]*DDM[i] + D[i]*(1-DDM[i]))*(1-SDM[i])
                 st_test.append(np.concatenate(ar_over, axis=1))
 
             result += [('SAEHD test', np.concatenate(st_test, axis=0)), ]
