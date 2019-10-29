@@ -668,6 +668,14 @@ class SAEHDModel(ModelBase):
 
             result += [ ('SAEHD masked', np.concatenate (st_m, axis=0 )), ]
 
+            st_p = []
+            for i in range(len(test_S)):
+                ar_face = S[i]*test_S_m[i], SS[i]*SSM[i], D[i]*test_D_m[i], DD[i]*DDM[i], SD[i]*(DDM[i]*SDM[i])
+                ar_bgrd = S[i]*(1-test_S_m[i]), SS[i]*(1-SSM[i]), D[i]*(1-test_D_m[i]), DD[i]*(1-DDM[i]), SD[i]*(1-DDM[i]*SDM[i])
+                st_p.append ( np.concatenate ( ar_bgrd, axis=1) )
+
+            result += [ ('SAEHD background', np.concatenate (st_p, axis=0 )), ]
+
         return result
 
     def predictor_func (self, face=None, dummy_predict=False):
