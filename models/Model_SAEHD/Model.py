@@ -672,10 +672,10 @@ class SAEHDModel(ModelBase):
             st_p = []
             for i in range(len(test_S)):
                 ar_face = S[i]*test_S_m[i], SS[i]*SSM[i], D[i]*test_D_m[i], DD[i]*DDM[i], SD[i]*(DDM[i]*SDM[i])
-                ar_bgrd = S[i]*(1-test_S_m[i]), SS[i]*(1-SSM[i]), D[i]*(1-test_D_m[i]), DD[i]*(1-DDM[i]), SD[i]*(1-DDM[i]*SDM[i])
+                ar_bgrd = S[i]*(1-test_S_m[i]), SS[i]*(1-SSM[i]), D[i]*(1-test_D_m[i]), DD[i]*(1-DDM[i]), SD[i]*(1-DDM[i])*(1-SDM[i])
                 st_b.append(np.concatenate(ar_bgrd, axis=1))
 
-                ar_over = S[i], SS[i]*SSM[i] + S[i]*(1-SSM[i]), D[i], DD[i]*DDM[i] + D[i]*(1-DDM[i]), SD[i]*(DDM[i]*SDM[i]) + D[i]*(1-DDM[i]*SDM[i])
+                ar_over = S[i], SS[i]*SSM[i] + S[i]*(1-SSM[i]), D[i], DD[i]*DDM[i] + D[i]*(1-DDM[i]), SD[i]*(DDM[i]*SDM[i]) + D[i]*(1-DDM[i])*(1-SDM[i])
                 st_p.append(np.concatenate(ar_over, axis=1))
 
             result += [('SAEHD background', np.concatenate(st_b, axis=0)), ]
