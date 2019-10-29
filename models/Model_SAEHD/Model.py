@@ -529,7 +529,8 @@ class SAEHDModel(ModelBase):
                 src_code_d_zeros = K.zeros_like(src_code_d)
                 dst_code_d = self.dis( self.model.dst_code )
                 dst_code_d_ones = K.ones_like(dst_code_d)
-                G_loss += 0.01*DLoss(src_code_d_ones, src_code_d)
+                dst_code_d_zeros = K.zeros_like(src_code_d)
+                G_loss += 0.01*(DLoss(src_code_d_ones, src_code_d) + DLoss(dst_code_d_zeros, dst_code_d))
 
                 loss_D = (DLoss(dst_code_d_ones , dst_code_d) + \
                           DLoss(src_code_d_zeros, src_code_d) ) * 0.5
