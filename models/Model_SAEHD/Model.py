@@ -680,6 +680,13 @@ class SAEHDModel(ModelBase):
             result += [('SAEHD background', np.concatenate(st_b, axis=0)), ]
             result += [('SAEHD overlay', np.concatenate(st_p, axis=0)), ]
 
+            st_test = []
+            for i in range(len(test_S)):
+                ar_over = S[i], SS[i]*SSM[i] + S[i]*(1-SSM[i]), D[i], DD[i]*DDM[i] + D[i]*(1-DDM[i]), SDM[i]*SSM[i] + (D[i]*(1-DDM[i]) + SDM[i]*DDM[i])*(1-SSM[i])
+                st_test.append(np.concatenate(ar_over, axis=1))
+
+            result += [('SAEHD test', np.concatenate(st_test, axis=0)), ]
+
         return result
 
     def predictor_func (self, face=None, dummy_predict=False):
