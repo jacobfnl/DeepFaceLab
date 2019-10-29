@@ -552,7 +552,7 @@ class SAEHDModel(ModelBase):
                 self.src_dst_mask_train = K.function ([self.model.warped_src, self.model.warped_dst, self.model.target_srcm, self.model.target_dstm],[src_mask_loss, dst_mask_loss], self.src_dst_mask_opt.get_updates(src_mask_loss+dst_mask_loss, self.model.src_dst_mask_trainable_weights ) )
 
             if self.options['learn_mask']:
-                self.AE_view = K.function ([self.model.warped_src, self.model.warped_dst], [self.model.pred_src_src, self.model.pred_dst_dst, self.model.pred_dst_dstm, self.model.pred_src_dst, self.model.pred_src_dstm])
+                self.AE_view = K.function ([self.model.warped_src, self.model.warped_dst], [self.model.pred_src_src, self.model.pred_src_srcm, self.model.pred_dst_dst, self.model.pred_dst_dstm, self.model.pred_src_dst, self.model.pred_src_dstm])
             else:
                 self.AE_view = K.function ([self.model.warped_src, self.model.warped_dst], [self.model.pred_src_src, self.model.pred_dst_dst, self.model.pred_src_dst ])
 
@@ -646,8 +646,8 @@ class SAEHDModel(ModelBase):
         test_D_m = sample[1][2][0:4]
 
         if self.options['learn_mask']:
-            S, D, SS, DD, DDM, SD, SDM = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S, test_D]) ) ]
-            DDM, SDM, = [ np.repeat (x, (3,), -1) for x in [DDM, SDM] ]
+            S, D, SS, SSM, DD, DDM, SD, SDM = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S, test_D]) ) ]
+            SSM, DDM, SDM, = [ np.repeat (x, (3,), -1) for x in [SSM, DDM, SDM]]
         else:
             S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S, test_D]) ) ]
 
@@ -663,10 +663,22 @@ class SAEHDModel(ModelBase):
         if self.options['learn_mask']:
             st_m = []
             for i in range(len(test_S)):
-                ar = S[i]*test_S_m[i], SS[i], D[i]*test_D_m[i], DD[i]*DDM[i], SD[i]*(DDM[i]*SDM[i])
+                ar = S[i]*test_S_m[i], SS[i]*SSM[i], D[i]*test_D_m[i], DD[i]*DDM[i], SD[i]*(DDM[i]*SDM[i])
                 st_m.append ( np.concatenate ( ar, axis=1) )
 
             result += [ ('SAEHD masked', np.concatenate (st_m, axis=0 )), ]
+
+            st_b = []
+            st_p = []
+            for i in range(len(test_S)):
+                ar_bgrd = S[i]*(1-test_S_m[i]), SS[i]*(1-SSM[i]), D[i]*(1-test_D_m[i]), DD[i]*(1-DDM[i]), SD[i]*(1-DDM[i])*(1-SDM[i])
+                st_b.append(np.concatenate(ar_bgrd, axis=1))
+
+                ar_over = S[i], SS[i]*SSM[i] + S[i]*(1-SSM[i]), D[i], DD[i]*DDM[i] + D[i]*(1-DDM[i]), SD[i]*(1-(1-DDM[i])*(1-SDM[i])) + D[i]*(1-DDM[i])*(1-SDM[i])
+                st_p.append(np.concatenate(ar_over, axis=1))
+
+            result += [('SAEHD background', np.concatenate(st_b, axis=0)), ]
+            result += [('SAEHD overlay', np.concatenate(st_p, axis=0)), ]
 
         return result
 
