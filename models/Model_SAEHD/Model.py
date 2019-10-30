@@ -454,7 +454,23 @@ class SAEHDModel(ModelBase):
 
             self.opt_dis_model = [ (self.dis, 'dis.h5') ]
 
-        loaded, not_loaded = [], self.model.get_model_filename_list()+self.opt_dis_model
+        if True:
+            def fake_dis_flow():
+                def func(x):
+                    x, = x
+                    from nnlib.nnlib import keras.applications.mobilenet_v2.MobileNetV2
+
+                    x = MobileNetV2(include_top=False, weights='imagenet')(x)
+                    return Dense(256, activation='sigmoid')(x)
+
+                return func
+
+            sh = [Input(bgr_shape)]
+            self.fake_dis = modelify(fake_dis_flow())(sh)
+
+            self.opt_fake_dis_model = [ (self.fake_dis, 'fake_dis.h5') ]
+
+        loaded, not_loaded = [], self.model.get_model_filename_list()+self.opt_dis_model + self.opt_fake_dis_model
         if not self.is_first_run():
             loaded, not_loaded = self.load_weights_safe(not_loaded)
 
@@ -486,6 +502,7 @@ class SAEHDModel(ModelBase):
             self.src_dst_opt      = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
             self.src_dst_mask_opt = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
             self.D_opt            = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
+            self.fake_D_opt       = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
 
             if self.options['ms_ssim_loss']:
                 # TODO - Done
@@ -536,10 +553,45 @@ class SAEHDModel(ModelBase):
 
                 self.D_train = K.function ([self.model.warped_src, self.model.warped_dst],[loss_D], self.D_opt.get_updates(loss_D, self.dis.trainable_weights) )
 
+            if self.options.get('fake_face_training', True):
+                def DLoss(labels, logits):
+                    return K.mean(K.binary_crossentropy(labels, logits))
+
+                real_src = self.model.target_src
+                fake_src = self.model.target_src*(1.0 - target_srcm) + self.model.pred_src_src*target_srcm
+                real_dst = self.model.target_dst
+                fake_dst = self.model.target_dst*(1.0 - target_dstm) + self.model.pred_dst_dst*target_dstm
+
+                real_src_d = self.fake_dis(real_src)
+                fake_src_d = self.fake_dis(fake_src)
+                real_dst_d = self.fake_dis(real_dst)
+                fake_dst_d = self.fake_dis(fake_dst)
+
+                src_d_zeros = K.zeros_like(real_src_d)
+                src_d_ones = K.ones_like(fake_src_d)
+                dst_d_zeros = K.zeros_like(real_dst_d)
+                dst_d_ones = K.ones_like(real_dst_d)
+
+                G_loss += 0.001 * (DLoss(src_d_ones, real_src_d)
+                                   + DLoss(src_d_zeros, fake_src_d)
+                                   + DLoss(dst_d_ones, real_dst_d)
+                                   + DLoss(dst_d_zeros, fake_src_d))
+
+                loss_fake_D = 0.25 * (DLoss(src_d_zeros, real_src_d)
+                                      + DLoss(src_d_ones, fake_src_d)
+                                      + DLoss(dst_d_zeros, real_dst_d)
+                                      + DLoss(dst_d_ones, fake_src_d))
+
+                self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst],
+                                               [loss_fake_D],
+                                               self.D_opt.get_updates(loss_fake_D, self.fake_dis.trainable_weights))
+
             self.src_dst_train = K.function ([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
                                              [src_loss,dst_loss],
                                              self.src_dst_opt.get_updates( G_loss, self.model.src_dst_trainable_weights)
                                              )
+
+
 
             if self.options['learn_mask']:
                 if self.options['ms_ssim_loss']:
