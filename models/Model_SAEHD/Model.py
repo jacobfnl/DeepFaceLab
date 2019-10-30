@@ -686,7 +686,7 @@ class SAEHDModel(ModelBase):
 
         if self.true_face_training:
             loss_d, = self.D_train([warped_src, warped_dst])
-            # losses.append(('true_face_loss', loss_d))
+            losses.append(('true_face_loss', loss_d))
 
         if True:
             loss_fake_D, = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
