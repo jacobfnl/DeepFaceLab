@@ -698,7 +698,7 @@ class SAEHDModel(ModelBase):
             losses.append(('src_mask_loss', src_mask_loss))
             losses.append(('dst_mask_loss', dst_mask_loss))
 
-        return losses
+        return tuple(losses)
 
     #override
     def onGetPreview(self, sample):
