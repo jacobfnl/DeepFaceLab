@@ -687,10 +687,10 @@ class SAEHDModel(ModelBase):
         if self.true_face_training:
             loss_d, = self.D_train([warped_src, warped_dst])
             # losses.append(('true_face_loss', loss_d))
-            losses = [('src_loss', src_loss), ('dst_loss', dst_loss), ('true_face_loss', 0.1)]
 
         if True:
             loss_fake_D, = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
+            io.log_info(f'loss fake dis: {loss_fake_D}')
             # losses.append(('fake_face_loss', loss_fake_D))
 
         if self.options['learn_mask']:
