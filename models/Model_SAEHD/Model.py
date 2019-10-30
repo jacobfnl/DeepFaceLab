@@ -582,7 +582,7 @@ class SAEHDModel(ModelBase):
 
                 self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst],
                                                [loss_fake_D],
-                                               self.D_opt.get_updates(loss_fake_D, self.fake_dis.trainable_weights))
+                                               self.fake_D_opt.get_updates(loss_fake_D, self.fake_dis.trainable_weights))
 
             self.src_dst_train = K.function ([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
                                              [src_loss,dst_loss],
