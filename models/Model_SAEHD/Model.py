@@ -458,7 +458,7 @@ class SAEHDModel(ModelBase):
             def fake_dis_flow():
                 def func(x):
                     x, = x
-                    x = MobileNetV2(include_top=False, weights='imagenet')(x)
+                    x = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights='imagenet')(x)
                     return Dense(256, activation='sigmoid')(x)
 
                 return func
