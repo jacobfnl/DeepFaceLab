@@ -682,6 +682,9 @@ class SAEHDModel(ModelBase):
         if self.true_face_training:
             self.D_train([warped_src, warped_dst])
 
+        if True:
+            self.fake_D_train([warped_src, warped_dst])
+
         if self.options['learn_mask']:
             feed = [ warped_src, warped_dst, target_srcm, target_dstm ]
             src_mask_loss, dst_mask_loss, = self.src_dst_mask_train (feed)
