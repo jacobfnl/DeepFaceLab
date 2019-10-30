@@ -569,7 +569,7 @@ class SAEHDModel(ModelBase):
                 self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
                                                [loss_fake_D],
                                                self.fake_D_opt.get_updates(loss_fake_D, self.fake_dis.trainable_weights))
-            
+
             G_loss = src_loss+dst_loss
 
             if self.true_face_training:
@@ -682,18 +682,23 @@ class SAEHDModel(ModelBase):
         feed = [warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm]
 
         src_loss, dst_loss, = self.src_dst_train (feed)
+        losses = [('src_loss', src_loss), ('dst_loss', dst_loss)]
 
         if self.true_face_training:
-            self.D_train([warped_src, warped_dst])
+            loss_d = self.D_train([warped_src, warped_dst])
+            losses.append(('true_face_loss', loss_d))
 
         if True:
-            self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
+            loss_fake_D = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
+            losses.append(('fake_face_loss', loss_fake_D))
 
         if self.options['learn_mask']:
             feed = [ warped_src, warped_dst, target_srcm, target_dstm ]
             src_mask_loss, dst_mask_loss, = self.src_dst_mask_train (feed)
+            losses.append(('src_mask_loss', src_mask_loss))
+            losses.append(('dst_mask_loss', dst_mask_loss))
 
-        return ( ('src_loss', src_loss), ('dst_loss', dst_loss), )
+        return losses
 
     #override
     def onGetPreview(self, sample):
