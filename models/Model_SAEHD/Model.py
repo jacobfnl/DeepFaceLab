@@ -539,24 +539,6 @@ class SAEHDModel(ModelBase):
                 dst_loss =  K.mean( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)(target_dst_masked_opt, pred_dst_dst_masked_opt) )
                 dst_loss += K.mean( 10*K.square( target_dst_masked_opt - pred_dst_dst_masked_opt ) )
 
-            G_loss = src_loss+dst_loss
-
-            if self.true_face_training:
-                def DLoss(labels,logits):
-                    return K.mean(K.binary_crossentropy(labels,logits))
-
-                src_code_d = self.dis( self.model.src_code )
-                src_code_d_ones = K.ones_like(src_code_d)
-                src_code_d_zeros = K.zeros_like(src_code_d)
-                dst_code_d = self.dis( self.model.dst_code )
-                dst_code_d_ones = K.ones_like(dst_code_d)
-                G_loss += 0.01*DLoss(src_code_d_ones, src_code_d)
-
-                loss_D = (DLoss(dst_code_d_ones , dst_code_d) + \
-                          DLoss(src_code_d_zeros, src_code_d) ) * 0.5
-
-                self.D_train = K.function ([self.model.warped_src, self.model.warped_dst],[loss_D], self.D_opt.get_updates(loss_D, self.dis.trainable_weights) )
-
             if self.options.get('fake_face_training', True):
                 def DLoss(labels, logits):
                     return K.mean(K.binary_crossentropy(labels, logits))
@@ -576,7 +558,8 @@ class SAEHDModel(ModelBase):
                 dst_d_zeros = K.zeros_like(real_dst_d)
                 dst_d_ones = K.ones_like(real_dst_d)
 
-                G_loss += 0.025 * (DLoss(src_d_zeros, fake_src_d) + DLoss(dst_d_zeros, fake_dst_d))
+                src_loss += 0.025 * DLoss(src_d_zeros, fake_src_d)
+                dst_loss += 0.025 * DLoss(dst_d_zeros, fake_dst_d)
 
                 loss_fake_D = 0.25 * (DLoss(src_d_zeros, real_src_d)
                                       + DLoss(src_d_ones, fake_src_d)
@@ -586,6 +569,24 @@ class SAEHDModel(ModelBase):
                 self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
                                                [loss_fake_D],
                                                self.fake_D_opt.get_updates(loss_fake_D, self.fake_dis.trainable_weights))
+            
+            G_loss = src_loss+dst_loss
+
+            if self.true_face_training:
+                def DLoss(labels,logits):
+                    return K.mean(K.binary_crossentropy(labels,logits))
+
+                src_code_d = self.dis( self.model.src_code )
+                src_code_d_ones = K.ones_like(src_code_d)
+                src_code_d_zeros = K.zeros_like(src_code_d)
+                dst_code_d = self.dis( self.model.dst_code )
+                dst_code_d_ones = K.ones_like(dst_code_d)
+                G_loss += 0.01*DLoss(src_code_d_ones, src_code_d)
+
+                loss_D = (DLoss(dst_code_d_ones , dst_code_d) + \
+                          DLoss(src_code_d_zeros, src_code_d) ) * 0.5
+
+                self.D_train = K.function ([self.model.warped_src, self.model.warped_dst],[loss_D], self.D_opt.get_updates(loss_D, self.dis.trainable_weights) )
 
             self.src_dst_train = K.function ([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
                                              [src_loss,dst_loss],
