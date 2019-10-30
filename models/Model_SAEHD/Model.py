@@ -462,6 +462,9 @@ class SAEHDModel(ModelBase):
                     x, = x
                     x = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights='imagenet')(x)
                     x = Dense(256)(x)
+                    x = LeakyReLU(0.1)(x)
+                    x = BatchNormalization()(x)
+                    x = Dropout(0.2)(x)
                     return Dense(1, activation='sigmoid')(x)
 
                 return func
