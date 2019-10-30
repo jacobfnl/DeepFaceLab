@@ -685,11 +685,11 @@ class SAEHDModel(ModelBase):
         losses = [('src_loss', src_loss), ('dst_loss', dst_loss)]
 
         if self.true_face_training:
-            loss_d = self.D_train([warped_src, warped_dst])
+            loss_d, = self.D_train([warped_src, warped_dst])
             losses.append(('true_face_loss', loss_d))
 
         if True:
-            loss_fake_D = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
+            loss_fake_D, = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
             losses.append(('fake_face_loss', loss_fake_D))
 
         if self.options['learn_mask']:
@@ -698,7 +698,7 @@ class SAEHDModel(ModelBase):
             losses.append(('src_mask_loss', src_mask_loss))
             losses.append(('dst_mask_loss', dst_mask_loss))
 
-        return tuple(losses)
+        return losses
 
     #override
     def onGetPreview(self, sample):
