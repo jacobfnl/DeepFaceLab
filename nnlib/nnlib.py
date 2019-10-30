@@ -86,6 +86,7 @@ ZeroPadding2D = KL.ZeroPadding2D
 
 RandomNormal = keras.initializers.RandomNormal
 Model = keras.models.Model
+MobileNetV2 = keras.applications.mobilenet_v2.MobileNetV2
 
 Adam = nnlib.Adam
 RMSprop = nnlib.RMSprop

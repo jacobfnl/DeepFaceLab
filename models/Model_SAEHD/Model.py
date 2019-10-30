@@ -458,8 +458,6 @@ class SAEHDModel(ModelBase):
             def fake_dis_flow():
                 def func(x):
                     x, = x
-                    from nnlib.nnlib import keras.applications.mobilenet_v2.MobileNetV2
-
                     x = MobileNetV2(include_top=False, weights='imagenet')(x)
                     return Dense(256, activation='sigmoid')(x)
 
