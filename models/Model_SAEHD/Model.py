@@ -454,6 +454,8 @@ class SAEHDModel(ModelBase):
 
             self.opt_dis_model = [ (self.dis, 'dis.h5') ]
 
+        self.opt_fake_dis_model = []
+
         if True:
             def fake_dis_flow():
                 def func(x):
