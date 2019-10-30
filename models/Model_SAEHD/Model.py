@@ -459,7 +459,8 @@ class SAEHDModel(ModelBase):
                 def func(x):
                     x, = x
                     x = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights='imagenet')(x)
-                    return Dense(256, activation='sigmoid')(x)
+                    x = Dense(256)(x)
+                    return Dense(1, activation='sigmoid')(x)
 
                 return func
 
@@ -657,11 +658,11 @@ class SAEHDModel(ModelBase):
 
     #override
     def get_model_filename_list(self):
-        return self.model.get_model_filename_list ( exclude_for_pretrain=(self.pretrain and self.iter != 0) ) +self.opt_dis_model
+        return self.model.get_model_filename_list ( exclude_for_pretrain=(self.pretrain and self.iter != 0) ) +self.opt_dis_model + self.opt_fake_dis_model
 
     #override
     def onSave(self):
-        self.save_weights_safe( self.get_model_filename_list()+self.opt_dis_model )
+        self.save_weights_safe( self.get_model_filename_list()+self.opt_dis_model+self.opt_fake_dis_model )
 
     #override
     def on_success_train_one_iter(self):
