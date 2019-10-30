@@ -570,7 +570,7 @@ class SAEHDModel(ModelBase):
                 dst_d_zeros = K.zeros_like(real_dst_d)
                 dst_d_ones = K.ones_like(real_dst_d)
 
-                G_loss += 0.001 * (DLoss(src_d_ones, real_src_d)
+                G_loss += 0.01 * (DLoss(src_d_ones, real_src_d)
                                    + DLoss(src_d_zeros, fake_src_d)
                                    + DLoss(dst_d_ones, real_dst_d)
                                    + DLoss(dst_d_zeros, fake_src_d))
