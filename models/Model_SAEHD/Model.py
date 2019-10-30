@@ -564,7 +564,7 @@ class SAEHDModel(ModelBase):
                 loss_fake_D = 0.25 * (DLoss(src_d_zeros, real_src_d)
                                       + DLoss(src_d_ones, fake_src_d)
                                       + DLoss(dst_d_zeros, real_dst_d)
-                                      + DLoss(dst_d_ones, fake_src_d))
+                                      + DLoss(dst_d_ones, fake_dst_d))
 
                 self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
                                                [loss_fake_D],
