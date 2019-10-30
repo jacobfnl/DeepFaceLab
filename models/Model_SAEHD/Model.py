@@ -580,7 +580,7 @@ class SAEHDModel(ModelBase):
                                       + DLoss(dst_d_zeros, real_dst_d)
                                       + DLoss(dst_d_ones, fake_src_d))
 
-                self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst],
+                self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
                                                [loss_fake_D],
                                                self.fake_D_opt.get_updates(loss_fake_D, self.fake_dis.trainable_weights))
 
@@ -683,7 +683,7 @@ class SAEHDModel(ModelBase):
             self.D_train([warped_src, warped_dst])
 
         if True:
-            self.fake_D_train([warped_src, warped_dst])
+            self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
 
         if self.options['learn_mask']:
             feed = [ warped_src, warped_dst, target_srcm, target_dstm ]
