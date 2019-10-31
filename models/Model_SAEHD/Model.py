@@ -137,6 +137,11 @@ class SAEHDModel(ModelBase):
             self.options['absolute_loss'] = self.options.get('absolute_loss', False)
             self.options['random_warp'] = self.options.get('random_warp', True)
             self.options['true_face_training'] = self.options.get('true_face_training', default_true_face_training)
+
+            self.options['gan_training'] = self.options.get('gan_training', default_gan_training)
+            self.options['gan_model'] = self.options.get('gan_model', default_gan_model)
+            self.options['gan_power'] = self.options.get('gan_power', default_gan_power)
+
             self.options['face_style_power'] = self.options.get('face_style_power', default_face_style_power)
             self.options['bg_style_power'] = self.options.get('bg_style_power', default_bg_style_power)
             self.options['ct_mode'] = self.options.get('ct_mode', 0)
@@ -475,7 +480,7 @@ class SAEHDModel(ModelBase):
 
         self.opt_fake_dis_model = []
 
-        if True:
+        if self.options['gan_training']:
             def fake_dis_flow():
                 def func(x):
                     x, = x
@@ -492,7 +497,7 @@ class SAEHDModel(ModelBase):
             self.fake_dis = modelify(fake_dis_flow())(sh)
             gan_model_name = 'mobilenetv2'
 
-            self.opt_fake_dis_model = [ (self.fake_dis, f'{gan_model_name}_dis.h5') ]
+            self.opt_fake_dis_model = [(self.fake_dis, f'{gan_model_name}_dis.h5')]
 
         loaded, not_loaded = [], self.model.get_model_filename_list()+self.opt_dis_model + self.opt_fake_dis_model
         if not self.is_first_run():
@@ -559,7 +564,7 @@ class SAEHDModel(ModelBase):
                 dst_loss =  K.mean( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)(target_dst_masked_opt, pred_dst_dst_masked_opt) )
                 dst_loss += K.mean( 10*K.square( target_dst_masked_opt - pred_dst_dst_masked_opt ) )
 
-            if self.options.get('fake_face_training', True):
+            if self.options['gan_training']:
                 def DLoss(labels, logits):
                     return K.mean(K.binary_crossentropy(labels, logits))
 
@@ -578,8 +583,9 @@ class SAEHDModel(ModelBase):
                 dst_d_zeros = K.zeros_like(real_dst_d)
                 dst_d_ones = K.ones_like(real_dst_d)
 
-                src_loss += 0.1 * DLoss(src_d_zeros, fake_src_d)
-                dst_loss += 0.1 * DLoss(dst_d_zeros, fake_dst_d)
+                generator_loss_coeff = self.options['gan_power'] / 100.0
+                src_loss += generator_loss_coeff * DLoss(src_d_zeros, fake_src_d)
+                dst_loss += generator_loss_coeff * DLoss(dst_d_zeros, fake_dst_d)
 
                 loss_fake_D = 0.25 * (DLoss(src_d_zeros, real_src_d)
                                       + DLoss(src_d_ones, fake_src_d)
@@ -708,9 +714,9 @@ class SAEHDModel(ModelBase):
             loss_d, = self.D_train([warped_src, warped_dst])
             # losses.append(('true_face_loss', loss_d))
 
-        if True:
+        if self.options['gan_training']:
             loss_fake_D, = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
-            io.log_info(f'loss fake dis: {loss_fake_D}')
+            io.log_info(f'discriminator loss': {loss_fake_D}')
             # losses.append(('fake_face_loss', loss_fake_D))
 
         if self.options['learn_mask']:
