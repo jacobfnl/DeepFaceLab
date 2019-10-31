@@ -11,11 +11,11 @@ from nnlib import nnlib
 from samplelib import *
 
 GAN_OPTIONS = [
-    {'name': 'MobileNetV2', 'menu_name': 'MobileNetV2 [3.5M params]'},
-    {'name': 'DenseNet121', 'menu_name': 'DenseNet121 [8M params]'},
-    {'name': 'InceptionV3', 'menu_name': 'DenseNet121 [23M params]'},
-    {'name': 'InceptionResNetV2', 'menu_name': 'DenseNet121 [55M params]'},
-    {'name': 'NASNetLarge', 'menu_name': 'DenseNet121 [88M params]'},
+    {'name': 'MobileNetV2', 'menu_name': 'MobileNetV2 [3.5M params]', 'model': MobileNetV2},
+    {'name': 'DenseNet121', 'menu_name': 'DenseNet121 [8M params]', 'model': DenseNet121},
+    {'name': 'InceptionV3', 'menu_name': 'DenseNet121 [23M params]', 'model': InceptionV3},
+    {'name': 'InceptionResNetV2', 'menu_name': 'DenseNet121 [55M params]', 'model': InceptionResNetV2},
+    {'name': 'NASNetLarge', 'menu_name': 'DenseNet121 [88M params]', 'model': NASNetLarge},
 ]
 
 #SAE - Styled AutoEncoder
@@ -489,10 +489,14 @@ class SAEHDModel(ModelBase):
         self.opt_fake_dis_model = []
 
         if self.options['gan_training']:
+            gan_option = GAN_OPTIONS[self.options['gan_model']]
+            gan_name = gan_option['name']
+            gan_model = gan_option['model']
+
             def fake_dis_flow():
                 def func(x):
                     x, = x
-                    x = MobileNetV2(input_shape=(resolution, resolution, 3), include_top=False, weights='imagenet')(x)
+                    x = gan_model(input_shape=(resolution, resolution, 3), include_top=False, weights='imagenet')(x)
                     x = Dense(256)(x)
                     x = LeakyReLU(0.1)(x)
                     x = BatchNormalization()(x)
@@ -503,9 +507,8 @@ class SAEHDModel(ModelBase):
 
             sh = [Input(bgr_shape)]
             self.fake_dis = modelify(fake_dis_flow())(sh)
-            gan_model_name = 'mobilenetv2'
 
-            self.opt_fake_dis_model = [(self.fake_dis, f'{gan_model_name}_dis.h5')]
+            self.opt_fake_dis_model = [(self.fake_dis, f'{gan_name}_dis.h5')]
 
         loaded, not_loaded = [], self.model.get_model_filename_list()+self.opt_dis_model + self.opt_fake_dis_model
         if not self.is_first_run():

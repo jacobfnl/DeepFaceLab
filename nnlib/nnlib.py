@@ -86,7 +86,12 @@ ZeroPadding2D = KL.ZeroPadding2D
 
 RandomNormal = keras.initializers.RandomNormal
 Model = keras.models.Model
+
 MobileNetV2 = keras.applications.mobilenet_v2.MobileNetV2
+DenseNet121 = keras.applications.densenet.DenseNet121
+InceptionV3 = keras.applications.inception_v3.InceptionV3
+InceptionResNetV2 = keras.applications.inception_resnet_v2.InceptionResNetV2
+NASNetLarge = keras.applications.nasnet.NASNetLarge
 
 Adam = nnlib.Adam
 RMSprop = nnlib.RMSprop
