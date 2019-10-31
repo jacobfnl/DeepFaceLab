@@ -465,7 +465,7 @@ class SAEHDModel(ModelBase):
                     x = LeakyReLU(0.1)(x)
                     x = BatchNormalization()(x)
                     x = Dropout(0.2)(x)
-                    return Dense(1, activation='sigmoid')(x)
+                    return Dense(1)(x)
 
                 return func
 
@@ -548,23 +548,15 @@ class SAEHDModel(ModelBase):
                 real_dst = self.model.target_dst
                 fake_dst = self.model.target_dst*(1.0 - target_dstm) + self.model.pred_dst_dst*target_dstm
 
-                real_src_d = self.fake_dis(real_src)
-                fake_src_d = self.fake_dis(fake_src)
-                real_dst_d = self.fake_dis(real_dst)
-                fake_dst_d = self.fake_dis(fake_dst)
+                real_src_scores = self.fake_dis(real_src)
+                fake_src_scores = self.fake_dis(fake_src)
+                real_dst_scores = self.fake_dis(real_dst)
+                fake_dst_scores = self.fake_dis(fake_dst)
 
-                src_d_zeros = K.zeros_like(real_src_d)
-                src_d_ones = K.ones_like(fake_src_d)
-                dst_d_zeros = K.zeros_like(real_dst_d)
-                dst_d_ones = K.ones_like(real_dst_d)
+                src_loss += -0.01 * K.mean(fake_src_scores)
+                dst_loss += -0.01 * K.mean(fake_dst_scores)
 
-                src_loss += 0.1 * DLoss(src_d_zeros, fake_src_d)
-                dst_loss += 0.1 * DLoss(dst_d_zeros, fake_dst_d)
-
-                loss_fake_D = 0.25 * (DLoss(src_d_zeros, real_src_d)
-                                      + DLoss(src_d_ones, fake_src_d)
-                                      + DLoss(dst_d_zeros, real_dst_d)
-                                      + DLoss(dst_d_ones, fake_dst_d))
+                loss_fake_D = K.mean(fake_src_scores) + K.mean(fake_dst_scores) - K.mean(real_src_scores) - K.mean(real_dst_scores)
 
                 self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
                                                [loss_fake_D],
