@@ -460,7 +460,7 @@ class SAEHDModel(ModelBase):
             def fake_dis_flow():
                 def func(x):
                     x, = x
-                    x = MobileNetV2(input_shape=(128, 128, 3), include_top=False, weights='imagenet')(x)
+                    x = MobileNetV2(input_shape=(resolution, resolution, 3), include_top=False, weights='imagenet')(x)
                     x = Dense(256)(x)
                     x = LeakyReLU(0.1)(x)
                     x = BatchNormalization()(x)
