@@ -471,8 +471,9 @@ class SAEHDModel(ModelBase):
 
             sh = [Input(bgr_shape)]
             self.fake_dis = modelify(fake_dis_flow())(sh)
+            gan_model_name = 'mobilenetv2'
 
-            self.opt_fake_dis_model = [ (self.fake_dis, 'fake_dis.h5') ]
+            self.opt_fake_dis_model = [ (self.fake_dis, f'{gan_model_name}_dis.h5') ]
 
         loaded, not_loaded = [], self.model.get_model_filename_list()+self.opt_dis_model + self.opt_fake_dis_model
         if not self.is_first_run():
