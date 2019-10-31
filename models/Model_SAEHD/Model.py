@@ -62,6 +62,11 @@ class SAEHDModel(ModelBase):
             self.options['ed_ch_dims'] = self.options.get('ed_ch_dims', default_ed_ch_dims)
 
         default_true_face_training = self.options.get('true_face_training', False)
+
+        default_gan_training = self.options.get('gan_training', False)
+        default_gan_model = self.options.get('default_gan_model', 0)
+        default_gan_power = self.options.get('default_gan_power', 1.0)
+
         default_face_style_power = self.options.get('face_style_power', 0.0)
         default_bg_style_power = self.options.get('bg_style_power', 0.0)
 
@@ -82,6 +87,20 @@ class SAEHDModel(ModelBase):
             self.options['random_warp'] = io.input_bool (f"Enable random warp of samples? ( y/n, ?:help skip:{yn_str[default_random_warp]}) : ", default_random_warp, help_message="Random warp is required to generalize facial expressions of both faces. When the face is trained enough, you can disable it to get extra sharpness for less amount of iterations.")
 
             self.options['true_face_training'] = io.input_bool (f"Enable 'true face' training? (y/n, ?:help skip:{yn_str[default_true_face_training]}) : ", default_true_face_training, help_message="The result face will be more like src and will get extra sharpness. Enable it for last 10-20k iterations before conversion.")
+
+            self.options['gan_training'] = io.input_bool (f"Enable GAN training? (y/n, ?:help skip:{yn_str[default_gan_training]}) : ", default_gan_training, help_message="Trains a discriminator to discern real vs fake faces")
+            if self.options['gan_training']:
+                self.options['gan_model'] = np.clip(io.input_int(
+                    "Choose discriminator model (0) MobileNetV2 [3.5M params], (1) DenseNet121 [8M params], (2) InceptionV3 [23M params], (3) InceptionResNetV2 [55M params], (4) NASNetLarge [88M params] ?:help skip:%s) : " % default_gan_model,
+                    default_gan_model,
+                    help_message="Larger models may be more accurate but require more VRAM to run"),
+                    0, 4)
+
+                self.options['gan_power'] = np.clip(io.input_int(
+                    "GAN style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % default_gan_power,
+                    default_gan_power,
+                    help_message="Controls how much the GAN output effects the generated images"),
+                    0.0, 100.0)
 
             self.options['face_style_power'] = np.clip ( io.input_number("Face style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % (default_face_style_power), default_face_style_power,
                                                                                help_message="Learn to transfer face style details such as light and color conditions. Warning: Enable it only after 10k iters, when predicted face is clear enough to start learn style. Start from 0.1 value and check history changes. Enabling this option increases the chance of model collapse."), 0.0, 100.0 )
