@@ -553,13 +553,16 @@ class SAEHDModel(ModelBase):
                 real_dst_scores = self.fake_dis(real_dst)
                 fake_dst_scores = self.fake_dis(fake_dst)
 
-                src_loss += -0.01 * K.mean(fake_src_scores)
-                dst_loss += -0.01 * K.mean(fake_dst_scores)
+                loss_fake_G_src = -K.mean(fake_src_scores)
+                loss_fake_G_dst = -K.mean(fake_src_scores)
+
+                src_loss += 0.01 * loss_fake_G_src
+                dst_loss += 0.01 * loss_fake_G_dst
 
                 loss_fake_D = K.mean(fake_src_scores) + K.mean(fake_dst_scores) - K.mean(real_src_scores) - K.mean(real_dst_scores)
 
                 self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
-                                               [loss_fake_D],
+                                               [loss_fake_D, loss_fake_G_src, loss_fake_G_dst],
                                                self.fake_D_opt.get_updates(loss_fake_D, self.fake_dis.trainable_weights))
 
             G_loss = src_loss+dst_loss
@@ -681,8 +684,8 @@ class SAEHDModel(ModelBase):
             # losses.append(('true_face_loss', loss_d))
 
         if True:
-            loss_fake_D, = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
-            io.log_info(f'loss fake dis: {loss_fake_D}')
+            loss_fake_D, loss_fake_G_src, loss_fake_G_dst, = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
+            io.log_info(f'dis: {loss_fake_D}, src: {loss_fake_G_src}, dst: {loss_fake_G_dst}')
             # losses.append(('fake_face_loss', loss_fake_D))
 
         if self.options['learn_mask']:
