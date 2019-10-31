@@ -11,11 +11,11 @@ from nnlib import nnlib
 from samplelib import *
 
 GAN_OPTIONS = [
-    {'name': 'MobileNetV2', 'menu_name': 'MobileNetV2 [3.5M params]', 'model': MobileNetV2},
-    {'name': 'DenseNet121', 'menu_name': 'DenseNet121 [8M params]', 'model': DenseNet121},
-    {'name': 'InceptionV3', 'menu_name': 'DenseNet121 [23M params]', 'model': InceptionV3},
-    {'name': 'InceptionResNetV2', 'menu_name': 'DenseNet121 [55M params]', 'model': InceptionResNetV2},
-    {'name': 'NASNetLarge', 'menu_name': 'DenseNet121 [88M params]', 'model': NASNetLarge},
+    {'name': 'MobileNetV2', 'menu_name': 'MobileNetV2 [3.5M params]', 'model': nnlib.MobileNetV2},
+    {'name': 'DenseNet121', 'menu_name': 'DenseNet121 [8M params]', 'model': nnlib.DenseNet121},
+    {'name': 'InceptionV3', 'menu_name': 'DenseNet121 [23M params]', 'model': nnlib.InceptionV3},
+    {'name': 'InceptionResNetV2', 'menu_name': 'DenseNet121 [55M params]', 'model': nnlib.InceptionResNetV2},
+    {'name': 'NASNetLarge', 'menu_name': 'DenseNet121 [88M params]', 'model': nnlib.NASNetLarge},
 ]
 
 #SAE - Styled AutoEncoder
