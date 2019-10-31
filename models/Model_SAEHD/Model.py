@@ -13,9 +13,9 @@ from samplelib import *
 GAN_OPTIONS = [
     {'name': 'MobileNetV2', 'menu_name': 'MobileNetV2 [3.5M params]'},
     {'name': 'DenseNet121', 'menu_name': 'DenseNet121 [8M params]'},
-    {'name': 'InceptionV3', 'menu_name': 'DenseNet121 [23M params]'},
-    {'name': 'InceptionResNetV2', 'menu_name': 'DenseNet121 [55M params]'},
-    {'name': 'NASNetLarge', 'menu_name': 'DenseNet121 [88M params]'},
+    {'name': 'InceptionV3', 'menu_name': 'InceptionV3 [23M params]'},
+    {'name': 'InceptionResNetV2', 'menu_name': 'InceptionResNetV2 [55M params]'},
+    {'name': 'NASNetLarge', 'menu_name': 'NASNetLarge [88M params]'},
 ]
 
 #SAE - Styled AutoEncoder
