@@ -11,11 +11,11 @@ from nnlib import nnlib
 from samplelib import *
 
 GAN_OPTIONS = [
-    {'name': 'MobileNetV2', 'menu_name': 'MobileNetV2 [3.5M params]', 'model': nnlib.MobileNetV2},
-    {'name': 'DenseNet121', 'menu_name': 'DenseNet121 [8M params]', 'model': nnlib.DenseNet121},
-    {'name': 'InceptionV3', 'menu_name': 'DenseNet121 [23M params]', 'model': nnlib.InceptionV3},
-    {'name': 'InceptionResNetV2', 'menu_name': 'DenseNet121 [55M params]', 'model': nnlib.InceptionResNetV2},
-    {'name': 'NASNetLarge', 'menu_name': 'DenseNet121 [88M params]', 'model': nnlib.NASNetLarge},
+    {'name': 'MobileNetV2', 'menu_name': 'MobileNetV2 [3.5M params]'},
+    {'name': 'DenseNet121', 'menu_name': 'DenseNet121 [8M params]'},
+    {'name': 'InceptionV3', 'menu_name': 'DenseNet121 [23M params]'},
+    {'name': 'InceptionResNetV2', 'menu_name': 'DenseNet121 [55M params]'},
+    {'name': 'NASNetLarge', 'menu_name': 'DenseNet121 [88M params]'},
 ]
 
 #SAE - Styled AutoEncoder
@@ -499,7 +499,13 @@ class SAEHDModel(ModelBase):
         if self.options['gan_training']:
             gan_option = GAN_OPTIONS[self.options['gan_model']]
             gan_name = gan_option['name']
-            gan_model = gan_option['model']
+
+            gan_model_dict = {'MobileNetV2': MobileNetV2,
+                              'DenseNet121': DenseNet121,
+                              'InceptionV3': InceptionV3,
+                              'InceptionResNetV2':InceptionResNetV2,
+                              'NASNetLarge': NASNetLarge}
+            gan_model = gan_model_dict[gan_option['name']]
 
             def fake_dis_flow():
                 def func(x):
