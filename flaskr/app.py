@@ -2,10 +2,13 @@ from pathlib import Path
 
 from flask import Flask, send_file, Response, render_template, render_template_string, request, g
 from flask_socketio import SocketIO, emit
+import logging
 
 
 def create_flask_app(s2c, c2s, s2flask, args):
     app = Flask(__name__, template_folder="templates", static_folder="static")
+    log = logging.getLogger('werkzeug')
+    log.disabled = True
     model_path = Path(args.get('model_path', ''))
     filename = 'preview.jpg'
     preview_file = str(model_path / filename)
