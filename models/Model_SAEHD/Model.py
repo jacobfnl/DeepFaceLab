@@ -716,7 +716,7 @@ class SAEHDModel(ModelBase):
 
         if self.options['gan_training']:
             loss_fake_D, = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
-            io.log_info(f'discriminator loss': {loss_fake_D}')
+            io.log_info(f'discriminator loss: {loss_fake_D}')
             # losses.append(('fake_face_loss', loss_fake_D))
 
         if self.options['learn_mask']:
