@@ -554,7 +554,7 @@ class SAEHDModel(ModelBase):
                 fake_dst_scores = self.fake_dis(fake_dst)
 
                 loss_fake_G_src = -K.mean(fake_src_scores)
-                loss_fake_G_dst = -K.mean(fake_src_scores)
+                loss_fake_G_dst = -K.mean(fake_dst_scores)
 
                 src_loss += 0.01 * loss_fake_G_src
                 dst_loss += 0.01 * loss_fake_G_dst
