@@ -10,6 +10,13 @@ from models import ModelBase
 from nnlib import nnlib
 from samplelib import *
 
+GAN_OPTIONS = [
+    {'name': 'MobileNetV2', 'menu_name': 'MobileNetV2 [3.5M params]'},
+    {'name': 'DenseNet121', 'menu_name': 'DenseNet121 [8M params]'},
+    {'name': 'InceptionV3', 'menu_name': 'DenseNet121 [23M params]'},
+    {'name': 'InceptionResNetV2', 'menu_name': 'DenseNet121 [55M params]'},
+    {'name': 'NASNetLarge', 'menu_name': 'DenseNet121 [88M params]'},
+]
 
 #SAE - Styled AutoEncoder
 class SAEHDModel(ModelBase):
@@ -90,8 +97,9 @@ class SAEHDModel(ModelBase):
 
             self.options['gan_training'] = io.input_bool (f"Enable GAN training? (y/n, ?:help skip:{yn_str[default_gan_training]}) : ", default_gan_training, help_message="Trains a discriminator to discern real vs fake faces")
             if self.options['gan_training']:
+                gan_menu_options = ', '.join([f'({i}) {option["menu_name"]}' for i, option in enumerate(GAN_OPTIONS)])
                 self.options['gan_model'] = np.clip(io.input_int(
-                    "Choose discriminator model (0) MobileNetV2 [3.5M params], (1) DenseNet121 [8M params], (2) InceptionV3 [23M params], (3) InceptionResNetV2 [55M params], (4) NASNetLarge [88M params] ?:help skip:%s) : " % default_gan_model,
+                    f"Choose discriminator model {gan_menu_options} ?:help skip:{default_gan_model}) : ",
                     default_gan_model,
                     help_message="Larger models may be more accurate but require more VRAM to run"),
                     0, 4)
