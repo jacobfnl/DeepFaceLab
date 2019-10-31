@@ -609,8 +609,10 @@ class SAEHDModel(ModelBase):
                 dst_d_ones = K.ones_like(real_dst_d)
 
                 generator_loss_coeff = self.options['gan_power'] / 100.0
-                src_loss += generator_loss_coeff * DLoss(src_d_zeros, fake_src_d)
-                dst_loss += generator_loss_coeff * DLoss(dst_d_zeros, fake_dst_d)
+                s_loss = DLoss(src_d_zeros, fake_src_d)
+                d_loss = DLoss(dst_d_zeros, fake_dst_d)
+                src_loss += generator_loss_coeff * s_loss
+                dst_loss += generator_loss_coeff * d_loss
 
                 loss_fake_D = 0.25 * (DLoss(src_d_zeros, real_src_d)
                                       + DLoss(src_d_ones, fake_src_d)
@@ -618,7 +620,7 @@ class SAEHDModel(ModelBase):
                                       + DLoss(dst_d_ones, fake_dst_d))
 
                 self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
-                                               [loss_fake_D],
+                                               [loss_fake_D, s_loss + d_loss],
                                                self.fake_D_opt.get_updates(loss_fake_D, self.fake_dis.trainable_weights))
 
             G_loss = src_loss+dst_loss
@@ -740,8 +742,8 @@ class SAEHDModel(ModelBase):
             # losses.append(('true_face_loss', loss_d))
 
         if self.options['gan_training']:
-            loss_fake_D, = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
-            io.log_info(f'discriminator loss: {loss_fake_D}')
+            loss_gan_d, loss_gan_g, = self.fake_D_train([warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm])
+            io.log_info(f'gan d loss: {loss_gan_d}, gan g loss: {loss_gan_g}')
             # losses.append(('fake_face_loss', loss_fake_D))
 
         if self.options['learn_mask']:
