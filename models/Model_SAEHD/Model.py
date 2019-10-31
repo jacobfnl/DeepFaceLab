@@ -71,8 +71,9 @@ class SAEHDModel(ModelBase):
         default_true_face_training = self.options.get('true_face_training', False)
 
         default_gan_training = self.options.get('gan_training', False)
-        default_gan_model = self.options.get('default_gan_model', 0)
-        default_gan_power = self.options.get('default_gan_power', 1.0)
+        default_gan_model = self.options.get('gan_model', 0)
+        default_gan_dims = self.options.get('gan_dims', 256)
+        default_gan_power = self.options.get('gan_power', 1.0)
 
         default_face_style_power = self.options.get('face_style_power', 0.0)
         default_bg_style_power = self.options.get('bg_style_power', 0.0)
@@ -103,6 +104,12 @@ class SAEHDModel(ModelBase):
                     default_gan_model,
                     help_message="Larger models may be more accurate but require more VRAM to run"),
                     0, 4)
+
+                self.options['gan_dims'] = np.clip(io.input_int(
+                    f"Choose GAN dims ?:help skip:{default_gan_dims}) : ",
+                    default_gan_dims,
+                    help_message="Larger models may be more accurate but require more VRAM to run"),
+                    1, 1024)
 
                 self.options['gan_power'] = np.clip(io.input_int(
                     "GAN style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % default_gan_power,
@@ -148,6 +155,7 @@ class SAEHDModel(ModelBase):
 
             self.options['gan_training'] = self.options.get('gan_training', default_gan_training)
             self.options['gan_model'] = self.options.get('gan_model', default_gan_model)
+            self.options['gan_dims'] = self.options.get('gan_dims', default_gan_dims)
             self.options['gan_power'] = self.options.get('gan_power', default_gan_power)
 
             self.options['face_style_power'] = self.options.get('face_style_power', default_face_style_power)
@@ -497,7 +505,7 @@ class SAEHDModel(ModelBase):
                 def func(x):
                     x, = x
                     x = gan_model(input_shape=(resolution, resolution, 3), include_top=False, weights='imagenet')(x)
-                    x = Dense(256)(x)
+                    x = Dense(self.options['gan_dims'])(x)
                     x = LeakyReLU(0.1)(x)
                     x = BatchNormalization()(x)
                     x = Dropout(0.2)(x)
@@ -508,7 +516,7 @@ class SAEHDModel(ModelBase):
             sh = [Input(bgr_shape)]
             self.fake_dis = modelify(fake_dis_flow())(sh)
 
-            self.opt_fake_dis_model = [(self.fake_dis, f'{gan_name}_dis.h5')]
+            self.opt_fake_dis_model = [(self.fake_dis, f'{gan_name}_gan.h5')]
 
         loaded, not_loaded = [], self.model.get_model_filename_list()+self.opt_dis_model + self.opt_fake_dis_model
         if not self.is_first_run():
