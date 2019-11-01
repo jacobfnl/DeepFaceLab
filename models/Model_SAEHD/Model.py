@@ -119,7 +119,7 @@ class SAEHDModel(ModelBase):
                     0.0, 100.0)
 
                 self.options['gan_mask_mode'] = np.clip(io.input_int(
-                    f"Choose discriminator masking mode (0) raw, (1) masked, (2) overlay ?:help skip:{default_gan_mask_mode}) : ",
+                    f"Choose GAN masking mode (0) raw, (1) masked, (2) overlay ?:help skip:{default_gan_mask_mode}) : ",
                     default_gan_mask_mode,
                     help_message="Choose what image type to run the discriminator over: raw compares the src and raw "
                                  "prediction, masked compares the masked images, overlay compares the src and "
