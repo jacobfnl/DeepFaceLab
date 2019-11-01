@@ -526,7 +526,7 @@ class SAEHDModel(ModelBase):
                     x = BatchNormalization()(x)
                     x = Dropout(0.2)(x)
                     x = Flatten()(x)
-                    return Dense(1, activation='sigmoid')(x)
+                    return Dense(2, activation='sigmoid')(x)
 
                 return func
 
@@ -620,23 +620,27 @@ class SAEHDModel(ModelBase):
                     real_dst = self.model.target_dst
                     fake_dst = self.model.target_dst*(1.0 - target_dstm) + self.model.pred_dst_dst*target_dstm
 
-                def get_noisy_label(label):
-                    if np.random.random() < 0.05:
-                        label = 0 if label == 1 else 1
-                    if label == 0:
-                        return np.random.uniform(0, 0.1)
-                    else:
-                        return np.random.uniform(0.9, 1.0)
+                def get_smooth_noisy_labels(labels, smoothing=0.1, noise=0.05):
+                    new_labels = []
+                    for label in labels:
+                        if np.random.random() < noise:
+                            label = 0 if label == 1 else 1
+                        if label == 0:
+                            new_labels.append(np.random.uniform(0, 0+smoothing))
+                        else:
+                            new_labels.append(np.random.uniform(1-smoothing, 1.0))
+                    return new_labels
+
 
                 real_src_d = self.fake_dis(real_src)
                 fake_src_d = self.fake_dis(fake_src)
                 real_dst_d = self.fake_dis(real_dst)
                 fake_dst_d = self.fake_dis(fake_dst)
 
-                src_d_zeros = [[get_noisy_label(0)] for i in range(self.batch_size)]
-                src_d_ones = [[get_noisy_label(1)] for i in range(self.batch_size)]
-                dst_d_zeros = [[get_noisy_label(0)] for i in range(self.batch_size)]
-                dst_d_ones = [[get_noisy_label(1)] for i in range(self.batch_size)]
+                src_d_zeros = [get_smooth_noisy_labels([0, 0]) for i in range(self.batch_size)]
+                src_d_ones = [get_smooth_noisy_labels([1, 0]) for i in range(self.batch_size)]
+                dst_d_zeros = [get_smooth_noisy_labels([0, 1]) for i in range(self.batch_size)]
+                dst_d_ones = [get_smooth_noisy_labels([1, 1]) for i in range(self.batch_size)]
 
                 generator_loss_coeff = self.options['gan_power'] / 100.0
                 s_loss = DLoss(src_d_zeros, fake_src_d)
