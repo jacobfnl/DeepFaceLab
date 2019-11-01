@@ -529,7 +529,7 @@ class SAEHDModel(ModelBase):
                     x = LeakyReLU(0.1)(x)
                     x = BatchNormalization()(x)
                     x = Dropout(0.2)(x)
-                    return Dense(2, activation='sigmoid')(x)
+                    return Dense(1, activation='sigmoid')(x)
 
                 return func
 
@@ -628,21 +628,21 @@ class SAEHDModel(ModelBase):
                 real_dst_d = self.fake_dis(real_dst)
                 fake_dst_d = self.fake_dis(fake_dst)
 
-                src_d_zeros_zeros = Concatenate()([K.zeros_like(real_src_d), K.zeros_like(real_src_d)])
-                src_d_ones_zeros = Concatenate()([K.ones_like(fake_src_d), K.zeros_like(fake_src_d)])
-                dst_d_zeros_ones = Concatenate()([K.zeros_like(real_dst_d), K.ones_like(real_dst_d)])
-                dst_d_ones_ones = Concatenate()([K.ones_like(fake_dst_d), K.ones_like(fake_dst_d)])
+                src_d_zeros = K.zeros_like(real_src_d)
+                src_d_ones = K.ones_like(fake_src_d)
+                dst_d_zeros = K.zeros_like(real_dst_d)
+                dst_d_ones = K.ones_like(real_dst_d)
 
                 generator_loss_coeff = self.options['gan_power'] / 100.0
-                s_loss = DLoss(src_d_zeros_zeros, fake_src_d)
-                d_loss = DLoss(dst_d_zeros_ones, fake_dst_d)
+                s_loss = DLoss(src_d_zeros, fake_src_d)
+                d_loss = DLoss(dst_d_zeros, fake_dst_d)
                 src_loss += generator_loss_coeff * s_loss
                 dst_loss += generator_loss_coeff * d_loss
 
-                loss_fake_D = 0.25 * (DLoss(src_d_zeros_zeros, real_src_d)
-                                      + DLoss(src_d_ones_zeros, fake_src_d)
-                                      + DLoss(dst_d_zeros_ones, real_dst_d)
-                                      + DLoss(dst_d_ones_ones, fake_dst_d))
+                loss_fake_D = 0.25 * (DLoss(src_d_zeros, real_src_d)
+                                      + DLoss(src_d_ones, fake_src_d)
+                                      + DLoss(dst_d_zeros, real_dst_d)
+                                      + DLoss(dst_d_ones, fake_dst_d))
 
                 self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
                                                [loss_fake_D, s_loss + d_loss],
