@@ -525,6 +525,10 @@ class SAEHDModel(ModelBase):
                     x = LeakyReLU(0.1)(x)
                     x = BatchNormalization()(x)
                     x = Dropout(0.2)(x)
+                    x = Dense(32)(x)
+                    x = LeakyReLU(0.1)(x)
+                    x = BatchNormalization()(x)
+                    x = Dropout(0.2)(x)
                     return Dense(1, activation='sigmoid')(x)
 
                 return func
