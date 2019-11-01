@@ -625,10 +625,10 @@ class SAEHDModel(ModelBase):
                 real_dst_d = self.fake_dis(real_dst)
                 fake_dst_d = self.fake_dis(fake_dst)
 
-                src_d_zeros = K.random_uniform((1,), 0.0, 0.1)
-                src_d_ones = K.random_uniform((1,), 0.9, 1.0)
-                dst_d_zeros = K.random_uniform((1,), 0.0, 0.1)
-                dst_d_ones = K.random_uniform((1,), 0.9, 1.0)
+                src_d_zeros = K.random_uniform((self.batch_size, 1), 0.0, 0.1)
+                src_d_ones = K.random_uniform((self.batch_size, 1), 0.9, 1.0)
+                dst_d_zeros = K.random_uniform((self.batch_size, 1), 0.0, 0.1)
+                dst_d_ones = K.random_uniform((self.batch_size, 1), 0.9, 1.0)
 
                 generator_loss_coeff = self.options['gan_power'] / 100.0
                 s_loss = DLoss(src_d_zeros, fake_src_d)
