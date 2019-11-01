@@ -620,15 +620,15 @@ class SAEHDModel(ModelBase):
                     real_dst = self.model.target_dst
                     fake_dst = self.model.target_dst*(1.0 - target_dstm) + self.model.pred_dst_dst*target_dstm
 
-                def get_smooth_noisy_labels(labels, smoothing=0.1, noise=0.05):
+                def get_smooth_noisy_labels(labels, smoothing=0.2, noise=0.05):
                     new_labels = []
                     for label in labels:
                         if np.random.random() < noise:
                             label = 0 if label == 1 else 1
                         if label == 0:
-                            new_labels.append(np.random.uniform(0, 0+smoothing))
+                            new_labels.append(np.random.uniform(0, 0+smoothing/2))
                         else:
-                            new_labels.append(np.random.uniform(1-smoothing, 1.0))
+                            new_labels.append(np.random.uniform(1-smoothing/2, 1.0))
                     return new_labels
 
 
