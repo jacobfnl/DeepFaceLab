@@ -112,7 +112,7 @@ class SAEHDModel(ModelBase):
                     help_message="Larger models may be more accurate but require more VRAM to run"),
                     1, 1024)
 
-                self.options['gan_power'] = np.clip(io.input_int(
+                self.options['gan_power'] = np.clip(io.input_number(
                     "GAN style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % default_gan_power,
                     default_gan_power,
                     help_message="Controls how much the GAN output effects the generated images"),
