@@ -525,10 +525,7 @@ class SAEHDModel(ModelBase):
                     x = LeakyReLU(0.1)(x)
                     x = BatchNormalization()(x)
                     x = Dropout(0.2)(x)
-                    x = Dense(32)(x)
-                    x = LeakyReLU(0.1)(x)
-                    x = BatchNormalization()(x)
-                    x = Dropout(0.2)(x)
+                    x = Flatten()(x)
                     return Dense(1, activation='sigmoid')(x)
 
                 return func
@@ -628,10 +625,10 @@ class SAEHDModel(ModelBase):
                 real_dst_d = self.fake_dis(real_dst)
                 fake_dst_d = self.fake_dis(fake_dst)
 
-                src_d_zeros = K.zeros_like(real_src_d)
-                src_d_ones = K.ones_like(fake_src_d)
-                dst_d_zeros = K.zeros_like(real_dst_d)
-                dst_d_ones = K.ones_like(real_dst_d)
+                src_d_zeros = K.random_uniform((1,), 0.0, 0.1)
+                src_d_ones = K.random_uniform((1,), 0.9, 1.0)
+                dst_d_zeros = K.random_uniform((1,), 0.0, 0.1)
+                dst_d_ones = K.random_uniform((1,), 0.9, 1.0)
 
                 generator_loss_coeff = self.options['gan_power'] / 100.0
                 s_loss = DLoss(src_d_zeros, fake_src_d)
