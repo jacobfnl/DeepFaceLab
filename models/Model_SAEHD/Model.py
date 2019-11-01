@@ -593,10 +593,15 @@ class SAEHDModel(ModelBase):
                 def DLoss(labels, logits):
                     return K.mean(K.binary_crossentropy(labels, logits))
 
-                real_src = self.model.target_src
-                fake_src = self.model.target_src*(1.0 - target_srcm) + self.model.pred_src_src*target_srcm
-                real_dst = self.model.target_dst
-                fake_dst = self.model.target_dst*(1.0 - target_dstm) + self.model.pred_dst_dst*target_dstm
+                # real_src = self.model.target_src
+                # fake_src = self.model.target_src*(1.0 - target_srcm) + self.model.pred_src_src*target_srcm
+                # real_dst = self.model.target_dst
+                # fake_dst = self.model.target_dst*(1.0 - target_dstm) + self.model.pred_dst_dst*target_dstm
+
+                real_src = self.model.target_src  # self.model.target_src * target_srcm
+                fake_src = self.model.pred_src_src  # self.model.pred_src_src * target_srcm
+                real_dst = self.model.target_dst  # self.model.target_dst * target_dstm
+                fake_dst = self.model.pred_dst_dst  # self.model.pred_dst_dst * target_dstm
 
                 real_src_d = self.fake_dis(real_src)
                 fake_src_d = self.fake_dis(fake_src)
