@@ -633,11 +633,10 @@ class SAEHDModel(ModelBase):
                 real_dst_d = self.fake_dis(real_dst)
                 fake_dst_d = self.fake_dis(fake_dst)
 
-
-                src_d_zeros = K.variable([get_noisy_label(0) for i in range(self.batch_size)], shape=(self.batch_size, 1))
-                src_d_ones = K.variable([get_noisy_label(1) for i in range(self.batch_size)], shape=(self.batch_size, 1))
-                dst_d_zeros = K.variable([get_noisy_label(0) for i in range(self.batch_size)], shape=(self.batch_size, 1))
-                dst_d_ones = K.variable([get_noisy_label(1) for i in range(self.batch_size)], shape=(self.batch_size, 1))
+                src_d_zeros = K.variable([[get_noisy_label(0)] for i in range(self.batch_size)])
+                src_d_ones = K.variable([[get_noisy_label(1)] for i in range(self.batch_size)])
+                dst_d_zeros = K.variable([[get_noisy_label(0)] for i in range(self.batch_size)])
+                dst_d_ones = K.variable([[get_noisy_label(1)] for i in range(self.batch_size)])
 
                 generator_loss_coeff = self.options['gan_power'] / 100.0
                 s_loss = DLoss(src_d_zeros, fake_src_d)
