@@ -74,6 +74,7 @@ class SAEHDModel(ModelBase):
         default_gan_model = self.options.get('gan_model', 0)
         default_gan_dims = self.options.get('gan_dims', 256)
         default_gan_power = self.options.get('gan_power', 1.0)
+        default_gan_mask_mode = self.options.get('gan_mask_mode', 0)
 
         default_face_style_power = self.options.get('face_style_power', 0.0)
         default_bg_style_power = self.options.get('bg_style_power', 0.0)
@@ -117,6 +118,14 @@ class SAEHDModel(ModelBase):
                     help_message="Controls how much the GAN output effects the generated images"),
                     0.0, 100.0)
 
+                self.options['gan_mask_mode'] = np.clip(io.input_int(
+                    f"Choose discriminator masking mode (0) raw, (1) masked, (2) overlay ?:help skip:{default_gan_mask_mode}) : ",
+                    default_gan_mask_mode,
+                    help_message="Choose what image type to run the discriminator over: raw compares the src and raw "
+                                 "prediction, masked compares the masked images, overlay compares the src and "
+                                 "overlayed prediction"),
+                    0, 2)
+
             self.options['face_style_power'] = np.clip ( io.input_number("Face style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % (default_face_style_power), default_face_style_power,
                                                                                help_message="Learn to transfer face style details such as light and color conditions. Warning: Enable it only after 10k iters, when predicted face is clear enough to start learn style. Start from 0.1 value and check history changes. Enabling this option increases the chance of model collapse."), 0.0, 100.0 )
 
@@ -157,6 +166,7 @@ class SAEHDModel(ModelBase):
             self.options['gan_model'] = self.options.get('gan_model', default_gan_model)
             self.options['gan_dims'] = self.options.get('gan_dims', default_gan_dims)
             self.options['gan_power'] = self.options.get('gan_power', default_gan_power)
+            self.options['gan_mask_mode'] = self.options.get('gan_mask_mode', default_gan_mask_mode)
 
             self.options['face_style_power'] = self.options.get('face_style_power', default_face_style_power)
             self.options['bg_style_power'] = self.options.get('bg_style_power', default_bg_style_power)
@@ -593,15 +603,21 @@ class SAEHDModel(ModelBase):
                 def DLoss(labels, logits):
                     return K.mean(K.binary_crossentropy(labels, logits))
 
-                # real_src = self.model.target_src
-                # fake_src = self.model.target_src*(1.0 - target_srcm) + self.model.pred_src_src*target_srcm
-                # real_dst = self.model.target_dst
-                # fake_dst = self.model.target_dst*(1.0 - target_dstm) + self.model.pred_dst_dst*target_dstm
-
-                real_src = self.model.target_src  # self.model.target_src * target_srcm
-                fake_src = self.model.pred_src_src  # self.model.pred_src_src * target_srcm
-                real_dst = self.model.target_dst  # self.model.target_dst * target_dstm
-                fake_dst = self.model.pred_dst_dst  # self.model.pred_dst_dst * target_dstm
+                if self.options['gan_mask_mode'] == 0:
+                    real_src = self.model.target_src
+                    fake_src = self.model.pred_src_src
+                    real_dst = self.model.target_dst
+                    fake_dst = self.model.pred_dst_dst
+                elif self.options['gan_mask_mode'] == 1:
+                    real_src = target_src_masked_opt
+                    fake_src = pred_src_src_masked_opt
+                    real_dst = target_dst_masked_opt
+                    fake_dst = pred_dst_dst_masked_opt
+                else:
+                    real_src = self.model.target_src
+                    fake_src = self.model.target_src*(1.0 - target_srcm) + self.model.pred_src_src*target_srcm
+                    real_dst = self.model.target_dst
+                    fake_dst = self.model.target_dst*(1.0 - target_dstm) + self.model.pred_dst_dst*target_dstm
 
                 real_src_d = self.fake_dis(real_src)
                 fake_src_d = self.fake_dis(fake_src)
