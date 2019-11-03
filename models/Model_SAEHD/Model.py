@@ -643,8 +643,8 @@ class SAEHDModel(ModelBase):
                 dst_d_ones = [get_smooth_noisy_labels([1, 1]) for i in range(self.batch_size)]
 
                 generator_loss_coeff = self.options['gan_power'] / 100.0
-                s_loss = DLoss(src_d_zeros, fake_src_d)
-                d_loss = DLoss(dst_d_zeros, fake_dst_d)
+                s_loss = DLoss([[0] for i in range(self.batch_size)], K.slice(fake_src_d), [0, 0], [-1, 1])
+                d_loss = DLoss([[0] for i in range(self.batch_size)], K.slice(fake_dst_d), [0, 0], [-1, 1])
                 src_loss += generator_loss_coeff * s_loss
                 dst_loss += generator_loss_coeff * d_loss
 
