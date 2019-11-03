@@ -648,10 +648,10 @@ class SAEHDModel(ModelBase):
                 src_loss += generator_loss_coeff * s_loss
                 dst_loss += generator_loss_coeff * d_loss
 
-                loss_fake_D = 0.25 * (DLoss(src_d_zeros,  K.slice(real_src_d), [0, 0], [-1, 1])
-                                      + DLoss(src_d_ones,  K.slice(fake_src_d), [0, 0], [-1, 1])
-                                      + DLoss(dst_d_zeros, K.slice(real_dst_d), [0, 0], [-1, 1])
-                                      + DLoss(dst_d_ones, K.slice(fake_dst_d), [0, 0], [-1, 1]))
+                loss_fake_D = 0.25 * (DLoss(K.slice(src_d_zeros), [0, 0], [-1, 1],  K.slice(real_src_d), [0, 0], [-1, 1])
+                                      + DLoss(K.slice(src_d_ones), [0, 0], [-1, 1],  K.slice(fake_src_d), [0, 0], [-1, 1])
+                                      + DLoss(K.slice(dst_d_zeros), [0, 0], [-1, 1], K.slice(real_dst_d), [0, 0], [-1, 1])
+                                      + DLoss(K.slice(dst_d_ones), [0, 0], [-1, 1], K.slice(fake_dst_d), [0, 0], [-1, 1]))
 
                 self.fake_D_train = K.function([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
                                                [loss_fake_D, s_loss + d_loss],
