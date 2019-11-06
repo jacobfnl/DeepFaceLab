@@ -133,25 +133,14 @@ class ModelBase(object):
 
         if ask_batch_size and (self.iter == 0 or ask_override):
             default_batch_size = 0 if self.iter == 0 else self.options.get('batch_size',0)
-            self.options['batch_cap'] = max(0, io.input_int("Batch_size (?:help skip:%d) : " % self.options.get('batch_cap', 1),self.options.get('batch_cap', 1),
+            self.options['batch_size'] = max(0, io.input_int("Batch_size (?:help skip:%d) : " % default_batch_size,
+                                                             default_batch_size,
                                                              help_message="Larger batch size is better for NN's"
                                                                           " generalization, but it can cause Out of"
                                                                           " Memory error. Tune this value for your"
                                                                           " videocard manually."))
-            self.options['ping_pong'] = io.input_bool(
-                "Enable ping-pong? (y/n ?:help skip:%s) : " % yn_str[self.options.get('ping_pong', False)],
-                self.options.get('ping_pong', False),
-                help_message="Cycles batch size between 1 and chosen batch size, simulating super convergence")
-            self.options['paddle'] = self.options.get('paddle','ping')
-            if self.options.get('ping_pong',False):
-                self.options['ping_pong_iter'] = max(0, io.input_int("Ping-pong iteration (skip:1000/default) : ", 1000))
-            else:
-                self.options['batch_size'] = self.options.get('batch_cap', 1)
-
         else:
-            self.options['batch_cap'] = self.options.get('batch_cap', 1)
-            self.options['ping_pong'] = self.options.get('ping_pong', False)
-            self.options['ping_pong_iter'] = self.options.get('ping_pong_iter',1000)
+            self.options['batch_size'] = self.options.get('batch_size', 1)
 
         if ask_sort_by_yaw:
             if (self.iter == 0 or ask_override):
@@ -191,26 +180,15 @@ class ModelBase(object):
         if self.target_iter == 0 and 'target_iter' in self.options:
             self.options.pop('target_iter')
 
-        self.batch_size = self.options.get('batch_size', 8)
-        self.batch_cap = self.options.get('batch_cap',1)
-        self.ping_pong_iter = self.options.get('ping_pong_iter',1000)
+        self.batch_size = self.options.get('batch_size', 1)
         self.sort_by_yaw = self.options.get('sort_by_yaw',False)
         self.random_flip = self.options.get('random_flip',True)
-        if self.batch_cap == 0:
-            self.options['batch_cap'] = self.batch_size
-            self.batch_cap = self.options.get('batch_cap',1)
 
         self.src_scale_mod = self.options.get('src_scale_mod',0)
         if self.src_scale_mod == 0 and 'src_scale_mod' in self.options:
             self.options.pop('src_scale_mod')
 
         self.onInitializeOptions(self.iter == 0, ask_override)
-
-        self.ping_pong_options = PingPongOptions(enabled=self.options['ping_pong'],
-                                                 iterations=self.ping_pong_iter,
-                                                 model_iter=self.iter,
-                                                 paddle=self.paddle,
-                                                 batch_cap=self.batch_size)
 
         nnlib.import_all(self.device_config)
         self.keras = nnlib.keras
@@ -282,14 +260,14 @@ class ModelBase(object):
                     io.destroy_window(wnd_name)
                 else:
                     self.sample_for_preview = self.generate_next_sample()
-                    
+
             try:
                 self.get_static_preview()
             except:
                 self.sample_for_preview = self.generate_next_sample()
-                
+
             self.last_sample = self.sample_for_preview
-            
+
         ###Generate text summary of model hyperparameters
         #Find the longest key name and value string. Used as column widths.
         width_name = max([len(k) for k in self.options.keys()] + [17]) + 1 # Single space buffer to left edge. Minimum of 17, the length of the longest static string used "Current iteration"
@@ -419,7 +397,6 @@ class ModelBase(object):
 
     def save(self):
         self.options['batch_size'] = self.batch_size
-        self.options['paddle'] = self.ping_pong_options.paddle
         summary_path = self.get_strpath_storage_for_file('summary.txt')
         Path( summary_path ).write_text(self.model_summary_text)
         self.onSave()
@@ -474,48 +451,48 @@ class ModelBase(object):
 
     def load_weights_safe(self, model_filename_list, optimizer_filename_list=[]):
         exec(nnlib.code_import_all, locals(), globals())
-        
+
         loaded = []
         not_loaded = []
         for mf in model_filename_list:
             model, filename = mf
             filename = self.get_strpath_storage_for_file(filename)
-            
+
             if Path(filename).exists():
                 loaded += [ mf ]
-                
+
                 if issubclass(model.__class__, keras.optimizers.Optimizer):
                     opt = model
-  
+
                     try:
                         with open(filename, "rb") as f:
                             fd = pickle.loads(f.read())
-                        
+
                         weights = fd.get('weights', None)
                         if weights is not None:
                             opt.set_weights(weights)
-                            
+
                     except Exception as e:
                         print ("Unable to load ", filename)
-                        
+
                 else:
                     model.load_weights(filename)
             else:
                 not_loaded += [ mf ]
-                
-                   
+
+
         return loaded, not_loaded
 
     def save_weights_safe(self, model_filename_list):
         exec(nnlib.code_import_all, locals(), globals())
-        
+
         for model, filename in model_filename_list:
             filename = self.get_strpath_storage_for_file(filename) + '.tmp'
 
             if issubclass(model.__class__, keras.optimizers.Optimizer):
                 opt = model
-                
-                try:                    
+
+                try:
                     fd = {}
                     symbolic_weights = getattr(opt, 'weights')
                     if symbolic_weights:
@@ -524,8 +501,8 @@ class ModelBase(object):
                     with open(filename, 'wb') as f:
                         f.write( pickle.dumps(fd) )
                 except Exception as e:
-                    print ("Unable to save ", filename)                
-            else:                
+                    print ("Unable to save ", filename)
+            else:
                 model.save_weights( filename)
 
         rename_list = model_filename_list
@@ -578,13 +555,8 @@ class ModelBase(object):
     #overridable
     def on_success_train_one_iter(self):
         pass
-        
+
     def train_one_iter(self):
-        # if self.iter == 1 and self.options.get('ping_pong', False):
-        #     self.set_batch_size(1)
-        #     self.paddle = 'ping'
-        # elif not self.options.get('ping_pong', False) and self.batch_cap != self.batch_size:
-        #     self.set_batch_size(self.batch_cap)
         sample = self.generate_next_sample()
         iter_time = time.time()
         losses = self.onTrainOneIter(sample, self.generator_list)
@@ -612,7 +584,7 @@ class ModelBase(object):
                 cv2_imwrite (filepath, img )
 
         self.on_success_train_one_iter()
-                
+
         self.iter += 1
 
         return self.iter, iter_time, self.batch_size

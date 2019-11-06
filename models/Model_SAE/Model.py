@@ -511,8 +511,7 @@ class SAEModel(ModelBase):
                                                         [{'types': (t.IMG_TRANSFORMED, face_type, t.MODE_M),
                                                           'resolution': resolution // (2 ** i)} for i in
                                                          range(ms_count)],
-                                    ping_pong=self.ping_pong_options,
-                         ),
+                                    ),
 
                     SampleGeneratorFace(training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, ),
@@ -525,7 +524,7 @@ class SAEModel(ModelBase):
                                                         [{'types': (t.IMG_TRANSFORMED, face_type, t.MODE_M),
                                                           'resolution': resolution // (2 ** i)} for i in
                                                          range(ms_count)],
-                                    ping_pong=self.ping_pong_options,)
+                                        )
                     ])
 
     #override
