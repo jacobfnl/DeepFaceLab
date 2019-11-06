@@ -249,7 +249,7 @@ class SampleProcessor(object):
                 img_bgr  = img[...,0:3]
                 img_mask = img[...,3:4]
 
-                if ct_mode and ct_sample is not None:
+                if ct_mode and isinstance(ct_mode, int) and ct_sample is not None:
                     if ct_sample_bgr is None:
                         ct_sample_bgr = ct_sample.load_bgr()
 
