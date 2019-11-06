@@ -85,7 +85,7 @@ class SAEHDModel(ModelBase):
             self.options['true_face_training'] = io.input_bool (f"Enable 'true face' training? (y/n, ?:help skip:{yn_str[default_true_face_training]}) : ", default_true_face_training, help_message="The result face will be more like src and will get extra sharpness. Enable it for last 10-20k iterations before conversion.")
 
             if self.options['true_face_training']:
-                self.options['true_face_power'] = np.clip(io.input_number("True Face power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % default_true_face_power,
+                self.options['true_face_power'] = np.clip(io.input_number("True face power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % default_true_face_power,
                                                                           default_true_face_power,
                                                                           help_message="Increase to force the shared layer between src and dst to be more similar"), 0.0, 100.0)
 
