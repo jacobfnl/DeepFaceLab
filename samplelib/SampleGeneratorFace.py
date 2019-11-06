@@ -5,9 +5,8 @@ import cv2
 import numpy as np
 
 from facelib import LandmarksProcessor
-from samplelib import (SampleGeneratorBase, SampleLoader, SampleProcessor, SampleGeneratorPingPong,
+from samplelib import (SampleGeneratorBase, SampleLoader, SampleProcessor,
                        SampleType)
-from samplelib.SampleGeneratorPingPong import PingPongOptions, SampleGeneratorPingPong
 from utils import iter_utils
 
 
@@ -18,23 +17,20 @@ output_sample_types = [
                         ...
                       ]
 '''
+class SampleGeneratorFace(SampleGeneratorBase):
+    def __init__ (self, samples_path, debug=False, batch_size=1,
+                  sort_by_yaw=False,
+                  sort_by_yaw_target_samples_path=None,
+                  random_ct_samples_path=None,
+                  sample_process_options=SampleProcessor.Options(),
+                  output_sample_types=[],
+                  person_id_mode=False,
+                  add_sample_idx=False,
+                  generators_count=2,
+                  generators_random_seed=None,
+                  **kwargs):
 
-
-class SampleGeneratorFace(SampleGeneratorPingPong):
-    def __init__ (self, samples_path, debug=False, batch_size=1, 
-                        sort_by_yaw=False, 
-                        sort_by_yaw_target_samples_path=None, 
-                        random_ct_samples_path=None, 
-                        sample_process_options=SampleProcessor.Options(), 
-                        output_sample_types=[], 
-                        person_id_mode=False,
-                        add_sample_idx=False, 
-                        generators_count=2, 
-                        generators_random_seed=None, 
-                        ping_pong=PingPongOptions(),
-                        **kwargs):
-                        
-        super().__init__(samples_path, debug, batch_size=batch_size, ping_pong=ping_pong)
+        super().__init__(samples_path, debug, batch_size)
         self.sample_process_options = sample_process_options
         self.output_sample_types = output_sample_types
         self.add_sample_idx = add_sample_idx
@@ -51,13 +47,13 @@ class SampleGeneratorFace(SampleGeneratorPingPong):
             raise ValueError("len(generators_random_seed) != generators_count")
 
         self.generators_random_seed = generators_random_seed
-        
+
         samples = SampleLoader.load (self.sample_type, self.samples_path, sort_by_yaw_target_samples_path, person_id_mode=person_id_mode)
         self.samples_len = len(samples)
-        
+
         if self.samples_len == 0:
             raise ValueError('No training data provided.')
-        
+
         ct_samples = SampleLoader.load (SampleType.FACE, random_ct_samples_path) if random_ct_samples_path is not None else None
         self.random_ct_sample_chance = 100
 
@@ -69,21 +65,20 @@ class SampleGeneratorFace(SampleGeneratorPingPong):
             self.generators = [iter_utils.SubprocessGenerator ( self.batch_func, (i, samples[i::self.generators_count], ct_samples ) ) for i in range(self.generators_count) ]
 
         self.generator_counter = -1
-    
+
     #overridable
     def get_total_sample_count(self):
         return self.samples_len
-        
+
     def __iter__(self):
         return self
 
     def __next__(self):
         self.generator_counter += 1
         generator = self.generators[self.generator_counter % len(self.generators) ]
-        super().__next__()
         return next(generator)
 
-    def batch_func(self, param ):        
+    def batch_func(self, param ):
         generator_id, samples, ct_samples = param
 
         if self.generators_random_seed is not None:
@@ -104,7 +99,7 @@ class SampleGeneratorFace(SampleGeneratorPingPong):
             shuffle_idxs = []
             shuffle_idxs_2D = [[]]*samples_len
 
-        while True:            
+        while True:
             batches = None
             for n_batch in range(self.batch_size):
                 while True:
@@ -136,16 +131,14 @@ class SampleGeneratorFace(SampleGeneratorPingPong):
 
                     if sample is not None:
                         try:
-                            ct_sample=None                            
-                            if ct_samples is not None:                                
+                            ct_sample=None
+                            if ct_samples is not None:
                                 if np.random.randint(100) < self.random_ct_sample_chance:
                                     ct_sample=ct_samples[np.random.randint(ct_samples_len)]
-                            
-                            x = SampleProcessor.process(sample, self.sample_process_options, self.output_sample_types,
-                                                        self.debug, ct_sample=ct_sample)
+
+                            x = SampleProcessor.process (sample, self.sample_process_options, self.output_sample_types, self.debug, ct_sample=ct_sample)
                         except:
-                            raise Exception(
-                                "Exception occured in sample %s. Error: %s" % (sample.filename, traceback.format_exc()))
+                            raise Exception ("Exception occured in sample %s. Error: %s" % (sample.filename, traceback.format_exc() ) )
 
                         if type(x) != tuple and type(x) != list:
                             raise Exception('SampleProcessor.process returns NOT tuple/list')
@@ -155,7 +148,7 @@ class SampleGeneratorFace(SampleGeneratorPingPong):
                             if self.add_sample_idx:
                                 batches += [ [] ]
                                 i_sample_idx = len(batches)-1
-                                
+
                             if self.person_id_mode:
                                 batches += [ [] ]
                                 i_person_id = len(batches)-1
@@ -165,16 +158,14 @@ class SampleGeneratorFace(SampleGeneratorPingPong):
 
                         if self.add_sample_idx:
                             batches[i_sample_idx].append (idx)
-                            
+
                         if self.person_id_mode:
                             batches[i_person_id].append ( np.array([sample.person_id]) )
 
                         break
+
             yield [ np.array(batch) for batch in batches]
-    
-    def update_batch(self, batch_size):
-        self.batch_size = batch_size
-    
+
     @staticmethod
     def get_person_id_max_count(samples_path):
         return SampleLoader.get_person_id_max_count(samples_path)
