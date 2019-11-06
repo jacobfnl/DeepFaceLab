@@ -241,7 +241,7 @@ class SAEJHModel(ModelBase):
                                 x = Add()([x, x0])
                                 x = LeakyReLU(0.2)(x)
 
-                        return Conv2D(output_nc, kernel_size=5, padding='same', activation='sigmoid')(x)
+                        return Conv2D(output_nc, kernel_size=5, padding='same', activation='linear')(x)
 
                     return func
 
@@ -355,7 +355,7 @@ class SAEJHModel(ModelBase):
                                 x = Add()([x, x0])
                                 x = LeakyReLU(0.2)(x)
 
-                        return Conv2D(output_nc, kernel_size=5, padding='same', activation='sigmoid')(x)
+                        return Conv2D(output_nc, kernel_size=5, padding='same', activation='linear')(x)
 
                     return func
 
@@ -573,6 +573,7 @@ class SAEJHModel(ModelBase):
             elif self.options['face_type'] == 'f':
                 face_type = t.FACE_TYPE_FULL
 
+            t_mode_lab = t.MODE_LAB
             t_mode_bgr = t.MODE_BGR if not self.pretrain else t.MODE_LAB_RAND_TRANSFORM
             if self.options['random_color_change']:
                 t_mode_bgr = t.MODE_LAB_RAND_TRANSFORM
@@ -593,15 +594,15 @@ class SAEJHModel(ModelBase):
                                                                 random_ct_samples_path=training_data_dst_path if self.options['ct_mode'] != 0 else None,
                                                                 debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, scale_range=np.array([-0.05, 0.05])+self.src_scale_mod / 100.0 ),
-                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_bgr), 'resolution':resolution, 'ct_mode': self.options['ct_mode'] },
-                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_bgr), 'resolution': resolution, 'ct_mode': self.options['ct_mode'] },
+                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_lab), 'resolution':resolution, 'ct_mode': self.options['ct_mode'] },
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_lab), 'resolution': resolution, 'ct_mode': self.options['ct_mode'] },
                                                 {'types' : (t.IMG_TRANSFORMED, face_type, t.MODE_M), 'resolution': resolution } ]
                                               ),
 
                     SampleGeneratorFace(training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, ),
-                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_bgr), 'resolution':resolution},
-                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_bgr), 'resolution': resolution},
+                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_lab), 'resolution':resolution},
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_lab), 'resolution': resolution},
                                                 {'types' : (t.IMG_TRANSFORMED, face_type, t.MODE_M), 'resolution': resolution} ])
                              ])
 

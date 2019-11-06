@@ -74,6 +74,7 @@ class SampleProcessor(object):
         MODE_M                     = 43  #mask only
         MODE_BGR_SHUFFLE           = 44  #BGR shuffle
         MODE_LAB_RAND_TRANSFORM    = 45
+        MODE_LAB                   = 46
         MODE_END = 50
 
     class Options(object):
@@ -312,6 +313,8 @@ class SampleProcessor(object):
                 elif mode_type == SPTF.MODE_LAB_RAND_TRANSFORM:
                     rnd_state = np.random.RandomState (sample_rnd_seed)
                     img = random_color_transform(img_bgr, rnd_state)
+                elif mode_type == SPTF.MODE_LAB:
+                    img = cv2.cvtColor(img.astype(np.float32), cv2.COLOR_BGR2LAB)
                 elif mode_type == SPTF.MODE_G:
                     img = np.concatenate ( (np.expand_dims(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY),-1),img_mask) , -1 )
                 elif mode_type == SPTF.MODE_GGG:
