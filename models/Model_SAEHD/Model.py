@@ -62,6 +62,7 @@ class SAEHDModel(ModelBase):
             self.options['ed_ch_dims'] = self.options.get('ed_ch_dims', default_ed_ch_dims)
 
         default_true_face_training = self.options.get('true_face_training', False)
+        default_true_face_power = self.options.get('true_face_power', 1.0)
         default_face_style_power = self.options.get('face_style_power', 0.0)
         default_bg_style_power = self.options.get('bg_style_power', 0.0)
 
@@ -82,6 +83,11 @@ class SAEHDModel(ModelBase):
             self.options['random_warp'] = io.input_bool (f"Enable random warp of samples? ( y/n, ?:help skip:{yn_str[default_random_warp]}) : ", default_random_warp, help_message="Random warp is required to generalize facial expressions of both faces. When the face is trained enough, you can disable it to get extra sharpness for less amount of iterations.")
 
             self.options['true_face_training'] = io.input_bool (f"Enable 'true face' training? (y/n, ?:help skip:{yn_str[default_true_face_training]}) : ", default_true_face_training, help_message="The result face will be more like src and will get extra sharpness. Enable it for last 10-20k iterations before conversion.")
+
+            if self.options['true_face_training']:
+                self.options['true_face_power'] = np.clip(io.input_number("True face power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % default_true_face_power,
+                                                                          default_true_face_power,
+                                                                          help_message="Increase to force the shared layer between src and dst to be more similar"), 0.0, 100.0)
 
             self.options['face_style_power'] = np.clip ( io.input_number("Face style power ( 0.0 .. 100.0 ?:help skip:%.2f) : " % (default_face_style_power), default_face_style_power,
                                                                                help_message="Learn to transfer face style details such as light and color conditions. Warning: Enable it only after 10k iters, when predicted face is clear enough to start learn style. Start from 0.1 value and check history changes. Enabling this option increases the chance of model collapse."), 0.0, 100.0 )
@@ -118,6 +124,7 @@ class SAEHDModel(ModelBase):
             self.options['absolute_loss'] = self.options.get('absolute_loss', False)
             self.options['random_warp'] = self.options.get('random_warp', True)
             self.options['true_face_training'] = self.options.get('true_face_training', default_true_face_training)
+            self.options['true_face_power'] = self.options.get('true_face_power', default_true_face_power)
             self.options['face_style_power'] = self.options.get('face_style_power', default_face_style_power)
             self.options['bg_style_power'] = self.options.get('bg_style_power', default_bg_style_power)
             self.options['ct_mode'] = self.options.get('ct_mode', 0)
@@ -529,7 +536,9 @@ class SAEHDModel(ModelBase):
                 src_code_d_zeros = K.zeros_like(src_code_d)
                 dst_code_d = self.dis( self.model.dst_code )
                 dst_code_d_ones = K.ones_like(dst_code_d)
-                G_loss += 0.01*DLoss(src_code_d_ones, src_code_d)
+
+                generator_loss_coeff = self.options.get('true_face_power', 1.0) / 100.0
+                G_loss += generator_loss_coeff * DLoss(src_code_d_ones, src_code_d)
 
                 loss_D = (DLoss(dst_code_d_ones , dst_code_d) + \
                           DLoss(src_code_d_zeros, src_code_d) ) * 0.5
