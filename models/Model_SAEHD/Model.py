@@ -61,6 +61,7 @@ class SAEHDModel(ModelBase):
             self.options['ae_dims'] = self.options.get('ae_dims', default_ae_dims)
             self.options['ed_ch_dims'] = self.options.get('ed_ch_dims', default_ed_ch_dims)
 
+        default_background_power = self.options.get('background_power', 0.0)
         default_true_face_training = self.options.get('true_face_training', False)
         default_true_face_power = self.options.get('true_face_power', 1.0)
         default_face_style_power = self.options.get('face_style_power', 0.0)
@@ -78,6 +79,10 @@ class SAEHDModel(ModelBase):
             #     "Use absolute loss (L1 norm)? (y/n, ?:help skip: %s ) : " % (yn_str[def_absolute_loss]),
             #     def_absolute_loss,
             #     help_message="")
+
+            self.options['background_power'] = np.clip(io.input_number(f"Background src/dst power ( 0.0 .. 100.0 ?:help skip:{default_background_power}) : ",
+                                                                       default_background_power,
+                                                                       help_message="Learn to transfer image around src/dst face. Does not require lower BS"), 0.0, 100.0)
 
             default_random_warp = self.options.get('random_warp', True)
             self.options['random_warp'] = io.input_bool (f"Enable random warp of samples? ( y/n, ?:help skip:{yn_str[default_random_warp]}) : ", default_random_warp, help_message="Random warp is required to generalize facial expressions of both faces. When the face is trained enough, you can disable it to get extra sharpness for less amount of iterations.")
@@ -123,6 +128,7 @@ class SAEHDModel(ModelBase):
             self.options['ms_ssim_loss'] = self.options.get('ms_ssim_loss', True)
             self.options['absolute_loss'] = self.options.get('absolute_loss', False)
             self.options['random_warp'] = self.options.get('random_warp', True)
+            self.options['background_power'] = self.options.get('background_power', default_background_power)
             self.options['true_face_training'] = self.options.get('true_face_training', default_true_face_training)
             self.options['true_face_power'] = self.options.get('true_face_power', default_true_face_power)
             self.options['face_style_power'] = self.options.get('face_style_power', default_face_style_power)
@@ -478,13 +484,17 @@ class SAEHDModel(ModelBase):
 
         target_src_masked = self.model.target_src*target_srcm
         target_dst_masked = self.model.target_dst*target_dstm
-        target_dst_anti_masked = self.model.target_dst*(1.0 - target_dstm)
+        target_src_anti_masked = self.model.target_src * (1.0 - target_srcm)
+        target_dst_anti_masked = self.model.target_dst * (1.0 - target_dstm)
 
         target_src_masked_opt = target_src_masked if masked_training else self.model.target_src
         target_dst_masked_opt = target_dst_masked if masked_training else self.model.target_dst
 
         pred_src_src_masked_opt = self.model.pred_src_src*target_srcm if masked_training else self.model.pred_src_src
         pred_dst_dst_masked_opt = self.model.pred_dst_dst*target_dstm if masked_training else self.model.pred_dst_dst
+
+        pred_src_src_anti_masked = self.model.pred_src_src * (1.0 - target_srcm)
+        pred_dst_dst_anti_masked = self.model.pred_dst_dst * (1.0 - target_dstm)
 
         psd_target_dst_masked = self.model.pred_src_dst*target_dstm
         psd_target_dst_anti_masked = self.model.pred_src_dst*(1.0 - target_dstm)
@@ -497,9 +507,25 @@ class SAEHDModel(ModelBase):
             if self.options['ms_ssim_loss']:
                 # TODO - Done
                 src_loss = K.mean(10 * MsSSIM(resolution)(target_src_masked_opt, pred_src_src_masked_opt))
+                dst_loss = K.mean(10 * MsSSIM(resolution)(target_dst_masked_opt, pred_dst_dst_masked_opt))
             else:
                 src_loss =  K.mean ( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( target_src_masked_opt, pred_src_src_masked_opt) )
                 src_loss += K.mean ( 10*K.square( target_src_masked_opt - pred_src_src_masked_opt ) )
+
+                dst_loss =  K.mean( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)(target_dst_masked_opt, pred_dst_dst_masked_opt) )
+                dst_loss += K.mean( 10*K.square( target_dst_masked_opt - pred_dst_dst_masked_opt ) )
+
+            background_power = self.options['background_power'] / 100.0
+            if background_power != 0:
+                if self.options['ms_ssim_loss']:
+                    src_loss += K.mean(10 * background_power * MsSSIM(resolution)(pred_src_src_anti_masked, target_src_anti_masked))
+                    dst_loss += K.mean(10 * background_power * MsSSIM(resolution)(pred_dst_dst_anti_masked, target_dst_anti_masked))
+                else:
+                    src_loss += K.mean( (10*background_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( pred_src_src_anti_masked, target_src_anti_masked ))
+                    src_loss += K.mean( (10*background_power)*K.square( pred_dst_dst_anti_masked - target_src_anti_masked ))
+
+                    src_loss += K.mean( (10*background_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( pred_dst_dst_anti_masked, target_dst_anti_masked ))
+                    src_loss += K.mean( (10*background_power)*K.square( pred_dst_dst_anti_masked - target_dst_anti_masked ))
 
             face_style_power = self.options['face_style_power'] / 100.0
             if face_style_power != 0:
@@ -518,12 +544,6 @@ class SAEHDModel(ModelBase):
                     src_loss += K.mean( (10*bg_style_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( psd_target_dst_anti_masked, target_dst_anti_masked ))
                     src_loss += K.mean( (10*bg_style_power)*K.square( psd_target_dst_anti_masked - target_dst_anti_masked ))
 
-            if self.options['ms_ssim_loss']:
-                # TODO - Done
-                dst_loss = K.mean(10 * MsSSIM(resolution)(target_dst_masked_opt, pred_dst_dst_masked_opt))
-            else:
-                dst_loss =  K.mean( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)(target_dst_masked_opt, pred_dst_dst_masked_opt) )
-                dst_loss += K.mean( 10*K.square( target_dst_masked_opt - pred_dst_dst_masked_opt ) )
 
             G_loss = src_loss+dst_loss
 
