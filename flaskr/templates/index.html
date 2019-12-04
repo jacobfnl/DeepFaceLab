@@ -62,6 +62,8 @@
         $('button#zoom_prev').click(zoom_prev);
         $('button#zoom_next').click(zoom_next);
 
+        $('img#preview').click(update);
+
         const socket = io.connect();
         socket.on('preview', function(msg) {
           console.log(msg);
