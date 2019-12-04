@@ -76,8 +76,8 @@
     </script>
 </head>
 <body>
-<h1>Training Preview</h1>
-<h2 id="loss"></h2>
+<div class="mdl-typography--headline">Training Preview</div>
+<div class="mdl-typography--title" id="loss"></div>
 <div>
     <button class='mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect' id='save'>Save</button>
     <button class='mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect' id='exit'>Exit</button>
@@ -87,6 +87,6 @@
     <button class='mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect' id='zoom_prev'>Zoom -</button>
     <button class='mdl-button mdl-js-button mdl-button--raised mdl-js-ripple-effect' id='zoom_next'>Zoom +</button>
 </div>
-<img id='preview' src="{{ url_for('preview_image') }}">
+<img id='preview' src="{{ url_for('preview_image') }}" style="max-width: 100%">
 </body>
 </html>
