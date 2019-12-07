@@ -544,7 +544,7 @@ class SAEHDModel(ModelBase):
             feed = [ warped_src, target_srcm]
             src_mask_loss, = self.src_mask_train (feed)
 
-        return ( ('src_loss', src_loss), )
+        return ( ('src_loss', src_loss), ('dst_loss', src_loss))
 
     #override
     def onGetPreview(self, sample):
