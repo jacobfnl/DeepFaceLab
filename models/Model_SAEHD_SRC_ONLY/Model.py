@@ -548,8 +548,8 @@ class SAEHDModel(ModelBase):
 
     #override
     def onGetPreview(self, sample):
-        test_S   = sample[0][1][0:4] #first 4 samples
-        test_S_m = sample[0][2][0:4] #first 4 samples
+        test_S   = sample[0][1][0:8] #first 8 samples
+        test_S_m = sample[0][2][0:8] #first 8 samples
 
         if self.options['learn_mask']:
             S, SS, SSM = [ np.clip(x, 0.0, 1.0) for x in ([test_S] + self.AE_view ([test_S]) ) ]
@@ -559,8 +559,10 @@ class SAEHDModel(ModelBase):
 
         result = []
         st = []
-        for i in range(len(test_S)):
-            ar = S[i], SS[i]
+        num_rows = len(test_S) // 2
+        for i in range(num_rows):
+            j = i + num_rows
+            ar = S[i], SS[i], S[j], SS[j]
 
             st.append ( np.concatenate ( ar, axis=1) )
 
@@ -569,7 +571,7 @@ class SAEHDModel(ModelBase):
         if self.options['learn_mask']:
             st_m = []
             for i in range(len(test_S)):
-                ar = S[i]*test_S_m[i], SS[i]*SSM[i]
+                ar = S[i]*test_S_m[i], SS[i]*SSM[i], S[j]*test_S_m[j], SS[j]*SSM[j]
                 st_m.append ( np.concatenate ( ar, axis=1) )
 
             result += [ ('SAEHD_SRC_ONLY masked', np.concatenate (st_m, axis=0 )), ]
@@ -577,10 +579,10 @@ class SAEHDModel(ModelBase):
             st_b = []
             st_p = []
             for i in range(len(test_S)):
-                ar_bgrd = S[i]*(1-test_S_m[i]), SS[i]*(1-SSM[i])
+                ar_bgrd = S[i]*(1-test_S_m[i]), SS[i]*(1-SSM[i]), S[j]*(1-test_S_m[j]), SS[j]*(1-SSM[j])
                 st_b.append(np.concatenate(ar_bgrd, axis=1))
 
-                ar_over = S[i], SS[i]*SSM[i] + S[i]*(1-SSM[i])
+                ar_over = S[i], SS[i]*SSM[i] + S[i]*(1-SSM[i]), S[j], SS[j]*SSM[j] + S[j]*(1-SSM[j])
                 st_p.append(np.concatenate(ar_over, axis=1))
 
             result += [('SAEHD_SRC_ONLY background', np.concatenate(st_b, axis=0)), ]
