@@ -570,7 +570,8 @@ class SAEHDModel(ModelBase):
 
         if self.options['learn_mask']:
             st_m = []
-            for i in range(len(test_S)):
+            for i in range(num_rows):
+                j = i + num_rows
                 ar = S[i]*test_S_m[i], SS[i]*SSM[i], S[j]*test_S_m[j], SS[j]*SSM[j]
                 st_m.append ( np.concatenate ( ar, axis=1) )
 
@@ -578,7 +579,8 @@ class SAEHDModel(ModelBase):
 
             st_b = []
             st_p = []
-            for i in range(len(test_S)):
+            for i in range(num_rows):
+                j = i + num_rows
                 ar_bgrd = S[i]*(1-test_S_m[i]), SS[i]*(1-SSM[i]), S[j]*(1-test_S_m[j]), SS[j]*(1-SSM[j])
                 st_b.append(np.concatenate(ar_bgrd, axis=1))
 
