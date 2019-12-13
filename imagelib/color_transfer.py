@@ -161,6 +161,40 @@ def random_color_transform(image, seed=None):
     np.clip(image, 0, 1, out=image)
     return image
 
+
+def bgr_to_lab_decimal(image):
+    image = cv2.cvtColor(image.astype(np.float32), cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(image)
+    l = np.clip(l, 0, 100) / 100
+    a = (np.clip(a, -127, 127) + 127) / 254
+    b = (np.clip(b, -127, 127) + 127) / 254
+    image = cv2.merge([l, a, b])
+    return image
+
+
+def lab_decimal_to_bgr(image):
+    l, a, b = cv2.split(image)
+    l = np.clip(l, 0, 1) * 100
+    a = np.clip(a, 0, 1) * 254 - 127
+    b = np.clip(b, 0, 1) * 254 - 127
+    image = cv2.merge([l, a, b])
+    image = cv2.cvtColor(image.astype(np.float32), cv2.COLOR_LAB2BGR)
+    return image
+
+
+def bgr_to_lab_decimal_shuffle(image, seed=None):
+    image = cv2.cvtColor(image.astype(np.float32), cv2.COLOR_BGR2LAB)
+    M = np.eye(3)
+    M[1:, 1:] = special_ortho_group.rvs(2, 1, seed)
+    image = image.dot(M)
+    l, a, b = cv2.split(image)
+    l = np.clip(l, 0, 100) / 100
+    a = (np.clip(a, -127, 127) + 127) / 254
+    b = (np.clip(b, -127, 127) + 127) / 254
+    image = cv2.merge([l, a, b])
+    return image
+
+
 def reinhard_color_transfer(source, target, clip=False, preserve_paper=False, source_mask=None, target_mask=None):
     """
     Transfers the color distribution from the target to the source

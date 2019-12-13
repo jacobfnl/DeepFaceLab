@@ -6,7 +6,8 @@ import numpy as np
 
 import imagelib
 from facelib import FaceType, LandmarksProcessor
-from imagelib.color_transfer import ColorTransferMode, random_color_transform
+from imagelib.color_transfer import ColorTransferMode, random_color_transform, bgr_to_lab_decimal, \
+    bgr_to_lab_decimal_shuffle
 
 """
 output_sample_types = [
@@ -74,6 +75,8 @@ class SampleProcessor(object):
         MODE_M                     = 43  #mask only
         MODE_BGR_SHUFFLE           = 44  #BGR shuffle
         MODE_LAB_RAND_TRANSFORM    = 45
+        MODE_LAB                   = 46
+        MODE_LAB_SHUFFLE           = 46
         MODE_END = 50
 
     class Options(object):
@@ -318,6 +321,10 @@ class SampleProcessor(object):
                     img = np.repeat ( np.expand_dims(cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY),-1), (3,), -1)
                 elif mode_type == SPTF.MODE_M and is_face_sample:
                     img = img_mask
+                elif mode_type == SPTF.MODE_LAB:
+                    img = bgr_to_lab_decimal(img_bgr)
+                elif mode_type == SPTF.MODE_LAB_SHUFFLE:
+                    img = bgr_to_lab_decimal_shuffle(img_bgr)
 
                 if not debug:
                     if normalize_tanh:
