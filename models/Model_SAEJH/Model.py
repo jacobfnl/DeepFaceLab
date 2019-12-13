@@ -677,10 +677,10 @@ class SAEHDModel(ModelBase):
         if self.options['learn_mask']:
             S, D, SS, SSM, DD, DDM, SD, SDM = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S, test_D]) ) ]
             SSM, DDM, SDM, = [ np.repeat (x, (3,), -1) for x in [SSM, DDM, SDM]]
-            S, D, SS, SSM, DD, DDM, SD, SDM = [lab_decimal_to_bgr(img) for img in (S, D, SS, SSM, DD, DDM, SD, SDM)]
         else:
             S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S, test_D]) ) ]
-            S, D, SS, DD, SD = [lab_decimal_to_bgr(img) for img in (S, D, SS, DD, SD)]
+
+        S, D, SS, DD, SD = [lab_decimal_to_bgr(img) for img in (S, D, SS, DD, SD)]
 
         result = []
         st = []
