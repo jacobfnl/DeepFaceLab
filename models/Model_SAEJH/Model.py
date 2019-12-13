@@ -680,7 +680,7 @@ class SAEHDModel(ModelBase):
         else:
             S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S, test_D]) ) ]
 
-        S, D, SS, DD, SD = [lab_decimal_to_bgr(img) for img in (S, D, SS, DD, SD)]
+        S, D, SS, DD, SD = ((lab_decimal_to_bgr(img) for img in sample) for sample in (S, D, SS, DD, SD))
 
         result = []
         st = []
