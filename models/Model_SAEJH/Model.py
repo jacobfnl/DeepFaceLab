@@ -685,12 +685,13 @@ class SAEHDModel(ModelBase):
             'L': lab_decimal_to_bgr(img, a_crop=(0.5, 0.5), b_crop=(0.5, 0.5)),
             'A': lab_decimal_to_bgr(img, l_crop=(0.5, 0.5), b_crop=(0.5, 0.5)),
             'B': lab_decimal_to_bgr(img, l_crop=(0.5, 0.5), a_crop=(0.5, 0.5)),
+            'H': lab_decimal_to_bgr(img, l_crop=(0.5, 0.5)),
         } for img in sample] for sample in (S, D, SS, DD, SD))
 
         result = []
         st = []
         for i in range(len(test_S)):
-            for ch in ['BGR', 'L', 'A', 'B']:
+            for ch in ['BGR', 'L', 'H']:
                 ar = S[i][ch], SS[i][ch], D[i][ch], DD[i][ch], SD[i][ch]
 
                 st.append ( np.concatenate ( ar, axis=1) )
@@ -700,7 +701,7 @@ class SAEHDModel(ModelBase):
         if self.options['learn_mask']:
             st_m = []
             for i in range(len(test_S)):
-                for ch in ['BGR', 'L', 'A', 'B']:
+                for ch in ['BGR', 'L', 'H']:
                     ar = S[i][ch]*test_S_m[i], SS[i][ch]*SSM[i], D[i][ch]*test_D_m[i], DD[i][ch]*DDM[i], SD[i][ch]*(DDM[i]*SDM[i])
                     st_m.append ( np.concatenate ( ar, axis=1) )
 
@@ -709,7 +710,7 @@ class SAEHDModel(ModelBase):
             st_b = []
             st_p = []
             for i in range(len(test_S)):
-                for ch in ['BGR', 'L', 'A', 'B']:
+                for ch in ['BGR', 'L', 'H']:
                     ar_bgrd = S[i][ch]*(1-test_S_m[i]), SS[i][ch]*(1-SSM[i]), D[i][ch]*(1-test_D_m[i]), DD[i][ch]*(1-DDM[i]), SD[i][ch]*(1-DDM[i])*(1-SDM[i])
                     st_b.append(np.concatenate(ar_bgrd, axis=1))
 
