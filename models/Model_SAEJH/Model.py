@@ -192,7 +192,8 @@ class SAEHDModel(ModelBase):
                 self.learn_mask = learn_mask
 
                 output_nc = 3
-                bgr_shape = (resolution, resolution, output_nc)
+                luma_shape = (resolution, resolution, 1)
+                chroma_shape = (resolution // 2, resolution // 2, 2)
                 mask_shape = (resolution, resolution, 1)
                 lowest_dense_res = resolution // 16
                 e_dims = output_nc*e_ch_dims
@@ -204,23 +205,28 @@ class SAEHDModel(ModelBase):
                     if dims % 2 != 0:
                         dims += 1
 
-                    def func(inp):
-                        x = self.downscale(dims  , 3, 1 )(inp)
+                    def func(inputs):
+                        luma, chroma = inputs
+                        x = self.downscale(dims  , 3, 1 )(luma)
+                        x = Concatenate()([x, chroma])
                         x = self.downscale(dims*2, 3, 1 )(x)
                         x = self.downscale(dims*4, 3, 1 )(x)
                         x0 = self.downscale(dims*8, 3, 1 )(x)
 
-                        x = self.downscale(dims  , 5, 1 )(inp)
+                        x = self.downscale(dims  , 5, 1 )(luma)
+                        x = Concatenate()([x, chroma])
                         x = self.downscale(dims*2, 5, 1 )(x)
                         x = self.downscale(dims*4, 5, 1 )(x)
                         x1 = self.downscale(dims*8, 5, 1 )(x)
 
-                        x = self.downscale(dims  , 5, 2 )(inp)
+                        x = self.downscale(dims  , 5, 2 )(luma)
+                        x = Concatenate()([x, chroma])
                         x = self.downscale(dims*2, 5, 2 )(x)
                         x = self.downscale(dims*4, 5, 2 )(x)
                         x2 = self.downscale(dims*8, 5, 2 )(x)
 
-                        x = self.downscale(dims  , 7, 2 )(inp)
+                        x = self.downscale(dims  , 7, 2 )(luma)
+                        x = Concatenate()([x, chroma])
                         x = self.downscale(dims*2, 7, 2 )(x)
                         x = self.downscale(dims*4, 7, 2 )(x)
                         x3 = self.downscale(dims*8, 7, 2 )(x)
@@ -254,11 +260,18 @@ class SAEHDModel(ModelBase):
                                 x = Add()([x, x0])
                                 x = LeakyReLU(0.2)(x)
 
-                        return Conv2D(output_nc, kernel_size=5, padding='same', activation='sigmoid')(x)
+                                if i == 4:
+                                    chroma = Conv2D(2, kernel_size=5, padding='same', activation='sigmoid')(x)
+
+                        if not is_mask:
+                            luma = Conv2D(1, kernel_size=5, padding='same', activation='sigmoid')(x)
+                            return [luma, chroma]
+                        else:
+                            return Conv2D(output_nc, kernel_size=5, padding='same', activation='sigmoid')(x)
 
                     return func
 
-                self.encoder = modelify(enc_flow(e_ch_dims, ae_dims, lowest_dense_res)) ( Input(bgr_shape) )
+                self.encoder = modelify(enc_flow(e_ch_dims, ae_dims, lowest_dense_res)) ( [Input(luma_shape), Input(chroma_shape)] )
 
                 sh = K.int_shape( self.encoder.outputs[0] )[1:]
                 self.decoder_src = modelify(dec_flow(output_nc, d_ch_dims)) ( Input(sh) )
@@ -304,7 +317,8 @@ class SAEHDModel(ModelBase):
                 self.learn_mask = learn_mask
 
                 output_nc = 3
-                bgr_shape = (resolution, resolution, output_nc)
+                luma_shape = (resolution, resolution, 1)
+                chroma_shape = (resolution // 2, resolution // 2, 2)
                 mask_shape = (resolution, resolution, 1)
 
                 lowest_dense_res = resolution // 16
@@ -314,23 +328,28 @@ class SAEHDModel(ModelBase):
                     if dims % 2 != 0:
                         dims += 1
 
-                    def func(inp):
-                        x = self.downscale(dims  , 3, 1 )(inp)
+                    def func(inputs):
+                        luma, chroma = inputs
+                        x = self.downscale(dims  , 3, 1 )(luma)
+                        x = Concatenate()([x, chroma])
                         x = self.downscale(dims*2, 3, 1 )(x)
                         x = self.downscale(dims*4, 3, 1 )(x)
                         x0 = self.downscale(dims*8, 3, 1 )(x)
 
-                        x = self.downscale(dims  , 5, 1 )(inp)
+                        x = self.downscale(dims  , 5, 1 )(luma)
+                        x = Concatenate()([x, chroma])
                         x = self.downscale(dims*2, 5, 1 )(x)
                         x = self.downscale(dims*4, 5, 1 )(x)
                         x1 = self.downscale(dims*8, 5, 1 )(x)
 
-                        x = self.downscale(dims  , 5, 2 )(inp)
+                        x = self.downscale(dims  , 5, 2 )(luma)
+                        x = Concatenate()([x, chroma])
                         x = self.downscale(dims*2, 5, 2 )(x)
                         x = self.downscale(dims*4, 5, 2 )(x)
                         x2 = self.downscale(dims*8, 5, 2 )(x)
 
-                        x = self.downscale(dims  , 7, 2 )(inp)
+                        x = self.downscale(dims  , 7, 2 )(luma)
+                        x = Concatenate()([x, chroma])
                         x = self.downscale(dims*2, 7, 2 )(x)
                         x = self.downscale(dims*4, 7, 2 )(x)
                         x3 = self.downscale(dims*8, 7, 2 )(x)
@@ -368,7 +387,14 @@ class SAEHDModel(ModelBase):
                                 x = Add()([x, x0])
                                 x = LeakyReLU(0.2)(x)
 
-                        return Conv2D(output_nc, kernel_size=5, padding='same', activation='sigmoid')(x)
+                                if i == 4:
+                                    chroma = Conv2D(2, kernel_size=5, padding='same', activation='sigmoid')(x)
+
+                        if not is_mask:
+                            luma = Conv2D(1, kernel_size=5, padding='same', activation='sigmoid')(x)
+                            return [luma, chroma]
+                        else:
+                            return Conv2D(output_nc, kernel_size=5, padding='same', activation='sigmoid')(x)
 
                     return func
 
