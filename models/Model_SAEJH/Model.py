@@ -509,70 +509,99 @@ class SAEHDModel(ModelBase):
                 if type(layer) == keras.layers.Conv2D:
                     self.CA_conv_weights_list += [layer.weights[0]] #- is Conv2D kernel_weights
 
-        target_srcm = gaussian_blur( max(1, resolution // 32) )(self.model.target_srcm)
-        target_dstm = gaussian_blur( max(1, resolution // 32) )(self.model.target_dstm)
+        target_srcm_luma = gaussian_blur( max(1, resolution // 32) )(self.model.target_srcm)
+        target_dstm_luma = gaussian_blur( max(1, resolution // 32) )(self.model.target_dstm)
 
-        target_src_masked = self.model.target_src*target_srcm
-        target_dst_masked = self.model.target_dst*target_dstm
-        target_src_anti_masked = self.model.target_src * (1.0 - target_srcm)
-        target_dst_anti_masked = self.model.target_dst * (1.0 - target_dstm)
+        from tensorflow.python.ops.image_ops_impl import ResizeMethod
+        target_srcm_chroma = nnlib.tf.image.resize(target_srcm_luma, (resolution // 2, resolution // 2), ResizeMethod.AREA)
+        target_dstm_chroma = nnlib.tf.image.resize(target_dstm_luma, (resolution // 2, resolution // 2), ResizeMethod.AREA)
 
-        target_src_masked_opt = target_src_masked if masked_training else self.model.target_src
-        target_dst_masked_opt = target_dst_masked if masked_training else self.model.target_dst
+        target_src_masked_luma = self.model.target_src_luma * target_srcm_luma
+        target_dst_masked_luma = self.model.target_dst_luma * target_dstm_luma
+        target_src_masked_chroma = self.model.target_src_chroma * target_srcm_chroma
+        target_dst_masked_chroma = self.model.target_dst_chroma * target_dstm_chroma
 
-        pred_src_src_masked_opt = self.model.pred_src_src*target_srcm if masked_training else self.model.pred_src_src
-        pred_dst_dst_masked_opt = self.model.pred_dst_dst*target_dstm if masked_training else self.model.pred_dst_dst
+        target_src_anti_masked_luma = self.model.target_src_luma * (1.0 - target_srcm_luma)
+        target_dst_anti_masked_luma = self.model.target_dst_luma * (1.0 - target_dstm_luma)
+        target_src_anti_masked_chroma = self.model.target_src_chroma * (1.0 - target_srcm_chroma)
+        target_dst_anti_masked_chroma = self.model.target_dst_chroma * (1.0 - target_dstm_chroma)
 
-        pred_src_src_anti_masked = self.model.pred_src_src * (1.0 - target_srcm)
-        pred_dst_dst_anti_masked = self.model.pred_dst_dst * (1.0 - target_dstm)
+        target_src_masked_opt_luma = target_src_masked_luma if masked_training else self.model.target_src_luma
+        target_dst_masked_opt_luma = target_dst_masked_luma if masked_training else self.model.target_dst_luma
+        target_src_masked_opt_chroma = target_src_masked_chroma if masked_training else self.model.target_src_chroma
+        target_dst_masked_opt_chroma = target_dst_masked_chroma if masked_training else self.model.target_dst_chroma
 
-        psd_target_dst_masked = self.model.pred_src_dst*target_dstm
-        psd_target_dst_anti_masked = self.model.pred_src_dst*(1.0 - target_dstm)
+        pred_src_src_masked_opt_luma = self.model.pred_src_src_luma*target_srcm_luma if masked_training else self.model.pred_src_src_luma
+        pred_dst_dst_masked_opt_luma = self.model.pred_dst_dst_luma*target_dstm_luma if masked_training else self.model.pred_dst_dst_luma
+        pred_src_src_masked_opt_chroma = self.model.pred_src_src_chroma*target_srcm_chroma if masked_training else self.model.pred_src_src_chroma
+        pred_dst_dst_masked_opt_chroma = self.model.pred_dst_dst_chroma*target_dstm_chroma if masked_training else self.model.pred_dst_dst_chroma
+
+        pred_src_src_anti_masked_luma = self.model.pred_src_src_luma * (1.0 - target_srcm_luma)
+        pred_dst_dst_anti_masked_luma = self.model.pred_dst_dst_luma * (1.0 - target_dstm_luma)
+        pred_src_src_anti_masked_chroma = self.model.pred_src_src_chroma * (1.0 - target_srcm_chroma)
+        pred_dst_dst_anti_masked_chroma = self.model.pred_dst_dst_chroma * (1.0 - target_dstm_chroma)
+
+        psd_target_dst_masked_luma = self.model.pred_src_dst_luma*target_dstm_luma
+        psd_target_dst_anti_masked_luma = self.model.pred_src_dst_luma*(1.0 - target_dstm_luma)
+        psd_target_dst_masked_chroma = self.model.pred_src_dst_chroma*target_dstm_chroma
+        psd_target_dst_anti_masked_chroma = self.model.pred_src_dst_chroma*(1.0 - target_dstm_chroma)
 
         if self.is_training_mode:
             self.src_dst_opt      = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
             self.src_dst_mask_opt = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
             self.D_opt            = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
 
-            if self.options['ms_ssim_loss']:
-                # TODO - Done
-                src_loss = K.mean(10 * MsSSIM(resolution)(target_src_masked_opt, pred_src_src_masked_opt))
-                dst_loss = K.mean(10 * MsSSIM(resolution)(target_dst_masked_opt, pred_dst_dst_masked_opt))
-            else:
-                src_loss =  K.mean ( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( target_src_masked_opt, pred_src_src_masked_opt) )
-                src_loss += K.mean ( 10*K.square( target_src_masked_opt - pred_src_src_masked_opt ) )
-
-                dst_loss =  K.mean( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)(target_dst_masked_opt, pred_dst_dst_masked_opt) )
-                dst_loss += K.mean( 10*K.square( target_dst_masked_opt - pred_dst_dst_masked_opt ) )
+            # if self.options['ms_ssim_loss']:
+            #     # TODO - Done
+            #     src_loss = K.mean(10 * MsSSIM(resolution)(target_src_masked_opt_luma, pred_src_src_masked_opt_luma)) / 3
+            #     src_loss += 2 * K.mean(10 * MsSSIM(resolution)(target_src_masked_opt_chroma, pred_src_src_masked_opt_chroma)) / 3
+            #     dst_loss = K.mean(10 * MsSSIM(resolution)(target_dst_masked_opt_luma, pred_dst_dst_masked_opt_luma)) / 3
+            #     dst_loss += 2 * K.mean(10 * MsSSIM(resolution)(target_dst_masked_opt_chroma, pred_dst_dst_masked_opt_chroma)) / 3
+            # else:
+            #     src_loss =  K.mean ( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( target_src_masked_opt, pred_src_src_masked_opt) )
+            #     src_loss += K.mean ( 10*K.square( target_src_masked_opt - pred_src_src_masked_opt ) )
+            #
+            #     dst_loss =  K.mean( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)(target_dst_masked_opt, pred_dst_dst_masked_opt) )
+            #     dst_loss += K.mean( 10*K.square( target_dst_masked_opt - pred_dst_dst_masked_opt ) )
+            src_loss = K.mean(10 * MsSSIM(resolution)(target_src_masked_opt_luma, pred_src_src_masked_opt_luma)) / 3
+            src_loss += 2 * K.mean(10 * MsSSIM(resolution)(target_src_masked_opt_chroma, pred_src_src_masked_opt_chroma)) / 3
+            dst_loss = K.mean(10 * MsSSIM(resolution)(target_dst_masked_opt_luma, pred_dst_dst_masked_opt_luma)) / 3
+            dst_loss += 2 * K.mean(10 * MsSSIM(resolution)(target_dst_masked_opt_chroma, pred_dst_dst_masked_opt_chroma)) / 3
 
             background_power = self.options['background_power'] / 100.0
             if background_power != 0:
-                if self.options['ms_ssim_loss']:
-                    src_loss += K.mean(10 * background_power * MsSSIM(resolution)(pred_src_src_anti_masked, target_src_anti_masked))
-                    dst_loss += K.mean(10 * background_power * MsSSIM(resolution)(pred_dst_dst_anti_masked, target_dst_anti_masked))
-                else:
-                    src_loss += K.mean( (10*background_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( pred_src_src_anti_masked, target_src_anti_masked ))
-                    src_loss += K.mean( (10*background_power)*K.square( pred_dst_dst_anti_masked - target_src_anti_masked ))
+                src_loss += K.mean(10 * background_power * MsSSIM(resolution)(pred_src_src_anti_masked_luma, target_src_anti_masked_luma)) / 3
+                src_loss += 2 * K.mean(10 * background_power * MsSSIM(resolution)(pred_src_src_anti_masked_chroma, target_src_anti_masked_chroma)) / 3
+                dst_loss += K.mean(10 * background_power * MsSSIM(resolution)(pred_dst_dst_anti_masked_luma, target_dst_anti_masked_luma)) / 3
+                dst_loss += 2 * K.mean(10 * background_power * MsSSIM(resolution)(pred_dst_dst_anti_masked_chroma, target_dst_anti_masked_chroma)) / 3
+                # if self.options['ms_ssim_loss']:
+                #     src_loss += K.mean(10 * background_power * MsSSIM(resolution)(pred_src_src_anti_masked_luma, target_src_anti_masked_luma)) / 3
+                #     src_loss += 2 * K.mean(10 * background_power * MsSSIM(resolution)(pred_src_src_anti_masked_chroma, target_src_anti_masked_chroma)) / 3
+                #     dst_loss += K.mean(10 * background_power * MsSSIM(resolution)(pred_dst_dst_anti_masked_luma, target_dst_anti_masked_luma)) / 3
+                #     dst_loss += 2 * K.mean(10 * background_power * MsSSIM(resolution)(pred_dst_dst_anti_masked_chroma, target_dst_anti_masked_chroma)) / 3
+                # else:
+                #     src_loss += K.mean( (10*background_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( pred_src_src_anti_masked, target_src_anti_masked ))
+                #     src_loss += K.mean( (10*background_power)*K.square( pred_dst_dst_anti_masked - target_src_anti_masked ))
+                #
+                #     src_loss += K.mean( (10*background_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( pred_dst_dst_anti_masked, target_dst_anti_masked ))
+                #     src_loss += K.mean( (10*background_power)*K.square( pred_dst_dst_anti_masked - target_dst_anti_masked ))
 
-                    src_loss += K.mean( (10*background_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( pred_dst_dst_anti_masked, target_dst_anti_masked ))
-                    src_loss += K.mean( (10*background_power)*K.square( pred_dst_dst_anti_masked - target_dst_anti_masked ))
-
-            face_style_power = self.options['face_style_power'] / 100.0
-            if face_style_power != 0:
-                if self.options['ms_ssim_loss']:
-                    # TODO
-                    src_loss += style_loss(gaussian_blur_radius=resolution//16, loss_weight=face_style_power, wnd_size=0)( psd_target_dst_masked, target_dst_masked )
-                else:
-                    src_loss += style_loss(gaussian_blur_radius=resolution//16, loss_weight=face_style_power, wnd_size=0)( psd_target_dst_masked, target_dst_masked )
-
-            bg_style_power = self.options['bg_style_power'] / 100.0
-            if bg_style_power != 0:
-                if self.options['ms_ssim_loss']:
-                    # TODO - Done
-                    src_loss += K.mean(10 * bg_style_power * MsSSIM(resolution)(psd_target_dst_anti_masked, target_dst_anti_masked))
-                else:
-                    src_loss += K.mean( (10*bg_style_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( psd_target_dst_anti_masked, target_dst_anti_masked ))
-                    src_loss += K.mean( (10*bg_style_power)*K.square( psd_target_dst_anti_masked - target_dst_anti_masked ))
+            # face_style_power = self.options['face_style_power'] / 100.0
+            # if face_style_power != 0:
+            #     if self.options['ms_ssim_loss']:
+            #         # TODO
+            #         src_loss += style_loss(gaussian_blur_radius=resolution//16, loss_weight=face_style_power, wnd_size=0)( psd_target_dst_masked, target_dst_masked )
+            #     else:
+            #         src_loss += style_loss(gaussian_blur_radius=resolution//16, loss_weight=face_style_power, wnd_size=0)( psd_target_dst_masked, target_dst_masked )
+            #
+            # bg_style_power = self.options['bg_style_power'] / 100.0
+            # if bg_style_power != 0:
+            #     if self.options['ms_ssim_loss']:
+            #         # TODO - Done
+            #         src_loss += K.mean(10 * bg_style_power * MsSSIM(resolution)(psd_target_dst_anti_masked, target_dst_anti_masked))
+            #     else:
+            #         src_loss += K.mean( (10*bg_style_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( psd_target_dst_anti_masked, target_dst_anti_masked ))
+            #         src_loss += K.mean( (10*bg_style_power)*K.square( psd_target_dst_anti_masked - target_dst_anti_masked ))
 
 
             G_loss = src_loss+dst_loss
