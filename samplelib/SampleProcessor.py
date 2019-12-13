@@ -324,7 +324,8 @@ class SampleProcessor(object):
                 elif mode_type == SPTF.MODE_LAB:
                     img = bgr_to_lab_decimal(img_bgr)
                 elif mode_type == SPTF.MODE_LAB_SHUFFLE:
-                    img = bgr_to_lab_decimal_shuffle(img_bgr)
+                    rnd_state = np.random.RandomState (sample_rnd_seed)
+                    img = bgr_to_lab_decimal_shuffle(img_bgr, rnd_state)
 
                 if not debug:
                     if normalize_tanh:
