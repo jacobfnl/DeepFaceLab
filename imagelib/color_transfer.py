@@ -172,11 +172,11 @@ def bgr_to_lab_decimal(image):
     return image
 
 
-def lab_decimal_to_bgr(image):
+def lab_decimal_to_bgr(image, l_crop=(0, 1), a_crop=(0, 1), b_crop=(0, 1)):
     l, a, b = cv2.split(image)
-    l = np.clip(l, 0, 1) * 100
-    a = np.clip(a, 0, 1) * 254 - 127
-    b = np.clip(b, 0, 1) * 254 - 127
+    l = np.clip(l, *l_crop) * 100
+    a = np.clip(a, *a_crop) * 254 - 127
+    b = np.clip(b, *b_crop) * 254 - 127
     image = cv2.merge([l, a, b])
     image = cv2.cvtColor(image.astype(np.float32), cv2.COLOR_LAB2BGR)
     return image

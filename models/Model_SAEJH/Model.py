@@ -680,33 +680,41 @@ class SAEHDModel(ModelBase):
         else:
             S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S, test_D]) ) ]
 
-        S, D, SS, DD, SD = ([lab_decimal_to_bgr(img) for img in sample] for sample in (S, D, SS, DD, SD))
+        S, D, SS, DD, SD = ([{
+            'BGR': lab_decimal_to_bgr(img),
+            'L': lab_decimal_to_bgr(img, a_crop=(0.5, 0.5), b_crop=(0.5, 0.5)),
+            'A': lab_decimal_to_bgr(img, l_crop=(0.5, 0.5), b_crop=(0.5, 0.5)),
+            'B': lab_decimal_to_bgr(img, l_crop=(0.5, 0.5), a_crop=(0.5, 0.5)),
+        } for img in sample] for sample in (S, D, SS, DD, SD))
 
         result = []
         st = []
         for i in range(len(test_S)):
-            ar = S[i], SS[i], D[i], DD[i], SD[i]
+            for ch in ['BGR', 'L', 'A', 'B']:
+                ar = S[i][ch], SS[i][ch], D[i][ch], DD[i][ch], SD[i][ch]
 
-            st.append ( np.concatenate ( ar, axis=1) )
+                st.append ( np.concatenate ( ar, axis=1) )
 
         result += [ ('SAEHD', np.concatenate (st, axis=0 )), ]
 
         if self.options['learn_mask']:
             st_m = []
             for i in range(len(test_S)):
-                ar = S[i]*test_S_m[i], SS[i]*SSM[i], D[i]*test_D_m[i], DD[i]*DDM[i], SD[i]*(DDM[i]*SDM[i])
-                st_m.append ( np.concatenate ( ar, axis=1) )
+                for ch in ['BGR', 'L', 'A', 'B']:
+                    ar = S[i][ch]*test_S_m[i], SS[i][ch]*SSM[i], D[i][ch]*test_D_m[i], DD[i][ch]*DDM[i], SD[i][ch]*(DDM[i]*SDM[i])
+                    st_m.append ( np.concatenate ( ar, axis=1) )
 
             result += [ ('SAEHD masked', np.concatenate (st_m, axis=0 )), ]
 
             st_b = []
             st_p = []
             for i in range(len(test_S)):
-                ar_bgrd = S[i]*(1-test_S_m[i]), SS[i]*(1-SSM[i]), D[i]*(1-test_D_m[i]), DD[i]*(1-DDM[i]), SD[i]*(1-DDM[i])*(1-SDM[i])
-                st_b.append(np.concatenate(ar_bgrd, axis=1))
+                for ch in ['BGR', 'L', 'A', 'B']:
+                    ar_bgrd = S[i][ch]*(1-test_S_m[i]), SS[i][ch]*(1-SSM[i]), D[i][ch]*(1-test_D_m[i]), DD[i][ch]*(1-DDM[i]), SD[i][ch]*(1-DDM[i])*(1-SDM[i])
+                    st_b.append(np.concatenate(ar_bgrd, axis=1))
 
-                ar_over = S[i], SS[i]*SSM[i] + S[i]*(1-SSM[i]), D[i], DD[i]*DDM[i] + D[i]*(1-DDM[i]), SD[i]*(1-(1-DDM[i])*(1-SDM[i])) + D[i]*(1-DDM[i])*(1-SDM[i])
-                st_p.append(np.concatenate(ar_over, axis=1))
+                    ar_over = S[i][ch], SS[i][ch]*SSM[i] + S[i][ch]*(1-SSM[i]), D[i][ch], DD[i]*DDM[i] + D[i][ch]*(1-DDM[i]), SD[i][ch]*(1-(1-DDM[i])*(1-SDM[i])) + D[i][ch]*(1-DDM[i])*(1-SDM[i])
+                    st_p.append(np.concatenate(ar_over, axis=1))
 
             result += [('SAEHD background', np.concatenate(st_b, axis=0)), ]
             result += [('SAEHD overlay', np.concatenate(st_p, axis=0)), ]
