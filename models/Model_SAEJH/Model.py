@@ -713,7 +713,7 @@ class SAEHDModel(ModelBase):
                     ar_bgrd = S[i][ch]*(1-test_S_m[i]), SS[i][ch]*(1-SSM[i]), D[i][ch]*(1-test_D_m[i]), DD[i][ch]*(1-DDM[i]), SD[i][ch]*(1-DDM[i])*(1-SDM[i])
                     st_b.append(np.concatenate(ar_bgrd, axis=1))
 
-                    ar_over = S[i][ch], SS[i][ch]*SSM[i] + S[i][ch]*(1-SSM[i]), D[i][ch], DD[i]*DDM[i] + D[i][ch]*(1-DDM[i]), SD[i][ch]*(1-(1-DDM[i])*(1-SDM[i])) + D[i][ch]*(1-DDM[i])*(1-SDM[i])
+                    ar_over = S[i][ch], SS[i][ch]*SSM[i] + S[i][ch]*(1-SSM[i]), D[i][ch], DD[i][ch]*DDM[i] + D[i][ch]*(1-DDM[i]), SD[i][ch]*(1-(1-DDM[i])*(1-SDM[i])) + D[i][ch]*(1-DDM[i])*(1-SDM[i])
                     st_p.append(np.concatenate(ar_over, axis=1))
 
             result += [('SAEHD background', np.concatenate(st_b, axis=0)), ]
