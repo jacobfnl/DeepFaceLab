@@ -76,7 +76,7 @@ class SampleProcessor(object):
         MODE_BGR_SHUFFLE           = 44  #BGR shuffle
         MODE_LAB_RAND_TRANSFORM    = 45
         MODE_LAB                   = 46
-        MODE_LAB_SHUFFLE           = 46
+        MODE_LAB_SHUFFLE           = 47
         MODE_END = 50
 
     class Options(object):
