@@ -286,14 +286,16 @@ class SAEHDModel(ModelBase):
                 if learn_mask:
                     self.src_dst_mask_trainable_weights = self.encoder.trainable_weights + self.decoder_srcm.trainable_weights + self.decoder_dstm.trainable_weights
 
-                self.warped_src, self.warped_dst = Input(bgr_shape), Input(bgr_shape)
-                self.target_src, self.target_dst = Input(bgr_shape), Input(bgr_shape)
+                self.warped_src_luma, self.warped_dst_luma = Input(luma_shape), Input(luma_shape)
+                self.warped_src_chroma, self.warped_dst_chroma = Input(chroma_shape), Input(chroma_shape)
+                self.target_src_luma, self.target_dst_luma = Input(luma_shape), Input(luma_shape)
+                self.target_src_chroma, self.target_dst_chroma = Input(chroma_shape), Input(chroma_shape)
                 self.target_srcm, self.target_dstm = Input(mask_shape), Input(mask_shape)
                 self.src_code, self.dst_code = self.encoder(self.warped_src), self.encoder(self.warped_dst)
 
-                self.pred_src_src = self.decoder_src(self.src_code)
-                self.pred_dst_dst = self.decoder_dst(self.dst_code)
-                self.pred_src_dst = self.decoder_src(self.dst_code)
+                self.pred_src_src_luma, self.pred_src_src_chroma = self.decoder_src(self.src_code)
+                self.pred_dst_dst_luma, self.pred_dst_dst_chroma = self.decoder_dst(self.dst_code)
+                self.pred_src_dst_luma, self.pred_src_dst_chroma = self.decoder_src(self.dst_code)
 
                 if learn_mask:
                     self.pred_src_srcm = self.decoder_srcm(self.src_code)
@@ -398,7 +400,7 @@ class SAEHDModel(ModelBase):
 
                     return func
 
-                self.encoder = modelify(enc_flow(e_ch_dims)) ( Input(bgr_shape) )
+                self.encoder = modelify(enc_flow(e_ch_dims)) ( [Input(luma_shape), Input(chroma_shape)] )
 
                 sh = K.int_shape( self.encoder.outputs[0] )[1:]
                 self.inter_B = modelify(inter_flow(lowest_dense_res, ae_dims)) ( Input(sh) )
@@ -415,8 +417,10 @@ class SAEHDModel(ModelBase):
                 if learn_mask:
                     self.src_dst_mask_trainable_weights = self.encoder.trainable_weights + self.inter_B.trainable_weights + self.inter_AB.trainable_weights + self.decoderm.trainable_weights
 
-                self.warped_src, self.warped_dst = Input(bgr_shape), Input(bgr_shape)
-                self.target_src, self.target_dst = Input(bgr_shape), Input(bgr_shape)
+                self.warped_src_luma, self.warped_dst_luma = Input(luma_shape), Input(luma_shape)
+                self.warped_src_chroma, self.warped_dst_chroma = Input(chroma_shape), Input(chroma_shape)
+                self.target_src_luma, self.target_dst_luma = Input(luma_shape), Input(luma_shape)
+                self.target_src_chroma, self.target_dst_chroma = Input(chroma_shape), Input(chroma_shape)
                 self.target_srcm, self.target_dstm = Input(mask_shape), Input(mask_shape)
 
                 warped_src_code = self.encoder (self.warped_src)
@@ -430,9 +434,9 @@ class SAEHDModel(ModelBase):
 
                 src_dst_code = Concatenate()([warped_dst_inter_AB_code,warped_dst_inter_AB_code])
 
-                self.pred_src_src = self.decoder(self.src_code)
-                self.pred_dst_dst = self.decoder(self.dst_code)
-                self.pred_src_dst = self.decoder(src_dst_code)
+                self.pred_src_src_luma, self.pred_src_src_chroma = self.decoder(self.src_code)
+                self.pred_dst_dst_luma, self.pred_dst_dst_chroma = self.decoder(self.dst_code)
+                self.pred_src_dst_luma, self.pred_src_dst_chroma = self.decoder(src_dst_code)
 
                 if learn_mask:
                     self.pred_src_srcm = self.decoderm(self.src_code)
