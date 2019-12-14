@@ -155,7 +155,7 @@ class SAEHDModel(ModelBase):
         self.set_vram_batch_requirements({1.5:4,4:8})
 
         input_resolution = self.options['input_resolution']
-        output_resolution = self.options['input_resolution']
+        output_resolution = self.options['output_resolution']
         learn_mask = self.options['learn_mask']
 
         ae_dims = self.options['ae_dims']
