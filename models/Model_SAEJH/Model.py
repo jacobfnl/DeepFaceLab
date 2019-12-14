@@ -606,23 +606,23 @@ class SAEHDModel(ModelBase):
 
             G_loss = src_loss+dst_loss
 
-            if self.true_face_training:
-                def DLoss(labels,logits):
-                    return K.mean(K.binary_crossentropy(labels,logits))
-
-                src_code_d = self.dis( self.model.src_code )
-                src_code_d_ones = K.ones_like(src_code_d)
-                src_code_d_zeros = K.zeros_like(src_code_d)
-                dst_code_d = self.dis( self.model.dst_code )
-                dst_code_d_ones = K.ones_like(dst_code_d)
-
-                generator_loss_coeff = self.options.get('true_face_power', 1.0) / 100.0
-                G_loss += generator_loss_coeff * DLoss(src_code_d_ones, src_code_d)
-
-                loss_D = (DLoss(dst_code_d_ones , dst_code_d) + \
-                          DLoss(src_code_d_zeros, src_code_d) ) * 0.5
-
-                self.D_train = K.function ([self.model.warped_src, self.model.warped_dst],[loss_D], self.D_opt.get_updates(loss_D, self.dis.trainable_weights) )
+            # if self.true_face_training:
+            #     def DLoss(labels,logits):
+            #         return K.mean(K.binary_crossentropy(labels,logits))
+            #
+            #     src_code_d = self.dis( self.model.src_code )
+            #     src_code_d_ones = K.ones_like(src_code_d)
+            #     src_code_d_zeros = K.zeros_like(src_code_d)
+            #     dst_code_d = self.dis( self.model.dst_code )
+            #     dst_code_d_ones = K.ones_like(dst_code_d)
+            #
+            #     generator_loss_coeff = self.options.get('true_face_power', 1.0) / 100.0
+            #     G_loss += generator_loss_coeff * DLoss(src_code_d_ones, src_code_d)
+            #
+            #     loss_D = (DLoss(dst_code_d_ones , dst_code_d) + \
+            #               DLoss(src_code_d_zeros, src_code_d) ) * 0.5
+            #
+            #     self.D_train = K.function ([self.model.warped_src, self.model.warped_dst],[loss_D], self.D_opt.get_updates(loss_D, self.dis.trainable_weights) )
 
             self.src_dst_train = K.function ([self.model.warped_src_luma, self.model.warped_src_chroma,
                                               self.model.warped_dst_luma, self.model.warped_dst_chroma,
