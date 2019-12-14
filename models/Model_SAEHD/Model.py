@@ -637,6 +637,7 @@ class SAEHDModel(ModelBase):
                                                                 debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, scale_range=np.array([-0.05, 0.05])+self.src_scale_mod / 100.0 ),
                         output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_bgr), 'resolution':input_resolution, 'ct_mode': self.options['ct_mode'] },
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_bgr), 'resolution': input_resolution, 'ct_mode': self.options['ct_mode'] },
                                                 {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_bgr), 'resolution': output_resolution, 'ct_mode': self.options['ct_mode'] },
                                                 {'types' : (t.IMG_TRANSFORMED, face_type, t.MODE_M), 'resolution': output_resolution } ]
                                               ),
@@ -644,6 +645,7 @@ class SAEHDModel(ModelBase):
                     SampleGeneratorFace(training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, ),
                         output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_bgr), 'resolution':input_resolution},
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_bgr), 'resolution': input_resolution},
                                                 {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_bgr), 'resolution': output_resolution},
                                                 {'types' : (t.IMG_TRANSFORMED, face_type, t.MODE_M), 'resolution': output_resolution} ])
                              ])
@@ -683,18 +685,18 @@ class SAEHDModel(ModelBase):
 
     #override
     def onGetPreview(self, sample):
-        test_S_w = sample[0][0][0:4] #first 4 samples
-        test_S_t = sample[0][1][0:4] #first 4 samples
-        test_S_m = sample[0][2][0:4] #first 4 samples
-        test_D_w = sample[1][0][0:4]
-        test_D_t = sample[1][1][0:4]
-        test_D_m = sample[1][2][0:4]
+        test_S_i = sample[0][1][0:4] #first 4 samples
+        test_S_t = sample[0][2][0:4] #first 4 samples
+        test_S_m = sample[0][3][0:4] #first 4 samples
+        test_D_i = sample[1][1][0:4]
+        test_D_t = sample[1][2][0:4]
+        test_D_m = sample[1][3][0:4]
 
         if self.options['learn_mask']:
-            S, D, SS, SSM, DD, DDM, SD, SDM = [ np.clip(x, 0.0, 1.0) for x in ([test_S_t,test_D_t] + self.AE_view ([test_S_w, test_D_w]) ) ]
+            S, D, SS, SSM, DD, DDM, SD, SDM = [ np.clip(x, 0.0, 1.0) for x in ([test_S_t,test_D_t] + self.AE_view ([test_S_i, test_D_i]) ) ]
             SSM, DDM, SDM, = [ np.repeat (x, (3,), -1) for x in [SSM, DDM, SDM]]
         else:
-            S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S_t,test_D_t] + self.AE_view ([test_S_w, test_D_w]) ) ]
+            S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S_t,test_D_t] + self.AE_view ([test_S_i, test_D_i]) ) ]
 
         result = []
         st = []
