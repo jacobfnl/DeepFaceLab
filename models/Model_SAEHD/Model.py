@@ -24,14 +24,21 @@ class SAEHDModel(ModelBase):
 
 
         if is_first_run:
-            resolution = io.input_int("Resolution ( 64-256 ?:help skip:128) : ", default_resolution, help_message="More resolution requires more VRAM and time to train. Value will be adjusted to multiple of 16.")
-            resolution = np.clip (resolution, 64, 256)
-            while np.modf(resolution / 16)[0] != 0.0:
-                resolution -= 1
-            self.options['resolution'] = resolution
+            input_resolution = io.input_int("Input resolution ( 64-256 ?:help skip:128) : ", default_resolution, help_message="More resolution requires more VRAM and time to train. Value will be adjusted to multiple of 16.")
+            input_resolution = np.clip (input_resolution, 64, 256)
+            while np.modf(input_resolution / 16)[0] != 0.0:
+                input_resolution -= 1
+            self.options['input_resolution'] = input_resolution
+            output_resolution = io.input_int("Output resolution ( 64-256 ?:help skip:128) : ", default_resolution, help_message="More resolution requires more VRAM and time to train. Value will be adjusted to multiple of 16.")
+            output_resolution = np.clip (output_resolution, 64, 256)
+            while np.modf(output_resolution / 16)[0] != 0.0:
+                output_resolution -= 1
+            self.options['output_resolution'] = output_resolution
             self.options['face_type'] = io.input_str ("Half, mid full, or full face? (h/mf/f, ?:help skip:f) : ", default_face_type, ['h','mf','f'], help_message="Half face has better resolution, but covers less area of cheeks. Mid face is 30% wider than half face.").lower()
         else:
-            self.options['resolution'] = self.options.get('resolution', default_resolution)
+            default_resolution = self.options.get('resolution', default_resolution)
+            self.options['input_resolution'] = self.options.get('input_resolution', default_resolution)
+            self.options['output_resolution'] = self.options.get('output_resolution', default_resolution)
             self.options['face_type'] = self.options.get('face_type', default_face_type)
 
         default_learn_mask = self.options.get('learn_mask', True)
@@ -147,7 +154,8 @@ class SAEHDModel(ModelBase):
         exec(nnlib.import_all(), locals(), globals())
         self.set_vram_batch_requirements({1.5:4,4:8})
 
-        resolution = self.options['resolution']
+        input_resolution = self.options['input_resolution']
+        output_resolution = self.options['input_resolution']
         learn_mask = self.options['learn_mask']
 
         ae_dims = self.options['ae_dims']
@@ -156,8 +164,10 @@ class SAEHDModel(ModelBase):
         if not self.pretrain:
             self.options.pop('pretrain')
 
-        bgr_shape = (resolution, resolution, 3)
-        mask_shape = (resolution, resolution, 1)
+        bgr_input_shape = (input_resolution, input_resolution, 3)
+        bgr_output_shape = (output_resolution, output_resolution, 3)
+        mask_input_shape = (input_resolution, input_resolution, 1)
+        mask_output_shape = (output_resolution, output_resolution, 1)
 
         self.true_face_training = self.options.get('true_face_training', False)
         masked_training = True
@@ -187,14 +197,16 @@ class SAEHDModel(ModelBase):
                 return func
 
         class SAEDFModel(CommonModel):
-            def __init__(self, resolution, ae_dims, e_ch_dims, d_ch_dims, learn_mask):
+            def __init__(self, input_resolution, output_resolution, ae_dims, e_ch_dims, d_ch_dims, learn_mask):
                 super().__init__()
                 self.learn_mask = learn_mask
 
                 output_nc = 3
-                bgr_shape = (resolution, resolution, output_nc)
-                mask_shape = (resolution, resolution, 1)
-                lowest_dense_res = resolution // 16
+                bgr_input_shape = (input_resolution, input_resolution, output_nc)
+                bgr_output_shape = (output_resolution, output_resolution, output_nc)
+                mask_input_shape = (input_resolution, input_resolution, 1)
+                mask_output_shape = (output_resolution, output_resolution, 1)
+                lowest_dense_res = output_resolution // 16
                 e_dims = output_nc*e_ch_dims
 
 
@@ -258,7 +270,7 @@ class SAEHDModel(ModelBase):
 
                     return func
 
-                self.encoder = modelify(enc_flow(e_ch_dims, ae_dims, lowest_dense_res)) ( Input(bgr_shape) )
+                self.encoder = modelify(enc_flow(e_ch_dims, ae_dims, lowest_dense_res)) ( Input(bgr_input_shape) )
 
                 sh = K.int_shape( self.encoder.outputs[0] )[1:]
                 self.decoder_src = modelify(dec_flow(output_nc, d_ch_dims)) ( Input(sh) )
@@ -273,9 +285,9 @@ class SAEHDModel(ModelBase):
                 if learn_mask:
                     self.src_dst_mask_trainable_weights = self.encoder.trainable_weights + self.decoder_srcm.trainable_weights + self.decoder_dstm.trainable_weights
 
-                self.warped_src, self.warped_dst = Input(bgr_shape), Input(bgr_shape)
-                self.target_src, self.target_dst = Input(bgr_shape), Input(bgr_shape)
-                self.target_srcm, self.target_dstm = Input(mask_shape), Input(mask_shape)
+                self.warped_src, self.warped_dst = Input(bgr_input_shape), Input(bgr_input_shape)
+                self.target_src, self.target_dst = Input(bgr_output_shape), Input(bgr_output_shape)
+                self.target_srcm, self.target_dstm = Input(mask_output_shape), Input(mask_output_shape)
                 self.src_code, self.dst_code = self.encoder(self.warped_src), self.encoder(self.warped_dst)
 
                 self.pred_src_src = self.decoder_src(self.src_code)
@@ -299,15 +311,17 @@ class SAEHDModel(ModelBase):
                 return ar
 
         class SAELIAEModel(CommonModel):
-            def __init__(self, resolution, ae_dims, e_ch_dims, d_ch_dims, learn_mask):
+            def __init__(self, input_resolution, output_resolution, ae_dims, e_ch_dims, d_ch_dims, learn_mask):
                 super().__init__()
                 self.learn_mask = learn_mask
 
                 output_nc = 3
-                bgr_shape = (resolution, resolution, output_nc)
-                mask_shape = (resolution, resolution, 1)
+                bgr_input_shape = (input_resolution, input_resolution, output_nc)
+                bgr_output_shape = (output_resolution, output_resolution, output_nc)
+                mask_input_shape = (input_resolution, input_resolution, 1)
+                mask_output_shape = (output_resolution, output_resolution, 1)
 
-                lowest_dense_res = resolution // 16
+                lowest_dense_res = output_resolution // 16
 
                 def enc_flow(e_ch_dims):
                     dims = output_nc*e_ch_dims
@@ -372,7 +386,7 @@ class SAEHDModel(ModelBase):
 
                     return func
 
-                self.encoder = modelify(enc_flow(e_ch_dims)) ( Input(bgr_shape) )
+                self.encoder = modelify(enc_flow(e_ch_dims)) ( Input(bgr_input_shape) )
 
                 sh = K.int_shape( self.encoder.outputs[0] )[1:]
                 self.inter_B = modelify(inter_flow(lowest_dense_res, ae_dims)) ( Input(sh) )
@@ -389,9 +403,9 @@ class SAEHDModel(ModelBase):
                 if learn_mask:
                     self.src_dst_mask_trainable_weights = self.encoder.trainable_weights + self.inter_B.trainable_weights + self.inter_AB.trainable_weights + self.decoderm.trainable_weights
 
-                self.warped_src, self.warped_dst = Input(bgr_shape), Input(bgr_shape)
-                self.target_src, self.target_dst = Input(bgr_shape), Input(bgr_shape)
-                self.target_srcm, self.target_dstm = Input(mask_shape), Input(mask_shape)
+                self.warped_src, self.warped_dst = Input(bgr_input_shape), Input(bgr_input_shape)
+                self.target_src, self.target_dst = Input(bgr_output_shape), Input(bgr_output_shape)
+                self.target_srcm, self.target_dstm = Input(mask_output_shape), Input(mask_output_shape)
 
                 warped_src_code = self.encoder (self.warped_src)
                 warped_src_inter_AB_code = self.inter_AB (warped_src_code)
@@ -428,9 +442,9 @@ class SAEHDModel(ModelBase):
                 return ar
 
         if 'df' in self.options['archi']:
-            self.model = SAEDFModel (resolution, ae_dims, ed_ch_dims, ed_ch_dims, learn_mask)
+            self.model = SAEDFModel (input_resolution, output_resolution, ae_dims, ed_ch_dims, ed_ch_dims, learn_mask)
         elif 'liae' in self.options['archi']:
-            self.model = SAELIAEModel (resolution, ae_dims, ed_ch_dims, ed_ch_dims, learn_mask)
+            self.model = SAELIAEModel (input_resolution, output_resolution, ae_dims, ed_ch_dims, ed_ch_dims, learn_mask)
 
         self.opt_dis_model = []
 
@@ -479,8 +493,8 @@ class SAEHDModel(ModelBase):
                 if type(layer) == keras.layers.Conv2D:
                     self.CA_conv_weights_list += [layer.weights[0]] #- is Conv2D kernel_weights
 
-        target_srcm = gaussian_blur( max(1, resolution // 32) )(self.model.target_srcm)
-        target_dstm = gaussian_blur( max(1, resolution // 32) )(self.model.target_dstm)
+        target_srcm = gaussian_blur( max(1, output_resolution // 32) )(self.model.target_srcm)
+        target_dstm = gaussian_blur( max(1, output_resolution // 32) )(self.model.target_dstm)
 
         target_src_masked = self.model.target_src*target_srcm
         target_dst_masked = self.model.target_dst*target_dstm
@@ -506,42 +520,42 @@ class SAEHDModel(ModelBase):
 
             if self.options['ms_ssim_loss']:
                 # TODO - Done
-                src_loss = K.mean(10 * MsSSIM(resolution)(target_src_masked_opt, pred_src_src_masked_opt))
-                dst_loss = K.mean(10 * MsSSIM(resolution)(target_dst_masked_opt, pred_dst_dst_masked_opt))
+                src_loss = K.mean(10 * MsSSIM(output_resolution)(target_src_masked_opt, pred_src_src_masked_opt))
+                dst_loss = K.mean(10 * MsSSIM(output_resolution)(target_dst_masked_opt, pred_dst_dst_masked_opt))
             else:
-                src_loss =  K.mean ( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( target_src_masked_opt, pred_src_src_masked_opt) )
+                src_loss =  K.mean ( 10*dssim(kernel_size=int(output_resolution/11.6),max_value=1.0)( target_src_masked_opt, pred_src_src_masked_opt) )
                 src_loss += K.mean ( 10*K.square( target_src_masked_opt - pred_src_src_masked_opt ) )
 
-                dst_loss =  K.mean( 10*dssim(kernel_size=int(resolution/11.6),max_value=1.0)(target_dst_masked_opt, pred_dst_dst_masked_opt) )
+                dst_loss =  K.mean( 10*dssim(kernel_size=int(output_resolution/11.6),max_value=1.0)(target_dst_masked_opt, pred_dst_dst_masked_opt) )
                 dst_loss += K.mean( 10*K.square( target_dst_masked_opt - pred_dst_dst_masked_opt ) )
 
             background_power = self.options['background_power'] / 100.0
             if background_power != 0:
                 if self.options['ms_ssim_loss']:
-                    src_loss += K.mean(10 * background_power * MsSSIM(resolution)(pred_src_src_anti_masked, target_src_anti_masked))
-                    dst_loss += K.mean(10 * background_power * MsSSIM(resolution)(pred_dst_dst_anti_masked, target_dst_anti_masked))
+                    src_loss += K.mean(10 * background_power * MsSSIM(output_resolution)(pred_src_src_anti_masked, target_src_anti_masked))
+                    dst_loss += K.mean(10 * background_power * MsSSIM(output_resolution)(pred_dst_dst_anti_masked, target_dst_anti_masked))
                 else:
-                    src_loss += K.mean( (10*background_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( pred_src_src_anti_masked, target_src_anti_masked ))
+                    src_loss += K.mean( (10*background_power)*dssim(kernel_size=int(output_resolution/11.6),max_value=1.0)( pred_src_src_anti_masked, target_src_anti_masked ))
                     src_loss += K.mean( (10*background_power)*K.square( pred_dst_dst_anti_masked - target_src_anti_masked ))
 
-                    src_loss += K.mean( (10*background_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( pred_dst_dst_anti_masked, target_dst_anti_masked ))
+                    src_loss += K.mean( (10*background_power)*dssim(kernel_size=int(output_resolution/11.6),max_value=1.0)( pred_dst_dst_anti_masked, target_dst_anti_masked ))
                     src_loss += K.mean( (10*background_power)*K.square( pred_dst_dst_anti_masked - target_dst_anti_masked ))
 
             face_style_power = self.options['face_style_power'] / 100.0
             if face_style_power != 0:
                 if self.options['ms_ssim_loss']:
                     # TODO
-                    src_loss += style_loss(gaussian_blur_radius=resolution//16, loss_weight=face_style_power, wnd_size=0)( psd_target_dst_masked, target_dst_masked )
+                    src_loss += style_loss(gaussian_blur_radius=output_resolution//16, loss_weight=face_style_power, wnd_size=0)( psd_target_dst_masked, target_dst_masked )
                 else:
-                    src_loss += style_loss(gaussian_blur_radius=resolution//16, loss_weight=face_style_power, wnd_size=0)( psd_target_dst_masked, target_dst_masked )
+                    src_loss += style_loss(gaussian_blur_radius=output_resolution//16, loss_weight=face_style_power, wnd_size=0)( psd_target_dst_masked, target_dst_masked )
 
             bg_style_power = self.options['bg_style_power'] / 100.0
             if bg_style_power != 0:
                 if self.options['ms_ssim_loss']:
                     # TODO - Done
-                    src_loss += K.mean(10 * bg_style_power * MsSSIM(resolution)(psd_target_dst_anti_masked, target_dst_anti_masked))
+                    src_loss += K.mean(10 * bg_style_power * MsSSIM(output_resolution)(psd_target_dst_anti_masked, target_dst_anti_masked))
                 else:
-                    src_loss += K.mean( (10*bg_style_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( psd_target_dst_anti_masked, target_dst_anti_masked ))
+                    src_loss += K.mean( (10*bg_style_power)*dssim(kernel_size=int(output_resolution/11.6),max_value=1.0)( psd_target_dst_anti_masked, target_dst_anti_masked ))
                     src_loss += K.mean( (10*bg_style_power)*K.square( psd_target_dst_anti_masked - target_dst_anti_masked ))
 
 
@@ -573,8 +587,8 @@ class SAEHDModel(ModelBase):
             if self.options['learn_mask']:
                 if self.options['ms_ssim_loss']:
                     # TODO - Done
-                    src_mask_loss = K.mean(MsSSIM(resolution)(self.model.target_srcm, self.model.pred_src_srcm))
-                    dst_mask_loss = K.mean(MsSSIM(resolution)(self.model.target_dstm, self.model.pred_dst_dstm))
+                    src_mask_loss = K.mean(MsSSIM(output_resolution)(self.model.target_srcm, self.model.pred_src_srcm))
+                    dst_mask_loss = K.mean(MsSSIM(output_resolution)(self.model.target_dstm, self.model.pred_dst_dstm))
                 else:
                     src_mask_loss = K.mean(K.square(self.model.target_srcm-self.model.pred_src_srcm))
                     dst_mask_loss = K.mean(K.square(self.model.target_dstm-self.model.pred_dst_dstm))
@@ -622,16 +636,16 @@ class SAEHDModel(ModelBase):
                                                                 random_ct_samples_path=training_data_dst_path if self.options['ct_mode'] != 0 else None,
                                                                 debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, scale_range=np.array([-0.05, 0.05])+self.src_scale_mod / 100.0 ),
-                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_bgr), 'resolution':resolution, 'ct_mode': self.options['ct_mode'] },
-                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_bgr), 'resolution': resolution, 'ct_mode': self.options['ct_mode'] },
-                                                {'types' : (t.IMG_TRANSFORMED, face_type, t.MODE_M), 'resolution': resolution } ]
+                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_bgr), 'resolution':input_resolution, 'ct_mode': self.options['ct_mode'] },
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_bgr), 'resolution': output_resolution, 'ct_mode': self.options['ct_mode'] },
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t.MODE_M), 'resolution': output_resolution } ]
                                               ),
 
                     SampleGeneratorFace(training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, ),
-                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_bgr), 'resolution':resolution},
-                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_bgr), 'resolution': resolution},
-                                                {'types' : (t.IMG_TRANSFORMED, face_type, t.MODE_M), 'resolution': resolution} ])
+                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_bgr), 'resolution':input_resolution},
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_bgr), 'resolution': output_resolution},
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t.MODE_M), 'resolution': output_resolution} ])
                              ])
 
     #override
@@ -713,7 +727,7 @@ class SAEHDModel(ModelBase):
 
     def predictor_func (self, face=None, dummy_predict=False):
         if dummy_predict:
-            self.AE_convert ([ np.zeros ( (1, self.options['resolution'], self.options['resolution'], 3), dtype=np.float32 ) ])
+            self.AE_convert ([ np.zeros ( (1, self.options['input_resolution'], self.options['output_resolution'], 3), dtype=np.float32 ) ])
         else:
             if self.options['learn_mask']:
                 bgr, mask_dst_dstm, mask_src_dstm = self.AE_convert ([face[np.newaxis,...]])
@@ -733,7 +747,7 @@ class SAEHDModel(ModelBase):
             face_type = FaceType.FULL
 
         import converters
-        return self.predictor_func, (self.options['resolution'], self.options['resolution'], 3), converters.ConverterConfigMasked(face_type=face_type,
+        return self.predictor_func, (self.options['input_resolution'], self.options['output_resolution'], 3), converters.ConverterConfigMasked(face_type=face_type,
                                      default_mode = 1 if self.options['ct_mode'] != 'none' or self.options['face_style_power'] or self.options['bg_style_power'] else 4,
                                      clip_hborder_mask_per=0.0625 if (face_type != FaceType.HALF) else 0,
                                     )
