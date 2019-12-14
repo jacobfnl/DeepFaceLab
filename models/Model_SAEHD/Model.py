@@ -667,8 +667,8 @@ class SAEHDModel(ModelBase):
 
     #override
     def onTrainOneIter(self, generators_samples, generators_list):
-        warped_src, target_src, target_srcm = generators_samples[0]
-        warped_dst, target_dst, target_dstm = generators_samples[1]
+        warped_src, preview_src, target_src, target_srcm = generators_samples[0]
+        warped_dst, preview_dst, target_dst, target_dstm = generators_samples[1]
 
         feed = [warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm]
 
