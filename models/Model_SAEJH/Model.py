@@ -624,7 +624,12 @@ class SAEHDModel(ModelBase):
 
                 self.D_train = K.function ([self.model.warped_src, self.model.warped_dst],[loss_D], self.D_opt.get_updates(loss_D, self.dis.trainable_weights) )
 
-            self.src_dst_train = K.function ([self.model.warped_src, self.model.warped_dst, self.model.target_src, self.model.target_srcm, self.model.target_dst, self.model.target_dstm],
+            self.src_dst_train = K.function ([self.model.warped_src_luma, self.model.warped_src_chroma,
+                                              self.model.warped_dst_luma, self.model.warped_dst_chroma,
+                                              self.model.target_src_luma, self.model.target_src_chroma,
+                                              self.model.target_srcm,
+                                              self.model.target_dst_luma, self.model.target_dst_chroma,
+                                              self.model.target_dstm],
                                              [src_loss,dst_loss],
                                              self.src_dst_opt.get_updates( G_loss, self.model.src_dst_trainable_weights)
                                              )
@@ -637,18 +642,37 @@ class SAEHDModel(ModelBase):
                 else:
                     src_mask_loss = K.mean(K.square(self.model.target_srcm-self.model.pred_src_srcm))
                     dst_mask_loss = K.mean(K.square(self.model.target_dstm-self.model.pred_dst_dstm))
-                self.src_dst_mask_train = K.function ([self.model.warped_src, self.model.warped_dst, self.model.target_srcm, self.model.target_dstm],[src_mask_loss, dst_mask_loss], self.src_dst_mask_opt.get_updates(src_mask_loss+dst_mask_loss, self.model.src_dst_mask_trainable_weights ) )
+                self.src_dst_mask_train = K.function ([self.model.warped_src_luma, self.model.warped_src_chroma,
+                                                       self.model.warped_dst_luma, self.model.warped_dst_chroma,
+                                                       self.model.target_srcm,
+                                                       self.model.target_dstm],
+                                                      [src_mask_loss, dst_mask_loss], self.src_dst_mask_opt.get_updates(src_mask_loss+dst_mask_loss, self.model.src_dst_mask_trainable_weights ) )
 
             if self.options['learn_mask']:
-                self.AE_view = K.function ([self.model.warped_src, self.model.warped_dst], [self.model.pred_src_src, self.model.pred_src_srcm, self.model.pred_dst_dst, self.model.pred_dst_dstm, self.model.pred_src_dst, self.model.pred_src_dstm])
+                self.AE_view = K.function ([self.model.warped_src_luma, self.model.warped_src_chroma,
+                                            self.model.warped_dst_luma, self.model.warped_dst_chroma],
+                                           [self.model.pred_src_src_luma, self.model.pred_src_src_chroma,
+                                            self.model.pred_src_srcm,
+                                            self.model.pred_dst_dst_luma, self.model.pred_dst_dst_chroma,
+                                            self.model.pred_dst_dstm,
+                                            self.model.pred_src_dst_luma, self.model.pred_src_dst_chroma,
+                                            self.model.pred_src_dstm])
             else:
-                self.AE_view = K.function ([self.model.warped_src, self.model.warped_dst], [self.model.pred_src_src, self.model.pred_dst_dst, self.model.pred_src_dst ])
+                self.AE_view = K.function ([self.model.warped_src_luma, self.model.warped_src_chroma,
+                                            self.model.warped_dst_luma, self.model.warped_dst_chroma],
+                                           [self.model.pred_src_src_luma, self.model.pred_src_src_chroma,
+                                            self.model.pred_dst_dst_luma, self.model.pred_dst_dst_chroma,
+                                            self.model.pred_src_dst_luma, self.model.pred_src_dst_chroma])
 
         else:
             if self.options['learn_mask']:
-                self.AE_convert = K.function ([self.model.warped_dst],[ self.model.pred_src_dst, self.model.pred_dst_dstm, self.model.pred_src_dstm ])
+                self.AE_convert = K.function ([self.model.warped_dst_luma, self.model.warped_dst_chroma],
+                                              [ self.model.pred_src_dst_luma, self.model.pred_src_dst_chroma,
+                                                self.model.pred_dst_dstm,
+                                                self.model.pred_src_dstm ])
             else:
-                self.AE_convert = K.function ([self.model.warped_dst],[ self.model.pred_src_dst ])
+                self.AE_convert = K.function ([self.model.warped_dst_luma, self.model.warped_dst_chroma],
+                                              [self.model.pred_src_dst_luma, self.model.pred_src_dst_chroma])
 
 
         if self.is_training_mode:
@@ -661,9 +685,10 @@ class SAEHDModel(ModelBase):
             elif self.options['face_type'] == 'f':
                 face_type = t.FACE_TYPE_FULL
 
-            t_mode_lab = t.MODE_LAB if not self.pretrain else t.MODE_LAB_SHUFFLE
+            t_mode_luma = t.MODE_LUMA
+            t_mode_chroma = t.MODE_CHROMA if not self.pretrain else t.MODE_CHROMA_SHUFFLE
             if self.options['random_color_change']:
-                t_mode_lab = t.MODE_LAB_SHUFFLE
+                t_mode_chroma = t.MODE_CHROMA_SHUFFLE
 
             training_data_src_path = self.training_data_src_path
             training_data_dst_path = self.training_data_dst_path
@@ -681,15 +706,19 @@ class SAEHDModel(ModelBase):
                                                                 random_ct_samples_path=training_data_dst_path if self.options['ct_mode'] != 0 else None,
                                                                 debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, scale_range=np.array([-0.05, 0.05])+self.src_scale_mod / 100.0 ),
-                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_lab), 'resolution':resolution, 'ct_mode': self.options['ct_mode'] },
-                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_lab), 'resolution': resolution, 'ct_mode': self.options['ct_mode'] },
+                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_luma), 'resolution':resolution, 'ct_mode': self.options['ct_mode'] },
+                                                {'types' : (t_img_warped, face_type, t_mode_chroma), 'resolution':resolution//2, 'ct_mode': self.options['ct_mode'] },
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_luma), 'resolution': resolution, 'ct_mode': self.options['ct_mode'] },
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_chroma), 'resolution': resolution//2, 'ct_mode': self.options['ct_mode'] },
                                                 {'types' : (t.IMG_TRANSFORMED, face_type, t.MODE_M), 'resolution': resolution } ]
                                               ),
 
                     SampleGeneratorFace(training_data_dst_path, debug=self.is_debug(), batch_size=self.batch_size,
                         sample_process_options=SampleProcessor.Options(random_flip=self.random_flip, ),
-                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_lab), 'resolution':resolution},
-                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_lab), 'resolution': resolution},
+                        output_sample_types = [ {'types' : (t_img_warped, face_type, t_mode_luma), 'resolution':resolution},
+                                                {'types' : (t_img_warped, face_type, t_mode_chroma), 'resolution':resolution//2},
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_luma), 'resolution': resolution},
+                                                {'types' : (t.IMG_TRANSFORMED, face_type, t_mode_chroma), 'resolution': resolution//2},
                                                 {'types' : (t.IMG_TRANSFORMED, face_type, t.MODE_M), 'resolution': resolution} ])
                              ])
 
@@ -710,18 +739,26 @@ class SAEHDModel(ModelBase):
 
     #override
     def onTrainOneIter(self, generators_samples, generators_list):
-        warped_src, target_src, target_srcm = generators_samples[0]
-        warped_dst, target_dst, target_dstm = generators_samples[1]
+        warped_src_luma, warped_src_chroma, target_src_luma, target_src_chroma, target_srcm = generators_samples[0]
+        warped_dst_luma, warped_dst_chroma, target_dst_luma, target_dst_chroma, target_dstm = generators_samples[1]
 
-        feed = [warped_src, warped_dst, target_src, target_srcm, target_dst, target_dstm]
+        feed = [warped_src_luma, warped_src_chroma,
+                warped_dst_luma, warped_dst_chroma,
+                target_src_luma, target_src_chroma,
+                target_srcm,
+                target_dst_luma, target_dst_chroma,
+                target_dstm]
 
         src_loss, dst_loss, = self.src_dst_train (feed)
 
-        if self.true_face_training:
-            self.D_train([warped_src, warped_dst])
+        # if self.true_face_training:
+        #     self.D_train([warped_src, warped_dst])
 
         if self.options['learn_mask']:
-            feed = [ warped_src, warped_dst, target_srcm, target_dstm ]
+            feed = [warped_src_luma, warped_src_chroma,
+                    warped_dst_luma, warped_dst_chroma,
+                    target_srcm,
+                    target_dstm]
             src_mask_loss, dst_mask_loss, = self.src_dst_mask_train (feed)
 
         return ( ('src_loss', src_loss), ('dst_loss', dst_loss), )
