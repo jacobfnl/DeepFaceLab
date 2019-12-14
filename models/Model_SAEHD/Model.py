@@ -683,20 +683,22 @@ class SAEHDModel(ModelBase):
 
     #override
     def onGetPreview(self, sample):
-        test_S   = sample[0][1][0:4] #first 4 samples
+        test_S_w = sample[0][0][0:4] #first 4 samples
+        test_S_t = sample[0][1][0:4] #first 4 samples
         test_S_m = sample[0][2][0:4] #first 4 samples
-        test_D   = sample[1][1][0:4]
+        test_D_w = sample[1][0][0:4]
+        test_D_t = sample[1][1][0:4]
         test_D_m = sample[1][2][0:4]
 
         if self.options['learn_mask']:
-            S, D, SS, SSM, DD, DDM, SD, SDM = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S, test_D]) ) ]
+            S, D, SS, SSM, DD, DDM, SD, SDM = [ np.clip(x, 0.0, 1.0) for x in ([test_S_t,test_D_t] + self.AE_view ([test_S_w, test_D_w]) ) ]
             SSM, DDM, SDM, = [ np.repeat (x, (3,), -1) for x in [SSM, DDM, SDM]]
         else:
-            S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S, test_D]) ) ]
+            S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S_t,test_D_t] + self.AE_view ([test_S_w, test_D_w]) ) ]
 
         result = []
         st = []
-        for i in range(len(test_S)):
+        for i in range(len(test_S_w)):
             ar = S[i], SS[i], D[i], DD[i], SD[i]
 
             st.append ( np.concatenate ( ar, axis=1) )
@@ -705,7 +707,7 @@ class SAEHDModel(ModelBase):
 
         if self.options['learn_mask']:
             st_m = []
-            for i in range(len(test_S)):
+            for i in range(len(test_S_w)):
                 ar = S[i]*test_S_m[i], SS[i]*SSM[i], D[i]*test_D_m[i], DD[i]*DDM[i], SD[i]*(DDM[i]*SDM[i])
                 st_m.append ( np.concatenate ( ar, axis=1) )
 
@@ -713,7 +715,7 @@ class SAEHDModel(ModelBase):
 
             st_b = []
             st_p = []
-            for i in range(len(test_S)):
+            for i in range(len(test_S_w)):
                 ar_bgrd = S[i]*(1-test_S_m[i]), SS[i]*(1-SSM[i]), D[i]*(1-test_D_m[i]), DD[i]*(1-DDM[i]), SD[i]*(1-DDM[i])*(1-SDM[i])
                 st_b.append(np.concatenate(ar_bgrd, axis=1))
 
