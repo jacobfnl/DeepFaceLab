@@ -7,7 +7,7 @@ import numpy as np
 import imagelib
 from facelib import FaceType, LandmarksProcessor
 from imagelib.color_transfer import ColorTransferMode, random_color_transform, bgr_to_lab_decimal, \
-    bgr_to_lab_decimal_shuffle
+    bgr_to_lab_decimal_shuffle, bgr_to_luma_decimal, bgr_to_chroma_decimal, bgr_to_chroma_decimal_shuffle
 
 """
 output_sample_types = [
@@ -77,7 +77,10 @@ class SampleProcessor(object):
         MODE_LAB_RAND_TRANSFORM    = 45
         MODE_LAB                   = 46
         MODE_LAB_SHUFFLE           = 47
-        MODE_END = 50
+        MODE_LUMA                  = 48
+        MODE_CHROMA                = 49
+        MODE_CHROMA_SHUFFLE        = 50
+        MODE_END = 51
 
     class Options(object):
         def __init__(self, random_flip = True, rotation_range=[-10,10], scale_range=[-0.05, 0.05], tx_range=[-0.05, 0.05], ty_range=[-0.05, 0.05] ):
@@ -324,7 +327,15 @@ class SampleProcessor(object):
                 elif mode_type == SPTF.MODE_LAB:
                     img = bgr_to_lab_decimal(img_bgr)
                 elif mode_type == SPTF.MODE_LAB_SHUFFLE:
-                    img = bgr_to_lab_decimal_shuffle(img_bgr)
+                    rnd_state = np.random.RandomState(sample_rnd_seed)
+                    img = bgr_to_lab_decimal_shuffle(img_bgr, rnd_state)
+                elif mode_type == SPTF.MODE_LUMA:
+                    img = bgr_to_luma_decimal(img_bgr)
+                elif mode_type == SPTF.MODE_CHROMA:
+                    img = bgr_to_chroma_decimal(img_bgr)
+                elif mode_type == SPTF.MODE_CHROMA_SHUFFLE:
+                    rnd_state = np.random.RandomState(sample_rnd_seed)
+                    img = bgr_to_chroma_decimal_shuffle(img_bgr, rnd_state)
 
                 if not debug:
                     if normalize_tanh:

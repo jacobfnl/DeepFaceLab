@@ -172,6 +172,22 @@ def bgr_to_lab_decimal(image):
     return image
 
 
+def bgr_to_luma_decimal(image):
+    image = cv2.cvtColor(image.astype(np.float32), cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(image)
+    l = np.clip(l, 0, 100) / 100
+    return l
+
+
+def bgr_to_chroma_decimal(image):
+    image = cv2.cvtColor(image.astype(np.float32), cv2.COLOR_BGR2LAB)
+    l, a, b = cv2.split(image)
+    a = (np.clip(a, -127, 127) + 127) / 254
+    b = (np.clip(b, -127, 127) + 127) / 254
+    image = cv2.merge([a, b])
+    return image
+
+
 def lab_decimal_to_bgr(image):
     l, a, b = cv2.split(image)
     l = np.clip(l, 0, 1) * 100
@@ -192,6 +208,18 @@ def bgr_to_lab_decimal_shuffle(image, seed=None):
     a = (np.clip(a, -127, 127) + 127) / 254
     b = (np.clip(b, -127, 127) + 127) / 254
     image = cv2.merge([l, a, b])
+    return image
+
+
+def bgr_to_chroma_decimal_shuffle(image, seed=None):
+    image = cv2.cvtColor(image.astype(np.float32), cv2.COLOR_BGR2LAB)
+    M = np.eye(3)
+    M[1:, 1:] = special_ortho_group.rvs(2, 1, seed)
+    image = image.dot(M)
+    l, a, b = cv2.split(image)
+    a = (np.clip(a, -127, 127) + 127) / 254
+    b = (np.clip(b, -127, 127) + 127) / 254
+    image = cv2.merge([a, b])
     return image
 
 
