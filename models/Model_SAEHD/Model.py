@@ -19,11 +19,15 @@ class SAEHDModel(ModelBase):
         yn_str = {True:'y',False:'n'}
 
         default_resolution = 128
+        default_decoder_depth = 3
         default_archi = 'df'
         default_face_type = 'f'
 
 
         if is_first_run:
+            decoder_depth = io.input_int("Decoder depth ( 1-10 ?:help skip:3) : ", default_decoder_depth, help_message="Deeper decoder, smaller dense layer")
+            decoder_depth = np.clip (decoder_depth, 1, 10)
+            self.options['decoder_depth'] = decoder_depth
             input_resolution = io.input_int("Input resolution ( 64-256 ?:help skip:128) : ", default_resolution, help_message="More resolution requires more VRAM and time to train. Value will be adjusted to multiple of 16.")
             input_resolution = np.clip (input_resolution, 64, 256)
             while np.modf(input_resolution / 16)[0] != 0.0:
@@ -31,12 +35,13 @@ class SAEHDModel(ModelBase):
             self.options['input_resolution'] = input_resolution
             output_resolution = io.input_int("Output resolution ( 64-256 ?:help skip:128) : ", default_resolution, help_message="More resolution requires more VRAM and time to train. Value will be adjusted to multiple of 16.")
             output_resolution = np.clip (output_resolution, 64, 256)
-            while np.modf(output_resolution / 16)[0] != 0.0:
+            while np.modf(output_resolution / (2 * 2**decoder_depth))[0] != 0.0:
                 output_resolution -= 1
             self.options['output_resolution'] = output_resolution
             self.options['face_type'] = io.input_str ("Half, mid full, or full face? (h/mf/f, ?:help skip:f) : ", default_face_type, ['h','mf','f'], help_message="Half face has better resolution, but covers less area of cheeks. Mid face is 30% wider than half face.").lower()
         else:
             default_resolution = self.options.get('resolution', default_resolution)
+            self.options['decoder_depth'] = self.options.get('decoder_depth', default_decoder_depth)
             self.options['input_resolution'] = self.options.get('input_resolution', default_resolution)
             self.options['output_resolution'] = self.options.get('output_resolution', default_resolution)
             self.options['face_type'] = self.options.get('face_type', default_face_type)
@@ -156,6 +161,7 @@ class SAEHDModel(ModelBase):
 
         input_resolution = self.options['input_resolution']
         output_resolution = self.options['output_resolution']
+        decoder_depth = self.options['decoder_depth']
         learn_mask = self.options['learn_mask']
 
         ae_dims = self.options['ae_dims']
@@ -206,7 +212,7 @@ class SAEHDModel(ModelBase):
                 bgr_output_shape = (output_resolution, output_resolution, output_nc)
                 mask_input_shape = (input_resolution, input_resolution, 1)
                 mask_output_shape = (output_resolution, output_resolution, 1)
-                lowest_dense_res = output_resolution // 16
+                lowest_dense_res = input_resolution // (2 * 2**decoder_depth)
                 e_dims = output_nc*e_ch_dims
 
 
@@ -255,7 +261,7 @@ class SAEHDModel(ModelBase):
 
                     def func(x):
 
-                        for i in [8,4,2]:
+                        for i in [2**j for j in range(decoder_depth, 0, -1)]:
                             x = self.upscale(dims*i)(x)
 
                             if not is_mask:
@@ -320,8 +326,7 @@ class SAEHDModel(ModelBase):
                 bgr_output_shape = (output_resolution, output_resolution, output_nc)
                 mask_input_shape = (input_resolution, input_resolution, 1)
                 mask_output_shape = (output_resolution, output_resolution, 1)
-
-                lowest_dense_res = output_resolution // 16
+                lowest_dense_res = output_resolution // (2 * 2**decoder_depth)
 
                 def enc_flow(e_ch_dims):
                     dims = output_nc*e_ch_dims
@@ -371,7 +376,7 @@ class SAEHDModel(ModelBase):
 
                     def func(x):
 
-                        for i in [8,4,2]:
+                        for i in [2**j for j in range(decoder_depth, 0, -1)]:
                             x = self.upscale(dims*i)(x)
 
                             if not is_mask:
