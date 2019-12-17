@@ -669,8 +669,10 @@ class SAEHDModel(ModelBase):
 
     #override
     def onGetPreview(self, sample):
+        test_S_w = sample[0][0][0:4]
         test_S   = sample[0][1][0:4] #first 4 samples
         test_S_m = sample[0][2][0:4] #first 4 samples
+        test_D_w = sample[1][0][0:4]
         test_D   = sample[1][1][0:4]
         test_D_m = sample[1][2][0:4]
 
@@ -708,6 +710,22 @@ class SAEHDModel(ModelBase):
 
             result += [('SAEHD background', np.concatenate(st_b, axis=0)), ]
             result += [('SAEHD overlay', np.concatenate(st_p, axis=0)), ]
+
+        if self.options['random_warp']:
+            if self.options['learn_mask']:
+                S, D, SS, SSM, DD, DDM, SD, SDM = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S_w, test_D_w]) ) ]
+                SSM, DDM, SDM, = [ np.repeat (x, (3,), -1) for x in [SSM, DDM, SDM]]
+            else:
+                S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S_w, test_D_w]) ) ]
+
+            result = []
+            st = []
+            for i in range(len(test_S)):
+                ar = S[i], SS[i], D[i], DD[i], SD[i]
+
+                st.append ( np.concatenate ( ar, axis=1) )
+
+            result += [ ('SAEHD warped', np.concatenate (st, axis=0 )), ]
 
         return result
 
