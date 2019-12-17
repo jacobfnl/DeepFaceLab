@@ -713,12 +713,11 @@ class SAEHDModel(ModelBase):
 
         if self.options['random_warp']:
             if self.options['learn_mask']:
-                S, D, SS, SSM, DD, DDM, SD, SDM = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S_w, test_D_w]) ) ]
+                S, D, SS, SSM, DD, DDM, SD, SDM = [ np.clip(x, 0.0, 1.0) for x in ([test_S_w,test_D_w] + self.AE_view ([test_S_w, test_D_w]) ) ]
                 SSM, DDM, SDM, = [ np.repeat (x, (3,), -1) for x in [SSM, DDM, SDM]]
             else:
-                S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S,test_D] + self.AE_view ([test_S_w, test_D_w]) ) ]
+                S, D, SS, DD, SD, = [ np.clip(x, 0.0, 1.0) for x in ([test_S_w,test_D_w] + self.AE_view ([test_S_w, test_D_w]) ) ]
 
-            result = []
             st = []
             for i in range(len(test_S)):
                 ar = S[i], SS[i], D[i], DD[i], SD[i]
