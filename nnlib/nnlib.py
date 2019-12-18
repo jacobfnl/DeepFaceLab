@@ -810,7 +810,8 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
             def get_updates(self, loss, params):
                 loss = loss * self.scaling_factor
                 grads = self.get_gradients(loss, params)
-                grads = grads / self.scaling_factor
+                # print('grads:', grads)
+                grads = [g / self.scaling_factor for g in grads]
 
                 e = K.tf.device("/cpu:0") if self.tf_cpu_mode > 0 else None
                 if e: e.__enter__()
