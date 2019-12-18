@@ -48,6 +48,7 @@ class ModelBase(object):
         self.device_args = device_args
 
         self.device_config = nnlib.DeviceConfig(allow_growth=True, **self.device_args)
+        io.log_info(f'Using device config: {vars(self.device_config)}')
 
         io.log_info ("Loading model...")
 
