@@ -811,16 +811,16 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
             def get_updates(self, loss, params):
                 loss = loss * self.scaling_factor
                 grads = self.get_gradients(loss, params)
-                is_inf_or_nan = any([nnlib.tf.reduce_any(nnlib.tf.is_nan(grad)) or nnlib.tf.reduce_any(nnlib.tf.is_inf(grad)) for grad in grads])
-                if is_inf_or_nan:
-                    self.scaling_factor *= 0.5
-                    self.iterations_without_inf_or_nan = 0
-                    return self.updates
-                else:
-                    self.iterations_without_inf_or_nan += 1
-
-                if self.iterations_without_inf_or_nan >= 2000:
-                    self.scaling_factor *= 2
+                # is_inf_or_nan = any([nnlib.tf.reduce_any(nnlib.tf.is_nan(grad)) or nnlib.tf.reduce_any(nnlib.tf.is_inf(grad)) for grad in grads])
+                # if is_inf_or_nan:
+                #     self.scaling_factor *= 0.5
+                #     self.iterations_without_inf_or_nan = 0
+                #     return self.updates
+                # else:
+                #     self.iterations_without_inf_or_nan += 1
+                #
+                # if self.iterations_without_inf_or_nan >= 2000:
+                #     self.scaling_factor *= 2
 
 
                 grads = [g / self.scaling_factor for g in grads]
