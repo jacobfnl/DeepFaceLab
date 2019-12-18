@@ -793,7 +793,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                               2 - allows to train x3 bigger network on same VRAM consuming RAM*2 and CPU power.
             """
 
-            def __init__(self, learning_rate=0.001, rho=0.9, tf_cpu_mode=0, scaling_factor=65504, **kwargs):
+            def __init__(self, learning_rate=0.001, rho=0.9, tf_cpu_mode=0, scaling_factor=2048, **kwargs):
                 self.initial_decay = kwargs.pop('decay', 0.0)
                 self.epsilon = kwargs.pop('epsilon', K.epsilon())
                 self.tf_cpu_mode = tf_cpu_mode
