@@ -793,12 +793,10 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                               2 - allows to train x3 bigger network on same VRAM consuming RAM*2 and CPU power.
             """
 
-            def __init__(self, learning_rate=0.001, rho=0.9, tf_cpu_mode=0, scaling_factor=2048, **kwargs):
+            def __init__(self, learning_rate=0.001, rho=0.9, tf_cpu_mode=0, **kwargs):
                 self.initial_decay = kwargs.pop('decay', 0.0)
                 self.epsilon = kwargs.pop('epsilon', K.epsilon())
                 self.tf_cpu_mode = tf_cpu_mode
-                self.scaling_factor = scaling_factor
-                self.iterations_without_inf_or_nan = 0
 
                 learning_rate = kwargs.pop('lr', learning_rate)
                 super(RMSprop, self).__init__(**kwargs)
@@ -809,21 +807,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                     self.iterations = K.variable(0, dtype='int64', name='iterations')
 
             def get_updates(self, loss, params):
-                loss = loss * self.scaling_factor
                 grads = self.get_gradients(loss, params)
-                # is_inf_or_nan = any([nnlib.tf.reduce_any(nnlib.tf.is_nan(grad)) or nnlib.tf.reduce_any(nnlib.tf.is_inf(grad)) for grad in grads])
-                # if is_inf_or_nan:
-                #     self.scaling_factor *= 0.5
-                #     self.iterations_without_inf_or_nan = 0
-                #     return self.updates
-                # else:
-                #     self.iterations_without_inf_or_nan += 1
-                #
-                # if self.iterations_without_inf_or_nan >= 2000:
-                #     self.scaling_factor *= 2
-
-
-                grads = [g / self.scaling_factor for g in grads]
 
                 e = K.tf.device("/cpu:0") if self.tf_cpu_mode > 0 else None
                 if e: e.__enter__()

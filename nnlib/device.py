@@ -36,6 +36,9 @@ class device:
             self.use_fp16 = use_fp16
             self.cpu_only = cpu_only
 
+            if self.use_fp16:
+                os.environ['TF_ENABLE_AUTO_MIXED_PRECISION'] = '1'
+
             if not self.cpu_only:
                 self.cpu_only = (self.backend == "tensorflow-cpu")
 
@@ -196,7 +199,7 @@ class device:
             for dev in cuda_devices:
                 if dev['name'] == idx_name:
                     result.append ( dev['index'] )
-                    
+
 
             return result
 
@@ -258,7 +261,7 @@ if plaidML_build:
     plaidML_devices_count = len(plaidML_devices)
     if plaidML_devices_count != 0:
         device.backend = "plaidML"
-else:      
+else:
     if cuda_devices is None:
         cuda_devices = []
         libnames = ('libcuda.so', 'libcuda.dylib', 'nvcuda.dll')
@@ -270,7 +273,7 @@ else:
                 continue
             else:
                 break
-        
+
         if cuda is not None:
             nGpus = ctypes.c_int()
             name = b' ' * 200
@@ -297,14 +300,14 @@ else:
                             cc = cc_major.value * 10 + cc_minor.value
                             if cc >= tf_min_req_cap:
                                 cuda_devices.append ( {'index':i,
-                                                       'name':name.split(b'\0', 1)[0].decode(),                                               
+                                                       'name':name.split(b'\0', 1)[0].decode(),
                                                        'total_mem':totalMem.value,
                                                        'free_mem':freeMem.value,
                                                        'cc':cc
                                                       }
                                                     )
-                        cuda.cuCtxDetach(context)    
-        
+                        cuda.cuCtxDetach(context)
+
     if len(cuda_devices) != 0:
         device.backend = "tensorflow"
 
