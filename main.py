@@ -63,7 +63,7 @@ if __name__ == "__main__":
     p.add_argument('--multi-gpu', action="store_true", dest="multi_gpu", default=False, help="Enables multi GPU.")
     p.add_argument('--cpu-only', action="store_true", dest="cpu_only", default=False, help="Extract on CPU.")
     p.set_defaults (func=process_dev_extract_vggface2_dataset)
-    
+
     def process_dev_extract_umd_csv(arguments):
         os_utils.set_process_lowest_prio()
         from mainscripts import Extractor
@@ -78,8 +78,8 @@ if __name__ == "__main__":
     p.add_argument('--multi-gpu', action="store_true", dest="multi_gpu", default=False, help="Enables multi GPU.")
     p.add_argument('--cpu-only', action="store_true", dest="cpu_only", default=False, help="Extract on CPU.")
     p.set_defaults (func=process_dev_extract_umd_csv)
-    
-    
+
+
     def process_dev_apply_celebamaskhq(arguments):
         os_utils.set_process_lowest_prio()
         from mainscripts import dev_misc
@@ -177,6 +177,7 @@ if __name__ == "__main__":
                    help="Disable preview window.")
     p.add_argument('--debug', action="store_true", dest="debug", default=False, help="Debug samples.")
     p.add_argument('--cpu-only', action="store_true", dest="cpu_only", default=False, help="Train on CPU.")
+    p.add_argument('--fp16', action="store_true", dest="fp_16", default=False, help="Use FP16 (half-percision floats, faster and less VRAM)")
     p.add_argument('--force-gpu-idx', type=int, dest="force_gpu_idx", default=-1, help="Force to choose this GPU idx.")
     p.add_argument('--execute-program', dest="execute_program", default=[], action='append', nargs='+')
     p.add_argument('--pingpong', dest="ping_pong", default=False,
@@ -201,7 +202,7 @@ if __name__ == "__main__":
         Converter.main (args, device_args)
 
     p = subparsers.add_parser( "convert", help="Converter")
-    p.add_argument('--training-data-src-dir', action=fixPathAction, dest="training_data_src_dir", help="(optional, may be required by some models) Dir of extracted SRC faceset.")    
+    p.add_argument('--training-data-src-dir', action=fixPathAction, dest="training_data_src_dir", help="(optional, may be required by some models) Dir of extracted SRC faceset.")
     p.add_argument('--input-dir', required=True, action=fixPathAction, dest="input_dir", help="Input directory. A directory containing the files you wish to process.")
     p.add_argument('--output-dir', required=True, action=fixPathAction, dest="output_dir", help="Output directory. This is where the converted files will be stored.")
     p.add_argument('--aligned-dir', action=fixPathAction, dest="aligned_dir", help="Aligned directory. This is where the extracted of dst faces stored.")
