@@ -47,7 +47,9 @@ class ModelBase(object):
                                                             [x[0] for x in idxs_names_list])
         self.device_args = device_args
 
+        # io.log_info(f'Using device args: {self.device_args}')
         self.device_config = nnlib.DeviceConfig(allow_growth=True, **self.device_args)
+        # io.log_info(f'Using device config: {vars(self.device_config)}')
 
         io.log_info ("Loading model...")
 
@@ -303,6 +305,7 @@ class ModelBase(object):
                 model_summary_text += [f'=={"Name": >{width_name}}: {nnlib.device.getDeviceName(idx): <{width_value}}=='] # GPU name
                 vram_str = f'{nnlib.device.getDeviceVRAMTotalGb(idx):.2f}GB' # GPU VRAM - Formated as #.## (or ##.##)
                 model_summary_text += [f'=={"VRAM": >{width_name}}: {vram_str: <{width_value}}==']
+        model_summary_text += [f'=={"FP16": >{width_name}}: {self.device_config.use_fp16!s: <{width_value}}==']
         model_summary_text += [f'=={" "*width_total}==']
         model_summary_text += [f'=={"="*width_total}==']
 
