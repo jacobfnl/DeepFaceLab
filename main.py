@@ -158,6 +158,7 @@ if __name__ == "__main__":
                 }
         device_args = {'cpu_only'  : arguments.cpu_only,
                        'force_gpu_idx' : arguments.force_gpu_idx,
+                       'fp_16': arguments.fp_16
                        }
 
         from mainscripts import Trainer
