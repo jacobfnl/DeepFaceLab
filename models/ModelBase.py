@@ -47,6 +47,7 @@ class ModelBase(object):
                                                             [x[0] for x in idxs_names_list])
         self.device_args = device_args
 
+        io.log_info(f'Using device args: {vars(self.device_args)}')
         self.device_config = nnlib.DeviceConfig(allow_growth=True, **self.device_args)
         io.log_info(f'Using device config: {vars(self.device_config)}')
 
