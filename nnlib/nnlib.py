@@ -89,6 +89,7 @@ Model = keras.models.Model
 
 Adam = nnlib.Adam
 RMSprop = nnlib.RMSprop
+LossScaleOptimizer = nlib.tf.keras.mixed_precision.experimental.LossScaleOptimizer
 
 modelify = nnlib.modelify
 gaussian_blur = nnlib.gaussian_blur
@@ -775,7 +776,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 return out
         nnlib.SelfAttention = SelfAttention
 
-        class RMSprop(keras.optimizers.Optimizer):
+        class RMSprop(nnlib.tf.keras.optimizers.Optimizer):
             """RMSProp optimizer.
             It is recommended to leave the parameters of this optimizer
             at their default values
@@ -793,11 +794,10 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                               2 - allows to train x3 bigger network on same VRAM consuming RAM*2 and CPU power.
             """
 
-            def __init__(self, learning_rate=0.001, rho=0.9, tf_cpu_mode=0, loss_scale=1, **kwargs):
+            def __init__(self, learning_rate=0.001, rho=0.9, tf_cpu_mode=0, **kwargs):
                 self.initial_decay = kwargs.pop('decay', 0.0)
                 self.epsilon = kwargs.pop('epsilon', K.epsilon())
                 self.tf_cpu_mode = tf_cpu_mode
-                self.loss_scale = loss_scale
 
                 learning_rate = kwargs.pop('lr', learning_rate)
                 super(RMSprop, self).__init__(**kwargs)
@@ -808,9 +808,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                     self.iterations = K.variable(0, dtype='int64', name='iterations')
 
             def get_updates(self, loss, params):
-                loss *= self.loss_scale
                 grads = self.get_gradients(loss, params)
-                grads = [g / self.loss_scale for g in grads]
 
                 e = K.tf.device("/cpu:0") if self.tf_cpu_mode > 0 else None
                 if e: e.__enter__()
