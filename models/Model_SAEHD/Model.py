@@ -123,6 +123,8 @@ class SAEHDModel(ModelBase):
                 self.options['clipgrad'] = io.input_bool (f"Enable gradient clipping? (y/n, ?:help skip:{yn_str[default_clipgrad]}) : ", default_clipgrad, help_message="Gradient clipping reduces chance of model collapse, sacrificing speed of training.")
             else:
                 self.options['clipgrad'] = False
+            default_loss_scale = self.options.get('loss_scale', 1)
+            self.options['loss_scale'] = io.input_number("Loss scale (skip:%.2f) : " % default_loss_scale, default_loss_scale)
 
         else:
             self.options['ms_ssim_loss'] = self.options.get('ms_ssim_loss', True)
@@ -136,6 +138,7 @@ class SAEHDModel(ModelBase):
             self.options['ct_mode'] = self.options.get('ct_mode', 0)
             self.options['random_color_change'] = self.options.get('random_color_change', False)
             self.options['clipgrad'] = self.options.get('clipgrad', False)
+            self.options['loss_scale'] = self.options.get('loss_scale', 1)
 
         if is_first_run:
             self.options['pretrain'] = io.input_bool ("Pretrain the model? (y/n, ?:help skip:n) : ", False, help_message="Pretrain the model with large amount of various faces. This technique may help to train the fake with overly different face shapes and light conditions of src/dst data. Face will be look more like a morphed. To reduce the morph effect, some model files will be initialized but not be updated after pretrain: LIAE: inter_AB.h5 DF: encoder.h5. The longer you pretrain the model the more morphed face will look. After that, save and run the training again.")
@@ -500,9 +503,9 @@ class SAEHDModel(ModelBase):
         psd_target_dst_anti_masked = self.model.pred_src_dst*(1.0 - target_dstm)
 
         if self.is_training_mode:
-            self.src_dst_opt      = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
-            self.src_dst_mask_opt = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
-            self.D_opt            = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1)
+            self.src_dst_opt      = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1, loss_scale=self.options['loss_scale'])
+            self.src_dst_mask_opt = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1, loss_scale=self.options['loss_scale'])
+            self.D_opt            = RMSprop(lr=5e-5, clipnorm=1.0 if self.options['clipgrad'] else 0.0, tf_cpu_mode=self.options['optimizer_mode']-1, loss_scale=self.options['loss_scale'])
 
             if self.options['ms_ssim_loss']:
                 # TODO - Done
