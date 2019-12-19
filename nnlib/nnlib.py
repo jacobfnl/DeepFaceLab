@@ -800,7 +800,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 self.tf_cpu_mode = tf_cpu_mode
 
                 learning_rate = kwargs.pop('lr', learning_rate)
-                super(RMSprop, self).__init__(**kwargs)
+                super(RMSprop, self).__init__(name='RMSprop', **kwargs)
                 with K.name_scope(self.__class__.__name__):
                     self.learning_rate = K.variable(learning_rate, name='learning_rate')
                     self.rho = K.variable(rho, name='rho')
