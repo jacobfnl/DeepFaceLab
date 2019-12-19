@@ -776,7 +776,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 return out
         nnlib.SelfAttention = SelfAttention
 
-        class RMSprop(nnlib.tf.keras.optimizers.Optimizer):
+        class RMSprop(nnlib.tf.keras.optimizers.RMSprop):
             """RMSProp optimizer.
             It is recommended to leave the parameters of this optimizer
             at their default values
