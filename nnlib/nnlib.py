@@ -797,6 +797,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 self.initial_decay = kwargs.pop('decay', 0.0)
                 self.epsilon = kwargs.pop('epsilon', K.epsilon())
                 self.tf_cpu_mode = tf_cpu_mode
+                self.iter = 0
 
                 learning_rate = kwargs.pop('lr', learning_rate)
                 super(RMSprop, self).__init__(**kwargs)
@@ -821,7 +822,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 self.weights = [self.iterations] + accumulators
                 self.updates = [K.update_add(self.iterations, 1)]
 
-                lr = self.learning_rate if self.iterations > 10 else 0
+                lr = self.learning_rate if self.iter > 10 else 0
                 if self.initial_decay > 0:
                     lr = lr * (1. / (1. + self.decay * K.cast(self.iterations,
                                                             K.dtype(self.decay))))
@@ -841,6 +842,8 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                         new_p = p.constraint(new_p)
 
                     self.updates.append(K.update(p, new_p))
+
+                self.iter += 1
                 return self.updates
 
             def set_weights(self, weights):
