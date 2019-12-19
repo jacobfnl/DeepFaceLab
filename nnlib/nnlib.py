@@ -797,6 +797,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 self.initial_decay = kwargs.pop('decay', 0.0)
                 self.epsilon = kwargs.pop('epsilon', K.epsilon())
                 self.tf_cpu_mode = tf_cpu_mode
+                self.dynamic_loss_scale = nnlib.tf.train.experimental.DynamicLossScale()
 
                 learning_rate = kwargs.pop('lr', learning_rate)
                 super(RMSprop, self).__init__(**kwargs)
@@ -807,7 +808,13 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                     self.iterations = K.variable(0, dtype='int64', name='iterations')
 
             def get_updates(self, loss, params):
+                loss_scale = self.dynamic_loss_scale()
+                loss *= loss_scale
                 grads = self.get_gradients(loss, params)
+                grads = [g / loss_scale for g in grads]
+                update_op, should_apply_gradients = self.dynamic_loss_scale.update(grads)
+                if not should_apply_gradients:
+                    return self.updates
 
                 e = K.tf.device("/cpu:0") if self.tf_cpu_mode > 0 else None
                 if e: e.__enter__()
