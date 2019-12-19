@@ -811,7 +811,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 loss_scale = self.dynamic_loss_scale()
                 loss *= loss_scale
                 grads = self.get_gradients(loss, params)
-                grads = [g / loss_scale for g in grads]
+                grads = [g / nnlib.tf.cast(loss_scale, nnlib.tf.float16) for g in grads]
                 update_op, should_apply_gradients = self.dynamic_loss_scale.update(grads)
                 if not should_apply_gradients:
                     return self.updates
