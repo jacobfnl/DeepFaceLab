@@ -809,7 +809,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
 
             def get_gradients(self, loss, params):
                 grads = super(RMSprop, self).get_gradients(loss, params)
-                return [nnlib.tf.cast(g, dtype=nnlib.tf.float16) for g in grads]
+                return [nnlib.tf.cast(g, dtype=nnlib.tf.float32) for g in grads]
 
             def get_updates(self, loss, params):
                 grads = self.get_gradients(loss, params)
