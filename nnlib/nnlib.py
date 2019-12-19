@@ -89,7 +89,7 @@ Model = keras.models.Model
 
 Adam = nnlib.Adam
 RMSprop = nnlib.RMSprop
-LossScaleOptimizer = nlib.tf.keras.mixed_precision.experimental.LossScaleOptimizer
+LossScaleOptimizer = nnlib.tf.keras.mixed_precision.experimental.LossScaleOptimizer
 
 modelify = nnlib.modelify
 gaussian_blur = nnlib.gaussian_blur
