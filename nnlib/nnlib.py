@@ -808,7 +808,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                     self.iterations = K.variable(0, dtype='int64', name='iterations')
 
             def get_updates(self, loss, params):
-                grads = self.get_gradients(loss, params)
+                grads = self.get_gradients(nnlib.tf.dtypes.cast(loss, nnlib.tf.float16), params)
 
                 e = K.tf.device("/cpu:0") if self.tf_cpu_mode > 0 else None
                 if e: e.__enter__()
