@@ -807,7 +807,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                     self.iterations = K.variable(0, dtype='int64', name='iterations')
 
             def get_updates(self, loss, params):
-                loss_scale = 1000
+                loss_scale = 1/1000
                 loss *= loss_scale
                 grads = self.get_gradients(loss, params)
                 grads = [g / loss_scale for g in grads]
