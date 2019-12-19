@@ -188,7 +188,7 @@ def trainer_thread(s2c, c2s, e, args, device_args, socketio=None):
             print('Error: %s' % (str(e)))
             traceback.print_exc()
         break
-    # c2s.put({'op': 'close'})
+    c2s.put({'op': 'close'})
 
 
 class Zoom(Enum):
@@ -482,6 +482,7 @@ def main(args, device_args):
                 try:
                     io.process_messages(0.1)
                 except KeyboardInterrupt:
-                    s2c.put({'op': 'close'})
+                    pass
+                    # s2c.put({'op': 'close'})
 
             io.destroy_all_windows()
