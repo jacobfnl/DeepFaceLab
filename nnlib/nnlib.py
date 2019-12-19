@@ -813,41 +813,45 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 grads = self.get_gradients(loss, params)
                 grads = [g / nnlib.tf.cast(loss_scale, nnlib.tf.float16) for g in grads]
                 update_op, should_apply_gradients = self.dynamic_loss_scale.update(grads)
-                if not should_apply_gradients:
-                    return self.updates
 
-                e = K.tf.device("/cpu:0") if self.tf_cpu_mode > 0 else None
-                if e: e.__enter__()
-                accumulators = [K.zeros(K.int_shape(p),
-                                dtype=K.dtype(p),
-                                name='accumulator_' + str(i))
-                                for (i, p) in enumerate(params)]
-                if e: e.__exit__(None, None, None)
-
-                self.weights = [self.iterations] + accumulators
-                self.updates = [K.update_add(self.iterations, 1)]
-
-                lr = self.learning_rate
-                if self.initial_decay > 0:
-                    lr = lr * (1. / (1. + self.decay * K.cast(self.iterations,
-                                                            K.dtype(self.decay))))
-
-                for p, g, a in zip(params, grads, accumulators):
-                    # update accumulator
-                    e = K.tf.device("/cpu:0") if self.tf_cpu_mode == 2 else None
+                def true_fn():
+                    e = K.tf.device("/cpu:0") if self.tf_cpu_mode > 0 else None
                     if e: e.__enter__()
-                    new_a = self.rho * a + (1. - self.rho) * K.square(g)
-                    new_p = p - lr * g / (K.sqrt(new_a) + self.epsilon)
+                    accumulators = [K.zeros(K.int_shape(p),
+                                    dtype=K.dtype(p),
+                                    name='accumulator_' + str(i))
+                                    for (i, p) in enumerate(params)]
                     if e: e.__exit__(None, None, None)
 
-                    self.updates.append(K.update(a, new_a))
+                    self.weights = [self.iterations] + accumulators
+                    self.updates = [K.update_add(self.iterations, 1)]
 
-                    # Apply constraints.
-                    if getattr(p, 'constraint', None) is not None:
-                        new_p = p.constraint(new_p)
+                    lr = self.learning_rate
+                    if self.initial_decay > 0:
+                        lr = lr * (1. / (1. + self.decay * K.cast(self.iterations,
+                                                                K.dtype(self.decay))))
 
-                    self.updates.append(K.update(p, new_p))
-                return self.updates
+                    for p, g, a in zip(params, grads, accumulators):
+                        # update accumulator
+                        e = K.tf.device("/cpu:0") if self.tf_cpu_mode == 2 else None
+                        if e: e.__enter__()
+                        new_a = self.rho * a + (1. - self.rho) * K.square(g)
+                        new_p = p - lr * g / (K.sqrt(new_a) + self.epsilon)
+                        if e: e.__exit__(None, None, None)
+
+                        self.updates.append(K.update(a, new_a))
+
+                        # Apply constraints.
+                        if getattr(p, 'constraint', None) is not None:
+                            new_p = p.constraint(new_p)
+
+                        self.updates.append(K.update(p, new_p))
+                    return self.updates
+
+                def false_fn():
+                    return self.updates
+
+                return nnlib.tf.cond(should_apply_gradients, true_fn, false_fn)
 
             def set_weights(self, weights):
                 params = self.weights
