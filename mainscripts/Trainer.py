@@ -188,7 +188,7 @@ def trainer_thread(s2c, c2s, e, args, device_args, socketio=None):
             print('Error: %s' % (str(e)))
             traceback.print_exc()
         break
-    c2s.put({'op': 'close'})
+    # c2s.put({'op': 'close'})
 
 
 class Zoom(Enum):
