@@ -804,7 +804,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                     self.learning_rate = K.variable(learning_rate, name='learning_rate')
                     self.rho = K.variable(rho, name='rho')
                     self.decay = K.variable(self.initial_decay, name='decay')
-                    self.iterations = K.variable(0, dtype='uint32', name='iterations')
+                    self.iterations = K.variable(0, dtype='int64', name='iterations')
 
             def get_updates(self, loss, params):
                 grads = self.get_gradients(loss, params)
@@ -820,7 +820,7 @@ NLayerDiscriminator = nnlib.NLayerDiscriminator
                 self.weights = [self.iterations] + accumulators
                 self.updates = [K.update_add(self.iterations, 1)]
 
-                lr = nnlib.tf.cond(nnlib.tf.greater(self.iterations, nnlib.tf.constant(0, dtype='uint32')),
+                lr = nnlib.tf.cond(nnlib.tf.greater(self.iterations, nnlib.tf.constant(0, dtype='int64')),
                                    lambda: self.learning_rate,
                                    lambda: nnlib.tf.constant(0, dtype=nnlib.tf.float16))
 
