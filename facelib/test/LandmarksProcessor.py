@@ -1,3 +1,5 @@
+import inspect
+import os
 import unittest
 
 import cv2
@@ -6,10 +8,15 @@ import numpy as np
 from facelib.LandmarksProcessor import draw_landmarks
 from samplelib import SampleLoader, SampleType
 
+THIS_FILE = os.path.normpath(os.path.abspath(inspect.getsourcefile(lambda: None)))
+DEEPFACE_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(THIS_FILE)))
+TEST_DST = os.path.join(DEEPFACE_ROOT, "imagelib", "test", "test_dst")
+TEST_SRC = os.path.join(DEEPFACE_ROOT, "imagelib", "test", "test_src")
+
 
 class LandmarksProcessorTests(unittest.TestCase):
     def test_algorithms(self):
-        src_samples = SampleLoader.load(SampleType.FACE, '../../imagelib/test/test_dst', None)
+        src_samples = SampleLoader.load(SampleType.FACE, TEST_DST, None)
 
         grid = []
         for src_sample in src_samples:
@@ -28,7 +35,7 @@ class LandmarksProcessorTests(unittest.TestCase):
         cv2.destroyAllWindows()
 
     def test_plot_landmarks_algorithms(self):
-        src_samples = SampleLoader.load(SampleType.FACE, '../../imagelib/test/test_src', None)
+        src_samples = SampleLoader.load(SampleType.FACE, TEST_SRC, None)
 
         grid = []
         for src_sample in src_samples:

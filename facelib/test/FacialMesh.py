@@ -1,3 +1,5 @@
+import inspect
+import os
 import random
 import time
 import unittest
@@ -10,11 +12,17 @@ from nnlib import nnlib
 from facelib import LandmarksExtractor, S3FDExtractor
 from samplelib import SampleLoader, SampleType
 
+THIS_FILE = os.path.normpath(os.path.abspath(inspect.getsourcefile(lambda: None)))
+THIS_DIR = os.path.dirname(THIS_FILE)
+CARREY_JPG = os.path.join(THIS_DIR, 'test_image', 'carrey.jpg')
+DEEPFACE_ROOT = os.path.dirname(os.path.dirname(THIS_DIR))
+TEST_DST = os.path.join(DEEPFACE_ROOT, "imagelib", "test", "test_dst")
+
 
 class MyTestCase(unittest.TestCase):
     def test_something(self):
         t0 = time.time()
-        source_image = cv2.imread('../../imagelib/test/test_src/carrey/carrey.jpg')
+        source_image = cv2.imread(CARREY_JPG)
         print(time.time() - t0, 'loaded image')
         print('source_image type:', source_image.dtype)
         print('source_image shape:', source_image.shape)
@@ -74,7 +82,7 @@ class MyTestCase(unittest.TestCase):
         cv2.destroyAllWindows()
 
     def test_compare_hull_mask_with_mesh_mask(self):
-        src_samples = SampleLoader.load(SampleType.FACE, '../../imagelib/test/test_dst', None)
+        src_samples = SampleLoader.load(SampleType.FACE, TEST_DST, None)
 
         sample_grid = self.get_sample_grid(src_samples)
         display_grid = []
