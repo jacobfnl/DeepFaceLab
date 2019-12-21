@@ -83,7 +83,7 @@ class SAEHDModel(ModelBase):
 
             self.options['src_dst_loss_ratio'] = np.clip(io.input_number(f"Ratio of src to dst loss: ( 0.0 .. 100.0 ?:help skip:{default_src_dst_loss_ratio}) : ",
                                                                          default_src_dst_loss_ratio,
-                                                                         help_message="Allows you to skew the percentage of loss from src and dst. 50% means no change. E.g.: (75) -> loss = 75% src loss + 25% dst loss"), 0.0, 100.0)
+                                                                         help_message="Allows you to skew the ratio of loss from src and dst. 50% means no change. E.g.: (75) -> loss = 75% src loss + 25% dst loss"), 0.0, 100.0)
 
             self.options['background_power'] = np.clip(io.input_number(f"Background src/dst power ( 0.0 .. 100.0 ?:help skip:{default_background_power}) : ",
                                                                        default_background_power,
@@ -550,8 +550,8 @@ class SAEHDModel(ModelBase):
                     src_loss += K.mean( (10*bg_style_power)*dssim(kernel_size=int(resolution/11.6),max_value=1.0)( psd_target_dst_anti_masked, target_dst_anti_masked ))
                     src_loss += K.mean( (10*bg_style_power)*K.square( psd_target_dst_anti_masked - target_dst_anti_masked ))
 
-            src_dst_loss_ratio = self.options['src_dst_loss_ratio'] / 100.0
-            G_loss = src_dst_loss_ratio * src_loss + (1-src_dst_loss_ratio) * dst_loss
+            src_dst_loss_ratio = 2 * self.options['src_dst_loss_ratio'] / 100.0
+            G_loss = src_dst_loss_ratio * src_loss + (2-src_dst_loss_ratio) * dst_loss
 
             if self.true_face_training:
                 def DLoss(labels,logits):
@@ -585,7 +585,7 @@ class SAEHDModel(ModelBase):
                     src_mask_loss = K.mean(K.square(self.model.target_srcm-self.model.pred_src_srcm))
                     dst_mask_loss = K.mean(K.square(self.model.target_dstm-self.model.pred_dst_dstm))
 
-                mask_loss = src_dst_loss_ratio * src_mask_loss + (1-src_dst_loss_ratio) * dst_mask_loss
+                mask_loss = src_dst_loss_ratio * src_mask_loss + (2-src_dst_loss_ratio) * dst_mask_loss
                 self.src_dst_mask_train = K.function ([self.model.warped_src, self.model.warped_dst, self.model.target_srcm, self.model.target_dstm],[src_mask_loss, dst_mask_loss], self.src_dst_mask_opt.get_updates(mask_loss, self.model.src_dst_mask_trainable_weights ) )
 
             if self.options['learn_mask']:
