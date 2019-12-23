@@ -320,7 +320,11 @@ def main(args, device_args):
 
         e.wait()  # Wait for inital load to occur.
 
-        flask_t = threading.Thread(target=socketio.run, args=(flask_app,),
+        port = 21000
+        if device_args['force_gpu_idx'] > 0:
+            port += device_args['force_gpu_idx']
+
+        flask_t = threading.Thread(target=socketio.run, args=(flask_app, '0.0.0.0', port),
                                    kwargs={'debug': True, 'use_reloader': False})
         flask_t.start()
 

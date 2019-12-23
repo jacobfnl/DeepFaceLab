@@ -202,14 +202,8 @@ class ModelBase(object):
             self.batch_size = 1
 
         if self.is_training_mode:
-            if self.device_args['force_gpu_idx'] == -1:
-                self.preview_history_path = self.model_path / ( '%s_history' % (self.get_model_name()) )
-                self.autobackups_path = self.model_path / ( '%s_autobackups' % (self.get_model_name()) )
-            else:
-                self.preview_history_path = self.model_path / ('%d_%s_history' % (self.device_args['force_gpu_idx'],
-                                                                                  self.get_model_name()))
-                self.autobackups_path = self.model_path / ('%d_%s_autobackups' % (self.device_args['force_gpu_idx'],
-                                                                                  self.get_model_name()))
+            self.preview_history_path = self.model_path / ( '%s_history' % (self.get_model_name()) )
+            self.autobackups_path = self.model_path / ( '%s_autobackups' % (self.get_model_name()) )
 
             if self.autobackup:
                 self.autobackup_current_hour = time.localtime().tm_hour
@@ -627,11 +621,7 @@ class ModelBase(object):
         return self.model_path
 
     def get_strpath_storage_for_file(self, filename):
-        if self.device_args['force_gpu_idx'] == -1:
-            return str( self.model_path / ( self.get_model_name() + '_' + filename) )
-        else:
-            return str(self.model_path / (
-                        str(self.device_args['force_gpu_idx']) + '_' + self.get_model_name() + '_' + filename))
+        return str( self.model_path / ( self.get_model_name() + '_' + filename) )
 
     def set_vram_batch_requirements (self, d):
         #example d = {2:2,3:4,4:8,5:16,6:32,7:32,8:32,9:48}
