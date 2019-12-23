@@ -7,11 +7,13 @@ from mainscripts.Util import recover_original_aligned_filename
 from utils import Path_utils, os_utils
 from interact import interact as io
 from pathlib import Path
-from shutil import copyfile
 import argparse
 
-DATA_DST_ALIGNED = 'workspace/data_dst/aligned'
+import tensorflow as tf
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
+DATA_DST_ALIGNED = 'workspace/data_dst/aligned'
+DEBUG_EXTRACTION_DIR = 'workspace/data_dst/debug_extraction'
 
 class FixPathAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -22,45 +24,61 @@ def fix_manual_cache(input_path, source_path):
     recover_original_aligned_filename(input_path)
     files = []
     source_chosen = os.path.join(source_path, 'chosen_frames')
-    if not os.path.exists(source_chosen):
-        os.makedirs(source_chosen)
+    if os.path.exists(source_chosen):
+        shutil.rmtree(source_chosen)
+    os.makedirs(source_chosen)
 
-    for filepath in io.progress_bar_generator(Path_utils.get_image_paths(input_path),
-                                              "Processing New Manual Fix Order."):
+    dir_to_fix = os.path.join(input_path, 'for_fixing')
+    if os.path.exists(dir_to_fix):
+        shutil.rmtree(dir_to_fix)
+    os.makedirs(dir_to_fix)
+
+    debug_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'workspace', 'data_dst', 'debug_extraction')
+    print("\ndebug_dir: {}\n".format(debug_dir))
+    chosen_debug = os.path.join(dir_to_fix, '00-debug-frames')
+    os.makedirs(chosen_debug)
+    x = 0
+    for filepath in io.progress_bar_generator(Path_utils.get_image_paths(input_path), "Processing New Manual Fix Order."):
         filepath = Path(filepath)
         # find the source image in source path.
         # example /home/cyrus/Documents/DFL/workspace/data_dst/warriors_src.086299_0.jpg
-        file_parts = filepath.stem.split('.')
-
-        chosen_file = filepath.stem.split('_')[0] + '.png'
+        file_parts = filepath.stem.split('.')[:-1].join('.')
+        print(file_parts)
+        exit()
+        stem = ''
+        for i in range(len(file_parts)-2):
+            stem += file_parts[i]
+        print(stem)
+        exit()
+        chosen_file = stem.split('_')[0] + '.png'
 
         if os.path.exists(os.path.join(source_path, chosen_file)):
             print("found png: {}".format(chosen_file))
-            exit()
         else:
             source_jpg = chosen_file.split('.')[0] + '.jpg'  # ¯\_(ツ)_/¯
             s_png = chosen_file
             if os.path.exists(os.path.join(source_path, source_jpg)):
                 print("found jpg: {}".format(source_jpg))
                 chosen_file = source_jpg
-                exit()
             else:
                 print("Unable to find path: {}\nand not here either: {}".format(os.path.join(source_path, s_png),
                                                                                 os.path.join(source_path, source_jpg)))
                 exit()
         # copy chosen originals to source_chosen
+        file_copy = filepath.stem.split('.')[:-1].join() + '_' + str(x) + 'png'
+        shutil.move(filepath, os.path.join(dir_to_fix, file_copy))
+        file_copy = chosen_file.split('.')[0] + '_' + str(x) + '.png'
+        shutil.copyfile(os.path.join(source_path, chosen_file), os.path.join(source_chosen, file_copy))
+        # copy the debug frame to debug_dir
+        chosen_file = chosen_file.split('.')[0] + '.jpg'
+        print("debug chosen file: {}".format(chosen_file))
+        file_copy = chosen_file.split('.')[0] + '_' + str(x) + '.jpg'
+        shutil.copyfile(os.path.join(debug_dir, chosen_file), os.path.join(chosen_debug, file_copy))
+        x += 1
 
-        copyfile(os.path.join(source_path, chosen_file), os.path.join(source_chosen, chosen_file))
+    print("\n\nExamples of the images to fix have been placed in {}.\nPlease open those images for reference.".format(dir_to_fix))
 
     # now implement manual fix on the items.
-    '''
-    "%PYTHON_EXECUTABLE%" "%DFL_ROOT%\main.py"
-    --input-dir  "%WORKSPACE%\data_dst"
-    --output-dir  "%WORKSPACE%\data_dst\aligned"
-    --multi-gpu
-    --detector manual --debug-dir "%WORKSPACE%\data_dst\aligned_debug"
-    '''
-
     Extractor.main(source_chosen,
                    input_path,
                    None,
@@ -77,7 +95,6 @@ if __name__ == "__main__":
     multiprocessing.set_start_method("spawn")
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers()
-
 
     def fix_manual_alignments(arrrgs):
         fix_manual_cache(arrrgs.input, arrrgs.source)
@@ -102,9 +119,10 @@ if __name__ == "__main__":
     p = subparsers.add_parser("clear-workspace")
     p.set_defaults(func=clear_workspace)
 
-
     def process_extract(arrrgs):
         os_utils.set_process_lowest_prio()
+        if arrrgs.manual:
+            arrrgs.detector = 'manual'
         from mainscripts import Extractor
         Extractor.main(arrrgs.input_dir,
                        arrrgs.output_dir,
@@ -148,30 +166,28 @@ if __name__ == "__main__":
         from mainscripts import Sorter
         Sorter.main(input_path=arrrgs.input_dir, sort_by_method=arrrgs.sort_by_method)
 
-
-    p = subparsers.add_parser("sort-vgg")
+    p = subparsers.add_parser("sort-vgg", help='Sort by VGGFace')
     p.add_argument('--input-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir", help="Input directory. A directory containing the files you wish to process.")
     p.add_argument('--by', default='vggface', dest="sort_by_method", choices=("blur", "face", "face-dissim", "face-yaw", "face-pitch", "hist", "hist-dissim", "brightness", "hue", "black", "origname", "oneface", "final", "final-no-blur", "vggface", "test"), help="Method of sorting. 'origname' sort by original filename to recover original sequence." )
     p.set_defaults(func=sort_vgg)
 
+    p = subparsers.add_parser("sort-hist", help='Sort by Histogram')
+    p.add_argument('--input-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir", help="Input directory. A directory containing the files you wish to process.")
+    p.add_argument('--by', default='hist', dest="sort_by_method", choices=("blur", "face", "face-dissim", "face-yaw", "face-pitch", "hist", "hist-dissim", "brightness", "hue", "black", "origname", "oneface", "final", "final-no-blur", "vggface", "test"), help="Method of sorting. 'origname' sort by original filename to recover original sequence." )
+    p.set_defaults(func=sort_vgg)
 
     def recover_original_filenames(arrrgs):
         os_utils.set_process_lowest_prio()
         from mainscripts import Util
-        if arguments.recover_original_aligned_filename:
-            Util.recover_original_aligned_filename(input_path=arguments.input_dir)
+        Util.recover_original_aligned_filename(input_path=arguments.input_dir)
 
-
-    p = subparsers.add_parser("recover-filenames")
-    p.add_argument('--input-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir",
-                   help="Input directory. A directory containing the files you wish to process.")
+    p = subparsers.add_parser("recover-filenames", help="recover the original file names")
+    p.add_argument('--input-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir", help="Input directory. A directory containing the files you wish to process.")
     p.set_defaults(func=recover_original_filenames)
-
 
     def bad_args(arrrgs):
         parser.print_help()
         exit(0)
-
 
     parser.set_defaults(func=bad_args)
     arguments = parser.parse_args()
