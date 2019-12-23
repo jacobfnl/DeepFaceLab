@@ -5,6 +5,7 @@ import argparse
 import multiprocessing
 from utils import Path_utils
 from utils import os_utils
+from utils.init_workspace import init_workspace
 from pathlib import Path
 
 import tensorflow as tf
@@ -12,6 +13,11 @@ tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 if sys.version_info[0] < 3 or (sys.version_info[0] == 3 and sys.version_info[1] < 6):
     raise Exception("This program requires at least Python 3.6")
+
+workspace, src_aligned, dst_aligned, workspace_model = init_workspace()
+data_src = os.path.abspath(os.path.join(src_aligned, os.pardir))
+data_dst = os.path.abspath(os.path.join(dst_aligned, os.pardir))
+
 
 class fixPathAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
