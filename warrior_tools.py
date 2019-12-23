@@ -99,12 +99,10 @@ if __name__ == "__main__":
     def fix_manual_alignments(arrrgs):
         fix_manual_cache(arrrgs.input, arrrgs.source)
 
-
-    p = subparsers.add_parser("fix-manual-cache")
-    p.add_argument('-i', '--input', type=str, required=True, help='Directory of aligned images you wish to re-do.')
-    p.add_argument('-s', '--source', type=str, required=True, help='Directory of Source Frames.')
+    p = subparsers.add_parser("manual-fix")
+    p.add_argument('-i', '--input', type=str, default=DATA_DST_ALIGNED, help='Directory of aligned images you wish to re-do.')
+    p.add_argument('-s', '--source', type=str, default='workspace/data_dst', help='Directory of Source Frames.')
     p.set_defaults(func=fix_manual_alignments)
-
 
     def clear_workspace(arrrgs):
         print("Clearing the workspace.")
@@ -114,7 +112,6 @@ if __name__ == "__main__":
         shutil.rmtree(data_dst)
         shutil.rmtree(data_src)
         print("Done.")
-
 
     p = subparsers.add_parser("clear-workspace")
     p.set_defaults(func=clear_workspace)
@@ -132,18 +129,16 @@ if __name__ == "__main__":
                        arrrgs.manual_output_debug_fix,
                        arrrgs.manual_window_size,
                        face_type=arrrgs.face_type,
-                       device_args={'cpu_only': arrrgs.cpu_only,
-                                    'multi_gpu': arrrgs.multi_gpu}
+                       device_args={'cpu_only': arrrgs.cpu_only, 'multi_gpu': arrrgs.multi_gpu},
+                       character_number=arrrgs.character
                        )
-
 
     p = subparsers.add_parser("extract", help="Extract the faces from a pictures.")
     p.add_argument('--input-dir', default='workspace/data_dst', action=FixPathAction, dest="input_dir",
                    help="Input directory. A directory containing the files you wish to process.")
-    p.add_argument('--output-dir', default='workspace/data_dst/aligned', action=FixPathAction, dest="output_dir",
+    p.add_argument('--output-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="output_dir",
                    help="Output directory. This is where the extracted files will be stored.")
-    p.add_argument('--debug-dir', default='workspace/data_dst/debug_extraction', action=FixPathAction, dest="debug_dir",
-                   help="Writes debug images to this directory.")
+    p.add_argument('--debug-dir', default=DEBUG_EXTRACTION_DIR, action=FixPathAction, dest="debug_dir", help="Writes debug images to this directory.")
     p.add_argument('--face-type', dest="face_type",
                    choices=['half_face', 'full_face', 'head', 'full_face_no_align', 'mark_only'], default='full_face',
                    help="Default 'full_face'. Don't change this option, currently all models uses 'full_face'")
@@ -158,8 +153,9 @@ if __name__ == "__main__":
                    help="Manual fix window size. Default: 1920.")
     p.add_argument('--cpu-only', action="store_true", dest="cpu_only", default=False,
                    help="Extract on CPU. Forces to use MT extractor.")
+    p.add_argument('--manual', action='store_true', default=False)
+    p.add_argument('--character', type=int, required=True, help='Enter the character Number you wish to track. 0=all')
     p.set_defaults(func=process_extract)
-
 
     def sort_vgg(arrrgs):
         os_utils.set_process_lowest_prio()
@@ -192,5 +188,3 @@ if __name__ == "__main__":
     parser.set_defaults(func=bad_args)
     arguments = parser.parse_args()
     arguments.func(arguments)
-
-
