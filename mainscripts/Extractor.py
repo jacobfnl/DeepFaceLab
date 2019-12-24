@@ -25,7 +25,6 @@ from utils.DFLPNG import DFLPNG
 
 DEBUG = False
 GAMMA = 1.0
-
 lut = np.array([i for i in np.arange(0, 256)]).astype("uint8")
 
 
@@ -46,7 +45,7 @@ def auto_gamma(image_input, yuv_2_bgr_or_rgb=cv2.COLOR_YUV2BGR):
 class ExtractSubprocessor(Subprocessor):
     class Data(object):
         def __init__(self, filename=None, rects=None, landmarks=None, landmarks_accurate=True, pitch_yaw_roll=None,
-                     final_output_files=None, size=0, character_number=0):
+                     final_output_files=None, size=0, character_number=0, gamma=1.1):
             self.filename = filename
             self.rects = rects or []
             self.rects_rotation = 0
@@ -57,6 +56,7 @@ class ExtractSubprocessor(Subprocessor):
             self.faces_detected = 0
             self.image_size = size
             self.character_number = character_number
+            self.gamma = gamma
 
     class Cli(Subprocessor.Cli):
 
@@ -72,7 +72,8 @@ class ExtractSubprocessor(Subprocessor):
             self.debug_dir = client_dict['debug_dir']
             self.image_size = client_dict['image_size']
             self.character_number = client_dict['character_number']
-
+            self.gamma = client_dict['gamma']
+            set_gamma(self.gamma)
             # transfer and set stdin in order to work code.interact in debug subprocess
             stdin_fd = client_dict['stdin_fd']
             if stdin_fd is not None and DEBUG:
@@ -176,6 +177,7 @@ class ExtractSubprocessor(Subprocessor):
                         elif rot == 270:
                             rotated_image = image.swapaxes(0, 1)[::-1, :, :]
 
+                        rotated_image = auto_gamma(rotated_image, cv2.COLOR_YUV2BGR)
                         rects = data.rects = self.e.extract(rotated_image, is_bgr=True)
                         if len(rects) != 0:
                             break
@@ -345,7 +347,7 @@ class ExtractSubprocessor(Subprocessor):
 
     # override
     def __init__(self, input_data, type, face_type=None, debug_dir=None, multi_gpu=False, cpu_only=False, manual=False,
-                 manual_window_size=0, size=0, max_faces_from_image=0, final_output_path=None, character_number=0):
+                 manual_window_size=0, size=0, max_faces_from_image=0, final_output_path=None, character_number=0, gamma=1.1):
         self.input_data = input_data
         self.type = type
         self.face_type = face_type
@@ -357,6 +359,7 @@ class ExtractSubprocessor(Subprocessor):
         self.result = []
         self.image_size = size
         self.character_number = character_number
+        self.gamma = gamma
 
         self.devices = ExtractSubprocessor.get_devices_for_config(self.manual, self.type, multi_gpu, cpu_only)
 
@@ -409,7 +412,8 @@ class ExtractSubprocessor(Subprocessor):
                      'debug_dir': self.debug_dir,
                      'final_output_dir': str(self.final_output_path),
                      'stdin_fd': sys.stdin.fileno(),
-                     'character_number': self.character_number}
+                     'character_number': self.character_number,
+                     'gamma': self.gamma}
 
         for (device_idx, device_type, device_name, device_total_vram_gb) in self.devices:
             client_dict = base_dict.copy()
@@ -794,7 +798,8 @@ def main(input_dir,
          face_type='full_face',
          max_faces_from_image=0,
          device_args={},
-         character_number: int = 0):
+         character_number: int = 0,
+         gamma=1.1):
     input_path = Path(input_dir)
     output_path = Path(output_dir)
     face_type = FaceType.fromString(face_type)
@@ -802,7 +807,7 @@ def main(input_dir,
     multi_gpu = device_args.get('multi_gpu', False)
     cpu_only = device_args.get('cpu_only', False)
 
-    image_size = io.input_int("Output image Size (?:help skip:0 ) : ", 0,
+    image_size = io.input_int("Output image Size (?:help skip:224 (standard) ) : ", 224,
                               help_message="Select extracted image size. A size of 0 will leave the extracted images unscaled")
 
     if not input_path.exists():
@@ -854,7 +859,7 @@ def main(input_dir,
             data = ExtractSubprocessor([ExtractSubprocessor.Data(filename) for filename in input_path_image_paths],
                                        'landmarks', face_type, debug_dir, size=image_size, cpu_only=cpu_only,
                                        manual=True, manual_window_size=manual_window_size,
-                                       character_number=character_number).run()
+                                       character_number=character_number, gamma=gamma).run()
         else:
             io.log_info('Performing 1st pass...')
             data = ExtractSubprocessor([ExtractSubprocessor.Data(filename) for filename in input_path_image_paths],

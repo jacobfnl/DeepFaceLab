@@ -20,9 +20,8 @@ class FixPathAction(argparse.Action):
         setattr(namespace, self.dest, os.path.abspath(os.path.expanduser(values)))
 
 
-def fix_manual_cache(input_path, source_path):
+def fix_manual_cache(input_path, source_path, character: int):
     recover_original_aligned_filename(input_path)
-    files = []
     source_chosen = os.path.join(source_path, 'chosen_frames')
     if os.path.exists(source_chosen):
         shutil.rmtree(source_chosen)
@@ -42,20 +41,15 @@ def fix_manual_cache(input_path, source_path):
         filepath = Path(filepath)
         # find the source image in source path.
         # example /home/cyrus/Documents/DFL/workspace/data_dst/warriors_src.086299_0.jpg
-        file_parts = filepath.stem.split('.')[:-1].join('.')
-        print(file_parts)
-        exit()
-        stem = ''
-        for i in range(len(file_parts)-2):
-            stem += file_parts[i]
+        file_parts = filepath.stem
+        extention = filepath.suffix
+        stem = file_parts
         print(stem)
-        exit()
-        chosen_file = stem.split('_')[0] + '.png'
-
-        if os.path.exists(os.path.join(source_path, chosen_file)):
-            print("found png: {}".format(chosen_file))
-        else:
-            source_jpg = chosen_file.split('.')[0] + '.jpg'  # ¯\_(ツ)_/¯
+        split_stem = stem.split('_')
+        chosen_file = split_stem[0] + '_' + split_stem[1] + '.png'
+        print(chosen_file)
+        if not os.path.exists(os.path.join(source_path, chosen_file)):
+            source_jpg = split_stem[0] + '_' + split_stem[1] + '.jpg'  # ¯\_(ツ)_/¯
             s_png = chosen_file
             if os.path.exists(os.path.join(source_path, source_jpg)):
                 print("found jpg: {}".format(source_jpg))
@@ -65,15 +59,21 @@ def fix_manual_cache(input_path, source_path):
                                                                                 os.path.join(source_path, source_jpg)))
                 exit()
         # copy chosen originals to source_chosen
-        file_copy = filepath.stem.split('.')[:-1].join() + '_' + str(x) + 'png'
+        file_copy = filepath.stem + extention
         shutil.move(filepath, os.path.join(dir_to_fix, file_copy))
-        file_copy = chosen_file.split('.')[0] + '_' + str(x) + '.png'
-        shutil.copyfile(os.path.join(source_path, chosen_file), os.path.join(source_chosen, file_copy))
+
+        chosen_file_path = Path(os.path.join(source_path, chosen_file))
+        file_copy = chosen_file_path.stem + '_' + str(x) + '.png'
+        shutil.copyfile(chosen_file_path, os.path.join(source_chosen, file_copy))
+
         # copy the debug frame to debug_dir
-        chosen_file = chosen_file.split('.')[0] + '.jpg'
-        print("debug chosen file: {}".format(chosen_file))
-        file_copy = chosen_file.split('.')[0] + '_' + str(x) + '.jpg'
-        shutil.copyfile(os.path.join(debug_dir, chosen_file), os.path.join(chosen_debug, file_copy))
+        chosen_file = chosen_file_path.stem + '.jpg'
+        file_copy = chosen_file_path.stem + '_' + str(x) + '.jpg'
+        if os.path.exists(os.path.join(debug_dir, chosen_file)):
+            print("debug chosen file: {}".format(chosen_file))
+            shutil.copyfile(os.path.join(debug_dir, chosen_file), os.path.join(chosen_debug, file_copy))
+        else:
+            print("debug file does not exist.")
         x += 1
 
     print("\n\nExamples of the images to fix have been placed in {}.\nPlease open those images for reference.".format(dir_to_fix))
@@ -87,8 +87,15 @@ def fix_manual_cache(input_path, source_path):
                    False,
                    1920,
                    face_type='full_face',
-                   device_args={'multi_gpu': True}
+                   device_args={'multi_gpu': True},
+                   character_number=character
                    )
+    # remove the extra frame underscore
+    for filepath in io.progress_bar_generator(Path_utils.get_image_paths(input_path), "Renaming files."):
+        filepath = Path(filepath)
+        parts = filepath.stem.split('_')
+        file_name = parts[0] + '_' + parts[1] + '_' + parts[3] + filepath.suffix
+        shutil.move(filepath, os.path.join(input_path, file_name))
 
 
 if __name__ == "__main__":
@@ -97,11 +104,12 @@ if __name__ == "__main__":
     subparsers = parser.add_subparsers()
 
     def fix_manual_alignments(arrrgs):
-        fix_manual_cache(arrrgs.input, arrrgs.source)
+        fix_manual_cache(arrrgs.input, arrrgs.source, arrrgs.character)
 
     p = subparsers.add_parser("manual-fix")
     p.add_argument('-i', '--input', type=str, default=DATA_DST_ALIGNED, help='Directory of aligned images you wish to re-do.')
     p.add_argument('-s', '--source', type=str, default='workspace/data_dst', help='Directory of Source Frames.')
+    p.add_argument('--character', type=int, default=0, help='Enter the character Number you wish to track.')
     p.set_defaults(func=fix_manual_alignments)
 
     def clear_workspace(arrrgs):
@@ -138,12 +146,17 @@ if __name__ == "__main__":
                    help="Input directory. A directory containing the files you wish to process.")
     p.add_argument('--output-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="output_dir",
                    help="Output directory. This is where the extracted files will be stored.")
-    p.add_argument('--debug-dir', default=DEBUG_EXTRACTION_DIR, action=FixPathAction, dest="debug_dir", help="Writes debug images to this directory.")
+    p.add_argument('--debug-dir', default=DEBUG_EXTRACTION_DIR, action=FixPathAction, dest="debug_dir",
+                   help="Writes debug images to this directory.")
     p.add_argument('--face-type', dest="face_type",
                    choices=['half_face', 'full_face', 'head', 'full_face_no_align', 'mark_only'], default='full_face',
                    help="Default 'full_face'. Don't change this option, currently all models uses 'full_face'")
     p.add_argument('--detector', dest="detector", choices=['dlib', 'mt', 's3fd', 'manual'], default='s3fd',
-                   help="Type of detector. Default 'dlib'. 'mt' (MTCNNv1) - faster, better, almost no jitter, perfect for gathering thousands faces for src-set. It is also good for dst-set, but can generate false faces in frames where main face not recognized! In this case for dst-set use either 'dlib' with '--manual-fix' or '--detector manual'. Manual detector suitable only for dst-set.")
+                   help="Type of detector. Default 'dlib'. 'mt' (MTCNNv1) - faster, better, almost no jitter, "
+                        "perfect for gathering thousands faces for src-set. It is also good for dst-set, "
+                        "but can generate false faces in frames where main face not recognized! In this case for "
+                        "dst-set use either 'dlib' with '--manual-fix' or '--detector manual'. "
+                        "Manual detector suitable only for dst-set.")
     p.add_argument('--multi-gpu', action="store_true", dest="multi_gpu", default=True, help="Enables multi GPU.")
     p.add_argument('--manual-fix', action="store_true", dest="manual_fix", default=False,
                    help="Enables manual extract only frames where faces were not recognized.")
@@ -155,6 +168,8 @@ if __name__ == "__main__":
                    help="Extract on CPU. Forces to use MT extractor.")
     p.add_argument('--manual', action='store_true', default=False)
     p.add_argument('--character', type=int, required=True, help='Enter the character Number you wish to track. 0=all')
+    p.add_argument('--gamma', type=float, default=1.1,
+                   help='Image brightness may be adjusted for better extractions 1.0=no brightness 1.4=high-brightness')
     p.set_defaults(func=process_extract)
 
     def sort_vgg(arrrgs):
