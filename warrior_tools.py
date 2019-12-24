@@ -196,6 +196,15 @@ if __name__ == "__main__":
     p.add_argument('--input-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir", help="Input directory. A directory containing the files you wish to process.")
     p.set_defaults(func=recover_original_filenames)
 
+    def id_character(arrrgs):
+        from utils import assign_character
+        assign_character.process_character(arrrgs.input, arrrgs.character)
+
+    p = subparsers.add_parser("assign", help="Assign a character ID to images")
+    p.add_argument('-i', '--input', type=str, default=DATA_DST_ALIGNED, help='Directory of images you wish to assign')
+    p.add_argument('-c', '--character', type=int, required=True, help="The Character ID number")
+    p.set_defaults(func=id_character)
+
     def bad_args(arrrgs):
         parser.print_help()
         exit(0)
