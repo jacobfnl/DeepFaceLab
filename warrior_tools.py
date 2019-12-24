@@ -126,7 +126,7 @@ if __name__ == "__main__":
 
     def process_extract(arrrgs):
         os_utils.set_process_lowest_prio()
-        if arrrgs.manual:
+        if arrrgs.manual or arrrgs.character > 0:
             arrrgs.detector = 'manual'
         from mainscripts import Extractor
         Extractor.main(arrrgs.input_dir,
@@ -142,11 +142,11 @@ if __name__ == "__main__":
                        )
 
     p = subparsers.add_parser("extract", help="Extract the faces from a pictures.")
-    p.add_argument('--input-dir', default='workspace/data_dst', action=FixPathAction, dest="input_dir",
+    p.add_argument('--input', default='workspace/data_dst', action=FixPathAction, dest="input_dir",
                    help="Input directory. A directory containing the files you wish to process.")
-    p.add_argument('--output-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="output_dir",
+    p.add_argument('--output', default=DATA_DST_ALIGNED, action=FixPathAction, dest="output_dir",
                    help="Output directory. This is where the extracted files will be stored.")
-    p.add_argument('--debug-dir', default=DEBUG_EXTRACTION_DIR, action=FixPathAction, dest="debug_dir",
+    p.add_argument('--debug', default=DEBUG_EXTRACTION_DIR, action=FixPathAction, dest="debug_dir",
                    help="Writes debug images to this directory.")
     p.add_argument('--face-type', dest="face_type",
                    choices=['half_face', 'full_face', 'head', 'full_face_no_align', 'mark_only'], default='full_face',
@@ -167,7 +167,7 @@ if __name__ == "__main__":
     p.add_argument('--cpu-only', action="store_true", dest="cpu_only", default=False,
                    help="Extract on CPU. Forces to use MT extractor.")
     p.add_argument('--manual', action='store_true', default=False)
-    p.add_argument('--character', type=int, required=True, help='Enter the character Number you wish to track. 0=all')
+    p.add_argument('--character', type=int, required=True, help="Enter the character id you wish to track. \n0=all")
     p.add_argument('--gamma', type=float, default=1.1,
                    help='Image brightness may be adjusted for better extractions 1.0=no brightness 1.4=high-brightness')
     p.set_defaults(func=process_extract)
@@ -178,13 +178,26 @@ if __name__ == "__main__":
         Sorter.main(input_path=arrrgs.input_dir, sort_by_method=arrrgs.sort_by_method)
 
     p = subparsers.add_parser("sort-vgg", help='Sort by VGGFace')
-    p.add_argument('--input-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir", help="Input directory. A directory containing the files you wish to process.")
-    p.add_argument('--by', default='vggface', dest="sort_by_method", choices=("blur", "face", "face-dissim", "face-yaw", "face-pitch", "hist", "hist-dissim", "brightness", "hue", "black", "origname", "oneface", "final", "final-no-blur", "vggface", "test"), help="Method of sorting. 'origname' sort by original filename to recover original sequence." )
+    p.add_argument('--input', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir",
+                   help="Input directory. A directory containing the files you wish to process.")
+    p.add_argument('--by', default='vggface', dest="sort_by_method",
+                   choices=("blur", "face", "face-dissim", "face-yaw", "face-pitch", "hist", "hist-dissim",
+                            "brightness", "hue", "black", "origname", "oneface", "final", "final-no-blur",
+                            "vggface", "test"),
+                   help="Method of sorting. 'origname'=sort by original filename to recover original sequence. "
+                        "'vggface' is default")
     p.set_defaults(func=sort_vgg)
 
     p = subparsers.add_parser("sort-hist", help='Sort by Histogram')
-    p.add_argument('--input-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir", help="Input directory. A directory containing the files you wish to process.")
-    p.add_argument('--by', default='hist', dest="sort_by_method", choices=("blur", "face", "face-dissim", "face-yaw", "face-pitch", "hist", "hist-dissim", "brightness", "hue", "black", "origname", "oneface", "final", "final-no-blur", "vggface", "test"), help="Method of sorting. 'origname' sort by original filename to recover original sequence." )
+    p.add_argument('--input', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir",
+                   help="Input directory. A directory containing the files you wish to process. "
+                        "Default is " + DATA_DST_ALIGNED)
+    p.add_argument('--by', default='hist', dest="sort_by_method",
+                   choices=("blur", "face", "face-dissim", "face-yaw", "face-pitch", "hist", "hist-dissim",
+                            "brightness", "hue", "black", "origname", "oneface", "final", "final-no-blur",
+                            "vggface", "test"),
+                   help="Method of sorting. 'origname' sort by original filename to recover original sequence. "
+                        "'hist' Histogram is default.")
     p.set_defaults(func=sort_vgg)
 
     def recover_original_filenames(arrrgs):
@@ -193,7 +206,8 @@ if __name__ == "__main__":
         Util.recover_original_aligned_filename(input_path=arguments.input_dir)
 
     p = subparsers.add_parser("recover-filenames", help="recover the original file names")
-    p.add_argument('--input-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir", help="Input directory. A directory containing the files you wish to process.")
+    p.add_argument('--input-dir', default=DATA_DST_ALIGNED, action=FixPathAction, dest="input_dir",
+                   help="Input directory. A directory containing the files you wish to process.")
     p.set_defaults(func=recover_original_filenames)
 
     def id_character(arrrgs):
@@ -201,8 +215,9 @@ if __name__ == "__main__":
         assign_character.process_character(arrrgs.input, arrrgs.character)
 
     p = subparsers.add_parser("assign", help="Assign a character ID to images")
-    p.add_argument('-i', '--input', type=str, default=DATA_DST_ALIGNED, help='Directory of images you wish to assign')
-    p.add_argument('-c', '--character', type=int, required=True, help="The Character ID number")
+    p.add_argument('-i', '--input', type=str, default=DATA_DST_ALIGNED, help="Directory of images you wish to assign. "
+                                                                             "Defaults to workspace/data_dst/aligned")
+    p.add_argument('-c', '--character', type=int, required=True, help="The Character ID number (required)")
     p.set_defaults(func=id_character)
 
     def bad_args(arrrgs):
