@@ -106,7 +106,7 @@ if __name__ == "__main__":
     def fix_manual_alignments(arrrgs):
         fix_manual_cache(arrrgs.input, arrrgs.source, arrrgs.character)
 
-    p = subparsers.add_parser("manual-fix", help="")
+    p = subparsers.add_parser("manual-fix", help="Manual fix of mis-alignments.")
     p.add_argument('-i', '--input', type=str, default=DATA_DST_ALIGNED,
                    help='Directory of aligned images you wish to re-do. Default is ' + DATA_DST_ALIGNED)
     p.add_argument('-s', '--source', type=str, default='workspace/data_dst',
@@ -150,7 +150,7 @@ if __name__ == "__main__":
     p.add_argument('--output', default=DATA_DST_ALIGNED, action=FixPathAction, dest="output_dir",
                    help="Output directory. This is where the extracted files will be stored.")
     p.add_argument('--debug', default=DEBUG_EXTRACTION_DIR, action=FixPathAction, dest="debug_dir",
-                   help="Writes debug images to this directory.")
+                   help="Writes debug images to this directory. Default location is: '" + DEBUG_EXTRACTION_DIR + "'")
     p.add_argument('--face-type', dest="face_type",
                    choices=['half_face', 'full_face', 'head', 'full_face_no_align', 'mark_only'], default='full_face',
                    help="Default 'full_face'. Don't change this option, currently all models uses 'full_face'")
