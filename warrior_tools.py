@@ -106,10 +106,13 @@ if __name__ == "__main__":
     def fix_manual_alignments(arrrgs):
         fix_manual_cache(arrrgs.input, arrrgs.source, arrrgs.character)
 
-    p = subparsers.add_parser("manual-fix")
-    p.add_argument('-i', '--input', type=str, default=DATA_DST_ALIGNED, help='Directory of aligned images you wish to re-do.')
-    p.add_argument('-s', '--source', type=str, default='workspace/data_dst', help='Directory of Source Frames.')
-    p.add_argument('--character', type=int, default=0, help='Enter the character Number you wish to track.')
+    p = subparsers.add_parser("manual-fix", help="")
+    p.add_argument('-i', '--input', type=str, default=DATA_DST_ALIGNED,
+                   help='Directory of aligned images you wish to re-do. Default is ' + DATA_DST_ALIGNED)
+    p.add_argument('-s', '--source', type=str, default='workspace/data_dst',
+                   help="Directory of Source Frames. Default is 'workspace/data_dst'")
+    p.add_argument('--character', type=int, default=0, help='Enter the Character ID you wish to track if all of '
+                                                            'your images are all the same character.')
     p.set_defaults(func=fix_manual_alignments)
 
     def clear_workspace(arrrgs):
