@@ -9,8 +9,6 @@ from interact import interact as io
 from pathlib import Path
 import argparse
 
-import tensorflow as tf
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 DATA_DST_ALIGNED = 'workspace/data_dst/aligned'
 DEBUG_EXTRACTION_DIR = 'workspace/data_dst/debug_extraction'
