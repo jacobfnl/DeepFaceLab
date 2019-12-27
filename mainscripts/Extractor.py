@@ -22,30 +22,16 @@ from utils import Path_utils
 from utils.cv2_utils import *
 from utils.DFLJPG import DFLJPG
 from utils.DFLPNG import DFLPNG
+from utils.warriors_image_processing import auto_gamma_image
 
 DEBUG = False
 GAMMA = 1.0
-lut = np.array([i for i in np.arange(0, 256)]).astype("uint8")
-
-
-def set_gamma(gamma=1.1):  # sourced from https://www.pyimagesearch.com/2015/10/05/opencv-gamma-correction/
-    inverse_gamma = 1.0 / gamma
-    globals()['lut'] = np.array([((i / 255.0) ** inverse_gamma) * 255 for i in np.arange(0, 256)]).astype("uint8")
-
-
-def auto_gamma(image_input, yuv_2_bgr_or_rgb=cv2.COLOR_YUV2BGR):
-    brightened = cv2.LUT(image_input, lut)
-    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(6, 4))
-    image_yuv = cv2.cvtColor(brightened, cv2.COLOR_BGR2YUV)
-    luma = image_yuv[:, :, 0]
-    image_yuv[:, :, 0] = clahe.apply(luma)
-    return cv2.cvtColor(image_yuv, yuv_2_bgr_or_rgb)
 
 
 class ExtractSubprocessor(Subprocessor):
     class Data(object):
         def __init__(self, filename=None, rects=None, landmarks=None, landmarks_accurate=True, pitch_yaw_roll=None,
-                     final_output_files=None, size=0, character_number=0, gamma=1.1):
+                     final_output_files=None, size=0, character_number=0, gamma=1.0):
             self.filename = filename
             self.rects = rects or []
             self.rects_rotation = 0
@@ -73,13 +59,13 @@ class ExtractSubprocessor(Subprocessor):
             self.image_size = client_dict['image_size']
             self.character_number = client_dict['character_number']
             self.gamma = client_dict['gamma']
-            set_gamma(self.gamma)
             # transfer and set stdin in order to work code.interact in debug subprocess
             stdin_fd = client_dict['stdin_fd']
             if stdin_fd is not None and DEBUG:
                 sys.stdin = os.fdopen(stdin_fd)
 
             self.cached_image = (None, None)
+            self.detector_image = None
 
             self.e = None
             device_config = nnlib.DeviceConfig(cpu_only=self.cpu_only, force_gpu_idx=self.device_idx, allow_growth=True)
@@ -151,6 +137,7 @@ class ExtractSubprocessor(Subprocessor):
                 if wm + hm != 0:  # fix odd image
                     image = image[0:h - hm, 0:w - wm, :]
                 self.cached_image = (filename_path_str, image)
+                self.detector_image = auto_gamma_image(image, self.gamma)
 
             src_dflimg = None
             h, w, ch = image.shape
@@ -162,22 +149,21 @@ class ExtractSubprocessor(Subprocessor):
                     src_dflimg = DFLJPG.load(str(filename_path))
 
             if 'rects' in self.type:
-                if min(w, h) < 64:
+                if min(w, h) < 48:
                     self.log_err('Image is too small %s : [%d, %d]' % (str(filename_path), w, h))
                     data.rects = []
                 else:
                     for rot in ([0, 90, 270, 180]):
                         data.rects_rotation = rot
                         if rot == 0:
-                            rotated_image = image
+                            rotated_image = self.detector_image
                         elif rot == 90:
-                            rotated_image = image.swapaxes(0, 1)[:, ::-1, :]
+                            rotated_image = self.detector_image.swapaxes(0, 1)[:, ::-1, :]
                         elif rot == 180:
-                            rotated_image = image[::-1, ::-1, :]
+                            rotated_image = self.detector_image[::-1, ::-1, :]
                         elif rot == 270:
-                            rotated_image = image.swapaxes(0, 1)[::-1, :, :]
+                            rotated_image = self.detector_image.swapaxes(0, 1)[::-1, :, :]
 
-                        rotated_image = auto_gamma(rotated_image, cv2.COLOR_YUV2BGR)
                         rects = data.rects = self.e.extract(rotated_image, is_bgr=True)
                         if len(rects) != 0:
                             break
@@ -190,15 +176,13 @@ class ExtractSubprocessor(Subprocessor):
             elif self.type == 'landmarks':
 
                 if data.rects_rotation == 0:
-                    rotated_image = image
+                    rotated_image = self.detector_image
                 elif data.rects_rotation == 90:
-                    rotated_image = image.swapaxes(0, 1)[:, ::-1, :]
+                    rotated_image = self.detector_image.swapaxes(0, 1)[:, ::-1, :]
                 elif data.rects_rotation == 180:
-                    rotated_image = image[::-1, ::-1, :]
+                    rotated_image = self.detector_image[::-1, ::-1, :]
                 elif data.rects_rotation == 270:
-                    rotated_image = image.swapaxes(0, 1)[::-1, :, :]
-
-                rotated_image = auto_gamma(rotated_image, cv2.COLOR_YUV2BGR)
+                    rotated_image = self.detector_image.swapaxes(0, 1)[::-1, :, :]
 
                 data.landmarks = self.e.extract(rotated_image, data.rects, self.second_pass_e if (
                             src_dflimg is None and data.landmarks_accurate) else None, is_bgr=True)
@@ -347,7 +331,7 @@ class ExtractSubprocessor(Subprocessor):
 
     # override
     def __init__(self, input_data, type, face_type=None, debug_dir=None, multi_gpu=False, cpu_only=False, manual=False,
-                 manual_window_size=0, size=0, max_faces_from_image=0, final_output_path=None, character_number=0, gamma=1.1):
+                 manual_window_size=0, size=0, max_faces_from_image=0, final_output_path=None, character_number=0, gamma=1):
         self.input_data = input_data
         self.type = type
         self.face_type = face_type
@@ -383,6 +367,8 @@ class ExtractSubprocessor(Subprocessor):
 
             self.cache_original_image = (None, None)
             self.cache_image = (None, None)
+            self.cache_detector_image = None
+            self.cache_original_detector_image = None
             self.cache_text_lines_img = (None, None)
             self.hide_help = False
             self.landmarks_accurate = True
@@ -452,10 +438,14 @@ class ExtractSubprocessor(Subprocessor):
                 if len(data_rects) == 0:
                     if self.cache_original_image[0] == filename:
                         self.original_image = self.cache_original_image[1]
+                        self.detector_image = self.cache_original_detector_image
                     else:
-                        self.original_image = imagelib.normalize_channels(cv2_imread(filename), 3)
+                        img = cv2_imread(filename)
+                        self.original_image = imagelib.normalize_channels(img, 3)
+                        self.cache_original_detector_image = auto_gamma_image(img, globals()['GAMMA'])
 
                         self.cache_original_image = (filename, self.original_image)
+                        self.cache_detector_image = self.cache_original_detector_image
 
                     (h, w, c) = self.original_image.shape
                     self.view_scale = 1.0 if self.manual_window_size == 0 else self.manual_window_size / (
@@ -463,11 +453,17 @@ class ExtractSubprocessor(Subprocessor):
 
                     if self.cache_image[0] == (h, w, c) + (self.view_scale, filename):
                         self.image = self.cache_image[1]
+                        self.detector_image = self.cache_detector_image
+
                     else:
                         self.image = cv2.resize(self.original_image,
                                                 (int(w * self.view_scale), int(h * self.view_scale)),
                                                 interpolation=cv2.INTER_LINEAR)
                         self.cache_image = ((h, w, c) + (self.view_scale, filename), self.image)
+                        self.detector_image = cv2.resize(self.cache_original_detector_image,
+                                                         (int(w * self.view_scale), int(h * self.view_scale)),
+                                                         interpolation=cv2.INTER_LINEAR)
+                        self.cache_detector_image = self.detector_image
 
                     (h, w, c) = self.image.shape
 
@@ -475,15 +471,14 @@ class ExtractSubprocessor(Subprocessor):
                     if self.cache_text_lines_img[0] == sh:
                         self.text_lines_img = self.cache_text_lines_img[1]
                     else:
-
                         self.text_lines_img = (imagelib.get_draw_text_lines(self.image, sh,
                                                                             ['[Mouse click] - lock/unlock selection',
                                                                              '[Mouse wheel] - change rect',
                                                                              '[-]/[=] - change rectangle size',
                                                                              '[Enter] / [Space] - confirm / skip frame',
-                                                                             '[,] [.]- prev frame, next frame. [Q] - skip remaining frames',
+                                                                             '[,]/[.]- prev frame, next frame. [Q] - skip remaining frames',
                                                                              '[a] - accuracy on/off (more fps)',
-                                                                             '[v], [b] - decrease/increase gamma: {}'.format(
+                                                                             '[v]/[b] - decrease/increase shadow brightness: {}'.format(
                                                                                  globals()['GAMMA']),
                                                                              '[h] - hide this help'
                                                                              ], (1, 1, 1)) * 255).astype(np.uint8)
@@ -576,16 +571,18 @@ class ExtractSubprocessor(Subprocessor):
                         elif key == ord('a'):
                             self.landmarks_accurate = not self.landmarks_accurate
                             break
-                        elif key == ord('b'):
+                        elif key == ord('b') and globals()['GAMMA'] < 2:
                             redraw_needed = True
                             globals()['GAMMA'] += 0.1
-                            set_gamma(globals()['GAMMA'])
-                            print("GAMMA: {}".format(globals()['GAMMA']))
+                            self.cache_original_detector_image = auto_gamma_image(self.original_image, globals()['GAMMA'])
+                            self.cache_detector_image = auto_gamma_image(self.original_image, globals()['GAMMA'])
+                            self.cache_text_lines_img = (None, None)  # force redraw of the text help
                         elif key == ord('v') and globals()['GAMMA'] > 1.09:
                             globals()['GAMMA'] -= 0.1
-                            set_gamma(globals()['GAMMA'])
+                            self.cache_original_detector_image = auto_gamma_image(self.original_image, globals()['GAMMA'])
+                            self.cache_detector_image = auto_gamma_image(self.original_image, globals()['GAMMA'])
                             redraw_needed = True
-                            print("GAMMA: {}".format(globals()['GAMMA']))
+                            self.cache_text_lines_img = (None, None)  # force text help redraw
 
                         if self.x != new_x or \
                                 self.y != new_y or \
@@ -636,9 +633,9 @@ class ExtractSubprocessor(Subprocessor):
             self.image_size = h
 
             if not self.hide_help:
-                image = cv2.addWeighted(self.image, 1.0, self.text_lines_img, 1.0, 0)
+                image = cv2.addWeighted(self.detector_image, 1.0, self.text_lines_img, 1.0, 0)
             else:
-                image = self.image.copy()
+                image = self.detector_image.copy()
 
             view_rect = (np.array(self.rect) * self.view_scale).astype(np.int).tolist()
             view_landmarks = (np.array(self.landmarks) * self.view_scale).astype(np.int).tolist()
@@ -663,9 +660,8 @@ class ExtractSubprocessor(Subprocessor):
             LandmarksProcessor.draw_rect_landmarks(image, view_rect, view_landmarks, self.image_size, self.face_type,
                                                    landmarks_color=landmarks_color)
             self.extract_needed = False
-            gamma_image = auto_gamma(image)
 
-            io.show_image(self.wnd_name, gamma_image)
+            io.show_image(self.wnd_name, image)
         else:
             self.result.append(result)
             io.progress_bar_inc(1)
@@ -799,7 +795,7 @@ def main(input_dir,
          max_faces_from_image=0,
          device_args={},
          character_number: int = 0,
-         gamma=1.1):
+         gamma=1.0):
     input_path = Path(input_dir)
     output_path = Path(output_dir)
     face_type = FaceType.fromString(face_type)
@@ -864,16 +860,18 @@ def main(input_dir,
             io.log_info('Performing 1st pass...')
             data = ExtractSubprocessor([ExtractSubprocessor.Data(filename) for filename in input_path_image_paths],
                                        'rects-' + detector, face_type, debug_dir, size=image_size, multi_gpu=multi_gpu,
-                                       cpu_only=cpu_only, manual=False, max_faces_from_image=max_faces_from_image).run()
+                                       cpu_only=cpu_only, manual=False, max_faces_from_image=max_faces_from_image,
+                                       character_number=character_number, gamma=gamma).run()
 
             io.log_info('Performing 2nd pass...')
             data = ExtractSubprocessor(data, 'landmarks', face_type, debug_dir, size=image_size, multi_gpu=multi_gpu,
-                                       cpu_only=cpu_only, manual=False).run()
+                                       cpu_only=cpu_only, manual=False, character_number=character_number,
+                                       gamma=gamma).run()
 
         io.log_info('Performing 3rd pass...')
         data = ExtractSubprocessor(data, 'final', face_type, debug_dir, size=image_size, multi_gpu=multi_gpu,
                                    cpu_only=cpu_only, manual=False, final_output_path=output_path,
-                                   character_number=character_number).run()
+                                   character_number=character_number, gamma=gamma).run()
         faces_detected += sum([d.faces_detected for d in data])
 
         if manual_fix:
@@ -884,10 +882,11 @@ def main(input_dir,
                 io.log_info('Performing manual fix for %d images...' % (len(fix_data)))
                 fix_data = ExtractSubprocessor(fix_data, 'landmarks', face_type, debug_dir, size=image_size,
                                                manual=True, manual_window_size=manual_window_size,
-                                               character_number=character_number).run()
+                                               character_number=character_number, gamma=gamma).run()
                 fix_data = ExtractSubprocessor(fix_data, 'final', face_type, debug_dir, size=image_size,
                                                multi_gpu=multi_gpu, cpu_only=cpu_only, manual=False,
-                                               final_output_path=output_path, character_number=character_number).run()
+                                               final_output_path=output_path, character_number=character_number,
+                                               gamma=gamma).run()
                 faces_detected += sum([d.faces_detected for d in fix_data])
 
     io.log_info('-------------------------')

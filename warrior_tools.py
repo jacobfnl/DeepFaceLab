@@ -139,7 +139,8 @@ if __name__ == "__main__":
                        arrrgs.manual_window_size,
                        face_type=arrrgs.face_type,
                        device_args={'cpu_only': arrrgs.cpu_only, 'multi_gpu': arrrgs.multi_gpu},
-                       character_number=arrrgs.character
+                       character_number=arrrgs.character,
+                       gamma=arrrgs.gamma
                        )
 
     p = subparsers.add_parser("extract", help="Extract the faces from a pictures.")
@@ -158,7 +159,7 @@ if __name__ == "__main__":
                         "but can generate false faces in frames where main face not recognized! In this case for "
                         "dst-set use either 'dlib' with '--manual-fix' or '--detector manual'. "
                         "Manual detector suitable only for dst-set.")
-    p.add_argument('--multi-gpu', action="store_true", dest="multi_gpu", default=True, help="Enables multi GPU.")
+    p.add_argument('--multi-gpu', action="store_true", dest="multi_gpu", default=False, help="Enables multi GPU.")
     p.add_argument('--manual-fix', action="store_true", dest="manual_fix", default=False,
                    help="Enables manual extract only frames where faces were not recognized.")
     p.add_argument('--manual-output-debug-fix', action="store_true", dest="manual_output_debug_fix", default=False,
