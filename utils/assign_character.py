@@ -24,7 +24,8 @@ def process_character(input_dir, character_id: int):
             io.log_err("{} is not a dfl image file".format(filepath.name))
             continue
         source = dflimg.get_source_filename()
-        split_stem = source.split('_')
+        path_source = Path(source)
+        split_stem = path_source.stem.split('_')
         new_file = split_stem[0] + '_' + split_stem[1] + '_' + str(character_id) + filepath.suffix
         if source == new_file:
             print("character id is already set.")
@@ -35,5 +36,5 @@ def process_character(input_dir, character_id: int):
         except:
             io.log_err("failed to rename {}".format(filepath.name))
 
-        dflimg.embed_and_set(os.path.join(dir, new_file), source_filename=new_file)
+        dflimg.embed_and_set(os.path.join(dir, new_file), source_filename=new_file, character_number=character_id)
 

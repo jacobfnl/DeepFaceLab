@@ -158,33 +158,38 @@ def recover_original_aligned_filename(input_path):
             io.log_err ("%s is not a dfl image file" % (filepath.name) )
             continue
 
-        files += [ [filepath, None, dflimg.get_source_filename(), False] ]
+        files += [ [filepath, None, dflimg.get_source_filename(), False, dflimg.get_character_number()] ]
 
     files_len = len(files)
     for i in io.progress_bar_generator( range(files_len), "Sorting" ):
-        fp, _, sf, converted = files[i]
+        fp, _, sf, converted, cn = files[i]
 
         if converted:
             continue
 
         sf_stem = Path(sf).stem
-
-        files[i][1] = fp.parent / ( sf_stem + '_0' + fp.suffix )
+        generic = ''
+        if cn is None:
+            generic = '_0'
+        files[i][1] = fp.parent / ( sf_stem + generic + fp.suffix )
         files[i][3] = True
         c = 1
 
         for j in range(i+1, files_len):
-            fp_j, _, sf_j, converted_j = files[j]
+            fp_j, _, sf_j, converted_j, cn_j = files[j]
             if converted_j:
                 continue
 
             if sf_j == sf:
-                files[j][1] = fp_j.parent / ( sf_stem + ('_%d' % (c)) + fp_j.suffix )
+                generic = ''
+                if cn_j is None:
+                    generic = "_{}".format(c)
+                files[j][1] = fp_j.parent / ( sf_stem + generic + fp_j.suffix )
                 files[j][3] = True
                 c += 1
 
     for file in io.progress_bar_generator( files, "Renaming", leave=False ):
-        fs, _, _, _ = file
+        fs, _, _, _, _ = file
         dst = fs.parent / ( fs.stem + '_tmp' + fs.suffix )
         try:
             fs.rename (dst)
@@ -192,7 +197,7 @@ def recover_original_aligned_filename(input_path):
             io.log_err ('fail to rename %s' % (fs.name) )
 
     for file in io.progress_bar_generator( files, "Renaming" ):
-        fs, fd, _, _ = file
+        fs, fd, _, _, _ = file
         fs = fs.parent / ( fs.stem + '_tmp' + fs.suffix )
         try:
             fs.rename (fd)
