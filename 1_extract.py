@@ -187,7 +187,7 @@ if __name__ == "__main__":
         time.sleep(1)
         cycle += 1
         logger.debug("cycle: {}".format(cycle))
-        key_id, created, url, uuid, ymd = check_database(db)
+        key_id, created, url, uuid, ymd = check_database()
         if key_id is None:
             continue
 

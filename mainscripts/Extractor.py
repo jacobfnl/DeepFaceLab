@@ -790,7 +790,7 @@ def main(input_dir,
          manual_fix=False,
          manual_output_debug_fix=False,
          manual_window_size=1368,
-         image_size=256,
+         image_size=-1,
          face_type='full_face',
          max_faces_from_image=0,
          device_args={},
@@ -803,8 +803,10 @@ def main(input_dir,
     multi_gpu = device_args.get('multi_gpu', False)
     cpu_only = device_args.get('cpu_only', False)
 
-    image_size = io.input_int("Output image Size (?:help skip:224 (standard) ) : ", 224,
-                              help_message="Select extracted image size. A size of 0 will leave the extracted images unscaled")
+    if image_size == -1:
+        image_size = io.input_int("Output image Size (?:help skip:224 (standard) ) : ", 224,
+                                  help_message="Select extracted image size. A size of 0 "
+                                               "will leave the extracted images unscaled")
 
     if not input_path.exists():
         raise ValueError('Input directory not found. Please ensure it exists.')
