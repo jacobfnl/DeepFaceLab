@@ -26,7 +26,14 @@ def process_character(input_dir, character_id: int):
         source = dflimg.get_source_filename()
         path_source = Path(source)
         split_stem = path_source.stem.split('_')
-        new_file = split_stem[0] + '_' + split_stem[1] + '_' + str(character_id) + filepath.suffix
+        if len(split_stem) > 1:
+            new_file = split_stem[0] + '_' + split_stem[1] + '_' + str(character_id) + filepath.suffix
+        elif len(split_stem):
+            new_file = split_stem[0] + '_' + str(character_id) + filepath.suffix
+        else:
+            print("error with source file names. contact jake!")
+            new_file = split_stem[0]+split_stem[1]+split_stem[2]+split_stem[3]
+            return
         if source == new_file:
             print("character id is already set.")
             continue
