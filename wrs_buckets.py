@@ -19,7 +19,7 @@ def get_film_characters():
 
 def get_dfl_chips(link: str):
     cursor = db.cursor()
-    query = f"SELECT CONTEXT, URL FROM DFLconode WHERE LINK_IDS='{link}'"
+    query = f"SELECT ID, CONTEXT, URL FROM DFLconode WHERE LINK_IDS='{link}'"
     cursor.execute(query)
     result = cursor.fetchall()
     cursor.close()
@@ -45,6 +45,7 @@ if __name__ == "__main__":
     db = open_db_connection()
     film_characters = get_film_characters()
     x = 0
+    errors = []
     for row in film_characters:
         x += 1
         film_kid, link_id = row
@@ -54,11 +55,16 @@ if __name__ == "__main__":
         dfl_conode = get_dfl_chips(link_id)
         io.progress_bar("Collecting files", len(dfl_conode))
         for dfl_row in dfl_conode:
-            frame_str, chip_url = dfl_row
+            dfl_id, frame_str, chip_url = dfl_row
             frame_number = int(frame_str)
             chip_url = server_root + chip_url[4:]
-            frame_url = warriors_source_images.path_for_frame(frame_number)
-            print(f"chip_URL: {chip_url}\tframe:{frame_url}")
+            try:
+                frame_url = warriors_source_images.path_for_frame(frame_number)
+            except ValueError:
+                errors.append(f"err: dfl_row: {dfl_id}, frame: {frame_str}, could not get frame url from frame number.")
+                io.progress_bar_inc(1)
+                continue
+            # print(f"chip_URL: {chip_url}\tframe:{frame_url}")
             c_path = Path(chip_url)
             c_dest = os.path.join(chips_path, c_path.stem + c_path.suffix)
             f_path = Path(frame_url)
@@ -70,6 +76,5 @@ if __name__ == "__main__":
             io.progress_bar_inc(1)
         io.progress_bar_close()
 
-        # copy chips to new directory on server_root+/character_buckets/<link_id>/chips/
-        # copy frames to
-
+    for err in errors:
+        print(err)

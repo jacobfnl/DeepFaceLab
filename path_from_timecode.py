@@ -24,8 +24,7 @@ class WarriorsSourceImages:
 
     def path_for_frame(self, frame_number: int):
         if frame_number < 1 or frame_number > 135216:  # known frame range
-            print('ERROR: frame out of range')
-            exit(-1)
+            raise ValueError('ERROR: frame out of range')
         frame = frame_number // 10000
         return self.base_path + str(frame).zfill(2) + '/warriors_src.' + str(frame_number).zfill(6) + '.png'
 
