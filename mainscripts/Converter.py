@@ -661,7 +661,14 @@ def main (args, device_args):
                     io.log_err ("%s is not a dfl image file" % (filepath.name) )
                     continue
 
+
                 source_filename_stem = Path( dflimg.get_source_filename() ).stem
+                character_number = dflimg.get_character_number()
+                if character_number is not None:
+                    split_stem = source_filename_stem.split('_')
+                    new_file = split_stem[0] + '_' + split_stem[1]
+                    source_filename_stem = new_file
+
                 if source_filename_stem not in alignments.keys():
                     alignments[ source_filename_stem ] = []
 
