@@ -34,10 +34,10 @@ def make_link_paths(link:str):
     frames_path = os.path.join(link_path, "frames")
     if not os.path.exists(frames_path):
         os.makedirs(frames_path)
-    output_path = os.path.join(link_path, "output")
+    output_path = os.path.join(link_path, "output", "_latest")
     if not os.path.exists(output_path):
         os.makedirs(output_path)
-    return link_path, chips_path, frames_path
+    return link_path, chips_path, frames_path, output_path
 
 
 if __name__ == "__main__":
@@ -46,16 +46,18 @@ if __name__ == "__main__":
     film_characters = get_film_characters()
     x = 0
     errors = []
+    clear_alpha_path = os.path.join(server_root, "testing", "clear_alpha.png")
     for row in film_characters:
         x += 1
         film_kid, link_id = row
         print(f"character: {link_id}")
-        link_path, chips_path, frames_path = make_link_paths(link_id)
+        link_path, chips_path, frames_path, output_path = make_link_paths(link_id)
         # grab chips info
         dfl_conode = get_dfl_chips(link_id)
         io.progress_bar("Collecting files", len(dfl_conode))
         for dfl_row in dfl_conode:
             dfl_id, frame_str, chip_url = dfl_row
+            frame_str: str = frame_str.split("_")[0]
             frame_number = int(frame_str)
             chip_url = server_root + chip_url[4:]
             try:
@@ -69,10 +71,13 @@ if __name__ == "__main__":
             c_dest = os.path.join(chips_path, c_path.stem + c_path.suffix)
             f_path = Path(frame_url)
             f_dest = os.path.join(frames_path, f_path.stem + f_path.suffix)
+            out_dest = os.path.join(output_path, f_path.stem + f_path.suffix)
             if not os.path.exists(c_dest):
                 shutil.copyfile(chip_url, c_dest)
             if not os.path.exists(f_dest):
                 shutil.copyfile(frame_url, f_dest)
+            if not os.path.exists(out_dest):
+                shutil.copyfile(clear_alpha_path, out_dest)
             io.progress_bar_inc(1)
         io.progress_bar_close()
 
