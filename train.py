@@ -1,7 +1,7 @@
 import os
 import shutil
 import multiprocessing
-
+import mysql.connector
 from mainscripts import Trainer
 from mainscripts.Util import recover_original_aligned_filename
 from utils import Path_utils, os_utils, db_connection
@@ -15,7 +15,7 @@ data_src = os.path.abspath(os.path.join(src_aligned, os.pardir))
 data_dst = os.path.abspath(os.path.join(dst_aligned, os.pardir))
 
 
-character_bucket = '/media/warriordata/character_bucket'
+character_bucket = '/media/warriordata/character_buckets'
 live_faces = '/media/warriordata/live_faces'
 
 
@@ -24,7 +24,7 @@ class fixPathAction(argparse.Action):
         setattr(namespace, self.dest, os.path.abspath(os.path.expanduser(values)))
 
 
-def process_train(training_data_src_dir,training_data_dst_dir, model_dir, debug_dir, force_gpu_idx):
+def process_train(training_data_src_dir,training_data_dst_dir, model_dir, force_gpu_idx, debug_dir=None):
     os_utils.set_process_lowest_prio()
     args = {'training_data_src_dir': training_data_src_dir,
             'training_data_dst_dir': training_data_dst_dir,
@@ -34,7 +34,7 @@ def process_train(training_data_src_dir,training_data_dst_dir, model_dir, debug_
             'no_preview': False,
             'debug': debug_dir,
             'flask_preview': True,
-            'execute_programs': []
+            'execute_programs': [],
             }
     device_args = {'cpu_only': False,
                    'force_gpu_idx': force_gpu_idx,
@@ -44,23 +44,16 @@ def process_train(training_data_src_dir,training_data_dst_dir, model_dir, debug_
     Trainer.main(args, device_args)
 
 
-
 if __name__ == "__main__":
     multiprocessing.set_start_method("spawn")
     parser = argparse.ArgumentParser()
 
     def process_args(args):
-        print(process_args.__name__)
-        os.environ.setdefault('DB_DB', 'WR')
-        os.environ.setdefault('DB_USER', '')
-        os.environ.setdefault('DB_PASS', '')
-        os.environ.setdefault('DB_ADDRESS', '')
         live_person_uuid = args.live_person
         link_id = args.link_id
         gpu_idx = args.gpu_idx
         training_data_dst_dir = os.path.join(character_bucket, link_id, 'chips')
-        model_dir = 'workspace/model_' + live_person_uuid
-
+        model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'workspace/model_' + live_person_uuid)
         db = db_connection.open_db_connection()
         query = f"SELECT COPYRIGHT FROM inconode where CONTENT_TYPE='extracted' AND DISTRIBUTION='{live_person_uuid}'"
         cursor = db.cursor()
@@ -74,7 +67,6 @@ if __name__ == "__main__":
                   f"or have a different CONTENT_TYPE code in the database.")
             exit(-1)
         training_data_src_dir = os.path.join(live_faces, yymmdd, live_person_uuid, 'chips_224')
-
         process_train(training_data_src_dir=training_data_src_dir, training_data_dst_dir=training_data_dst_dir,
                       model_dir=model_dir, force_gpu_idx=gpu_idx)
 

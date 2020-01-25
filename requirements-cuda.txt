@@ -7,7 +7,10 @@ plaidml==0.6.0
 plaidml-keras==0.5.0
 scikit-image
 tqdm
-ffmpeg-python==0.1.17
+ffmpeg-python
+timecode
+mysql-connector-python==8.0.19
 git+https://www.github.com/keras-team/keras-contrib.git
 Flask==1.1.1
 flask-socketio==4.2.1
+
