@@ -209,7 +209,7 @@ if __name__ == "__main__":
     p = subparsers.add_parser("sort-person", help="Sort the Museum Guest's images")
     p.add_argument('-u', '--person-uuid', dest='person_uuid' )
     p.add_argument('--base', default='/media', help="Default is /media for Linux. Adjust if your filepath base to /warriordata is different (windows or mac)")
-
+    p.set_defaults(func=sort_person)
 
     def sort_vgg(arrrgs):
         os_utils.set_process_lowest_prio()
