@@ -1,17 +1,18 @@
 import os
 import shutil
 import multiprocessing
-
+import platform
 from mainscripts import Extractor
 from mainscripts.Util import recover_original_aligned_filename
-from utils import Path_utils, os_utils
+from utils import Path_utils, os_utils, db_connection
 from interact import interact as io
 from pathlib import Path
 import argparse
-
+import subprocess
 
 DATA_DST_ALIGNED = 'workspace/data_dst/aligned'
 DEBUG_EXTRACTION_DIR = 'workspace/data_dst/debug_extraction'
+live_faces = '/warriordata/live_faces'
 
 class FixPathAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -174,6 +175,42 @@ if __name__ == "__main__":
                    help='Image brightness may be adjusted for better extractions 1.0=no brightness 1.4=high-brightness')
     p.set_defaults(func=process_extract)
 
+
+    def open_file(path):
+        if platform.system() == "Windows":
+            os.startfile(path)
+        elif platform.system() == "Darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+
+
+    def sort_person(arrrgs):
+        os_utils.set_process_lowest_prio()
+        from mainscripts import Sorter
+        person_uuid = arrrgs.person_uuid
+        db = db_connection.open_db_connection()
+        query = f"SELECT COPYRIGHT FROM inconode where CONTENT_TYPE='extracted' AND DISTRIBUTION='{person_uuid}'"
+        cursor = db.cursor()
+        cursor.execute(query)
+        result = cursor.fetchall()
+        yymmdd = ''
+        if len(result):
+            yymmdd = result[0][0]
+        if yymmdd == '':
+            print(f"\nError, could not find person: {person_uuid} \nPerhaps they've not been extracted, "
+                  f"or have a different CONTENT_TYPE code in the database.")
+            exit(-1)
+
+        training_data_src_dir = os.path.join(arrrgs.base, live_faces, yymmdd, person_uuid, 'chips_224')
+        Sorter.main(input_path=training_data_src_dir, sort_by_method='hist')
+        open_file(training_data_src_dir)
+
+    p = subparsers.add_parser("sort-person", help="Sort the Museum Guest's images")
+    p.add_argument('-u', '--person-uuid', dest='person_uuid' )
+    p.add_argument('--base', default='/media', help="Default is /media for Linux. Adjust if your filepath base to /warriordata is different (windows or mac)")
+
+
     def sort_vgg(arrrgs):
         os_utils.set_process_lowest_prio()
         from mainscripts import Sorter
@@ -202,6 +239,7 @@ if __name__ == "__main__":
                         "'hist' Histogram is default.")
     p.set_defaults(func=sort_vgg)
 
+
     def recover_original_filenames(arrrgs):
         os_utils.set_process_lowest_prio()
         from mainscripts import Util
@@ -221,6 +259,9 @@ if __name__ == "__main__":
                                                                              "Defaults to workspace/data_dst/aligned")
     p.add_argument('-c', '--character', type=int, required=True, help="The Character ID number (required)")
     p.set_defaults(func=id_character)
+
+    def sort_person(arrrgs):
+
 
     def bad_args(arrrgs):
         parser.print_help()
