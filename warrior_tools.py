@@ -260,8 +260,6 @@ if __name__ == "__main__":
     p.add_argument('-c', '--character', type=int, required=True, help="The Character ID number (required)")
     p.set_defaults(func=id_character)
 
-    def sort_person(arrrgs):
-
 
     def bad_args(arrrgs):
         parser.print_help()
