@@ -2,9 +2,10 @@ import os
 import shutil
 import multiprocessing
 import platform
+import mysql.connector
 from mainscripts import Extractor
 from mainscripts.Util import recover_original_aligned_filename
-from utils import Path_utils, os_utils, db_connection
+from utils import Path_utils, os_utils
 from interact import interact as io
 from pathlib import Path
 import argparse
@@ -12,7 +13,22 @@ import subprocess
 
 DATA_DST_ALIGNED = 'workspace/data_dst/aligned'
 DEBUG_EXTRACTION_DIR = 'workspace/data_dst/debug_extraction'
-live_faces = '/warriordata/live_faces'
+live_faces = '/media/warriordata/live_faces'
+
+
+def open_db_connection():
+    DB_USER = os.getenv('DB_USER')
+    DB_PASS = os.getenv('DB_PASS')
+    DB_ADDRESS = os.getenv('DB_ADDRESS')
+    DB_DB = os.getenv('DB_DB')
+    config = {
+        'user': DB_USER,
+        'password': DB_PASS,
+        'host': DB_ADDRESS,
+        'database': DB_DB,
+        'raise_on_warnings': True
+    }
+    return mysql.connector.connect(**config)
 
 class FixPathAction(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -182,18 +198,90 @@ if __name__ == "__main__":
         elif platform.system() == "Darwin":
             subprocess.Popen(["open", path])
         else:
-            subprocess.Popen(["xdg-open", path])
+            try:
+                subprocess.Popen([f"nautilus {path} "], shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            except:
+                return
 
 
-    def sort_person(arrrgs):
+    def verify(arrrgs):
+        person_uuid = arrrgs.person_uuid
+        db = open_db_connection()
+        query = f"UPDATE inconode set CONTENT_TYPE='verified', `UPDATE`=NOW() WHERE CONTENT_TYPE='extracted' " \
+                f"AND DISTRIBUTION='{person_uuid}';"
+        cursor = db.cursor()
+        try:
+            cursor.execute(query)
+            db.commit()
+        except mysql.connector.DatabaseError:
+            query = f"SELECT CONTENT_TYPE, `UPDATE` from inconode WHERE DISTRIBUTION='{person_uuid}'"
+            cursor.execute(query)
+            result = cursor.fetchall()
+            print("there was an error trying to verify this person.")
+            for row in result:
+                print(f"{row[1]} - marked: {row[0]}")
+        cursor.close()
+        db.close()
+        print(f"Marked as Sorted-Verified: {person_uuid}")
+
+    p = subparsers.add_parser("verify", help="mark entry as verified.")
+    p.add_argument('-p', '--person-uuid', dest='person_uuid', required=True, help="person to mark as verified.")
+    p.set_defaults(func=verify)
+
+    def mark_unusable(arrrgs):
+        person_uuid = arrrgs.person
+        db = open_db_connection()
+        query = f"UPDATE inconode set CONTENT_TYPE='unusable', `UPDATE`=NOW() WHERE (CONTENT_TYPE='extracted' " \
+                f"OR CONTENT_TYPE='verified') AND DISTRIBUTION='{person_uuid}';"
+        cursor = db.cursor()
+        try:
+            cursor.execute(query)
+            db.commit()
+        except mysql.connector.DatabaseError:
+            query = f"SELECT CONTENT_TYPE, `UPDATE` from inconode WHERE DISTRIBUTION='{person_uuid}'"
+            cursor.execute(query)
+            result = cursor.fetchall()
+            print("there was an error trying to mark this person unusable:")
+            for row in result:
+                print(f"{row[1]} - marked: {row[0]}")
+                if row[0] == 'unusable':
+                    print("already marked unusable!")
+
+        cursor.close()
+        db.close()
+        print(f"Marked as Unusable: {person_uuid}")
+
+    p = subparsers.add_parser("unusable", help="Mark performance as unusable.")
+    p.add_argument('-p', '--person', required=True)
+    p.set_defaults(func=mark_unusable)
+
+    def sort_person(training_dir, person_uuid):
         os_utils.set_process_lowest_prio()
         from mainscripts import Sorter
-        person_uuid = arrrgs.person_uuid
-        db = db_connection.open_db_connection()
-        query = f"SELECT COPYRIGHT FROM inconode where CONTENT_TYPE='extracted' AND DISTRIBUTION='{person_uuid}'"
+        Sorter.main(input_path=training_dir, sort_by_method='hist')
+        print(f"opening directory: {training_dir}")
+        try:
+            open_file(training_dir)
+        except:
+            return
+        print(f"\n\nWhen done verify or mark unusable:\n"
+              f"python warrior_tools.py unusable -p {person_uuid}\n\n"
+              f"python warrior_tools.py verify -p {person_uuid}\n")
+        exit(0)
+
+    def select_query_results(query):
+        db = open_db_connection()
         cursor = db.cursor()
         cursor.execute(query)
         result = cursor.fetchall()
+        cursor.close()
+        db.close()
+        return result
+
+    def sort_live(arrrgs):
+        person_uuid = arrrgs.person_uuid
+        query = f"SELECT COPYRIGHT FROM inconode where CONTENT_TYPE='extracted' AND DISTRIBUTION='{person_uuid}'"
+        result = select_query_results(query)
         yymmdd = ''
         if len(result):
             yymmdd = result[0][0]
@@ -201,15 +289,29 @@ if __name__ == "__main__":
             print(f"\nError, could not find person: {person_uuid} \nPerhaps they've not been extracted, "
                   f"or have a different CONTENT_TYPE code in the database.")
             exit(-1)
-
-        training_data_src_dir = os.path.join(arrrgs.base, live_faces, yymmdd, person_uuid, 'chips_224')
-        Sorter.main(input_path=training_data_src_dir, sort_by_method='hist')
-        open_file(training_data_src_dir)
+        training_data_src_dir = os.path.abspath(os.path.join(live_faces, yymmdd, person_uuid, 'chips_224'))
+        sort_person(training_data_src_dir, person_uuid)
 
     p = subparsers.add_parser("sort-person", help="Sort the Museum Guest's images")
     p.add_argument('-u', '--person-uuid', dest='person_uuid' )
-    p.add_argument('--base', default='/media', help="Default is /media for Linux. Adjust if your filepath base to /warriordata is different (windows or mac)")
-    p.set_defaults(func=sort_person)
+    p.set_defaults(func=sort_live)
+
+    def sort_next(arrrgs):
+        query = "SELECT COPYRIGHT, DISTRIBUTION from inconode where ID>983000 AND CONTENT_TYPE='extracted' limit 1"
+        result = select_query_results(query)
+        yymmdd = ""
+        person_uuid = ""
+        for row in result:
+            yymmdd = row[0]
+            person_uuid = row[1]
+        if yymmdd == "":
+            print("Error, couldn't find the next person.")
+            exit(-2)
+        training_data_src_dir = os.path.abspath(os.path.join(live_faces, yymmdd, person_uuid, 'chips_224'))
+        sort_person(training_data_src_dir, person_uuid)
+
+    p = subparsers.add_parser("next", help="Get and sort next person.")
+    p.set_defaults(func=sort_next)
 
     def sort_vgg(arrrgs):
         os_utils.set_process_lowest_prio()
@@ -268,3 +370,4 @@ if __name__ == "__main__":
     parser.set_defaults(func=bad_args)
     arguments = parser.parse_args()
     arguments.func(arguments)
+
