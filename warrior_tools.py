@@ -207,19 +207,15 @@ if __name__ == "__main__":
     def verify(arrrgs):
         person_uuid = arrrgs.person_uuid
         db = open_db_connection()
-        query = f"UPDATE inconode set CONTENT_TYPE='verified', `UPDATE`=NOW() WHERE CONTENT_TYPE='extracted' " \
-                f"AND DISTRIBUTION='{person_uuid}';"
+        query = f"UPDATE workflow set current_stage='verified', w_04_verified=NOW(), unswappable=0 " \
+                f"WHERE w_03_extract_fin IS NOT NULL AND person_uuid='{person_uuid}';"
+
         cursor = db.cursor()
         try:
             cursor.execute(query)
             db.commit()
         except mysql.connector.DatabaseError:
-            query = f"SELECT CONTENT_TYPE, `UPDATE` from inconode WHERE DISTRIBUTION='{person_uuid}'"
-            cursor.execute(query)
-            result = cursor.fetchall()
-            print("there was an error trying to verify this person.")
-            for row in result:
-                print(f"{row[1]} - marked: {row[0]}")
+            print("there was an error trying to verify this person. perhaps they've not been extracted?")
         cursor.close()
         db.close()
         print(f"Marked as Sorted-Verified: {person_uuid}")
@@ -231,20 +227,20 @@ if __name__ == "__main__":
     def mark_unusable(arrrgs):
         person_uuid = arrrgs.person
         db = open_db_connection()
-        query = f"UPDATE inconode set CONTENT_TYPE='unusable', `UPDATE`=NOW() WHERE (CONTENT_TYPE='extracted' " \
-                f"OR CONTENT_TYPE='verified') AND DISTRIBUTION='{person_uuid}';"
+        query = f"UPDATE workflow SET unswappable=1, `ignore`=1 " \
+                f"WHERE person_uuid='{person_uuid}' AND w_03_extract_fin IS NOT NULL"
         cursor = db.cursor()
         try:
             cursor.execute(query)
             db.commit()
         except mysql.connector.DatabaseError:
-            query = f"SELECT CONTENT_TYPE, `UPDATE` from inconode WHERE DISTRIBUTION='{person_uuid}'"
+            query = f"SELECT unswappable, w_03_extract_fin, from workflow WHERE person_uuid='{person_uuid}'"
             cursor.execute(query)
             result = cursor.fetchall()
             print("there was an error trying to mark this person unusable:")
             for row in result:
                 print(f"{row[1]} - marked: {row[0]}")
-                if row[0] == 'unusable':
+                if row[0] == 1:
                     print("already marked unusable!")
 
         cursor.close()
@@ -280,7 +276,8 @@ if __name__ == "__main__":
 
     def sort_live(arrrgs):
         person_uuid = arrrgs.person_uuid
-        query = f"SELECT COPYRIGHT FROM inconode where CONTENT_TYPE='extracted' AND DISTRIBUTION='{person_uuid}'"
+        query = f"SELECT yymmdd FROM workflow where person_uuid='{person_uuid}' " \
+                f"AND w_03_extract_fin IS NOT NULL AND w_04_verified IS NULL AND unswappable=0"
         result = select_query_results(query)
         yymmdd = ''
         if len(result):
@@ -297,7 +294,8 @@ if __name__ == "__main__":
     p.set_defaults(func=sort_live)
 
     def sort_next(arrrgs):
-        query = "SELECT COPYRIGHT, DISTRIBUTION from inconode where ID>983000 AND CONTENT_TYPE='extracted' limit 1"
+        query = "SELECT yymmdd, person_uuid from workflow where " \
+                "w_03_extract_fin IS NOT NULL AND w_04_verified IS NULL AND unswappable=0"
         result = select_query_results(query)
         yymmdd = ""
         person_uuid = ""

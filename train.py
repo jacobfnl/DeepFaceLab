@@ -4,7 +4,7 @@ import multiprocessing
 import mysql.connector
 from mainscripts import Trainer
 from mainscripts.Util import recover_original_aligned_filename
-from utils import Path_utils, os_utils, db_connection
+from utils import Path_utils, os_utils
 from interact import interact as io
 from pathlib import Path
 from utils.init_workspace import init_workspace
@@ -17,6 +17,21 @@ data_dst = os.path.abspath(os.path.join(dst_aligned, os.pardir))
 
 character_bucket = '/media/warriordata/character_buckets'
 live_faces = '/media/warriordata/live_faces'
+
+
+def open_db_connection():
+    DB_USER = os.getenv('DB_USER')
+    DB_PASS = os.getenv('DB_PASS')
+    DB_ADDRESS = os.getenv('DB_ADDRESS')
+    DB_DB = os.getenv('DB_DB')
+    config = {
+        'user': DB_USER,
+        'password': DB_PASS,
+        'host': DB_ADDRESS,
+        'database': DB_DB,
+        'raise_on_warnings': True
+    }
+    return mysql.connector.connect(**config)
 
 
 class fixPathAction(argparse.Action):
@@ -54,7 +69,7 @@ if __name__ == "__main__":
         gpu_idx = args.gpu_idx
         training_data_dst_dir = os.path.join(character_bucket, link_id, 'chips')
         model_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'workspace/model_' + live_person_uuid)
-        db = db_connection.open_db_connection()
+        db = open_db_connection()
         query = f"SELECT COPYRIGHT FROM inconode where CONTENT_TYPE='extracted' AND DISTRIBUTION='{live_person_uuid}'"
         cursor = db.cursor()
         cursor.execute(query)
